@@ -6,31 +6,33 @@ import { Text } from "../../ui/Text";
 import { BookPickerList } from "../library/components/BookPickerList";
 import { Section } from "../library/components/StyleControls";
 import { DraftField } from "./DraftField";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export type SaveStyle = (patch: ReaderCardStylePatch) => Promise<boolean>;
 type Book = Record<string, unknown>;
 
 function NoteField({ signature, onChange, flushRef }: { signature: ChosenSignature; onChange: SaveStyle; flushRef: RefObject<() => void> }) {
-  return <DraftField label="Note" initial={signature.note} max={SIGNATURE_NOTE_MAX} onSave={(note) => onChange({ signature: { bookKey: signature.bookKey, note } })} flushRef={flushRef} />;
+  const t = useT();
+  return <DraftField label={t("readerCard.note")} initial={signature.note} max={SIGNATURE_NOTE_MAX} onSave={(note) => onChange({ signature: { bookKey: signature.bookKey, note } })} flushRef={flushRef} />;
 }
 
 export function SignatureChoice({ books, signature, chosen, onChange }: { books: Book[]; signature: ChosenSignature | null; chosen?: ReaderCardChosen["signature"]; onChange: SaveStyle }) {
+  const t = useT();
   const { colors } = useTheme();
   const finished = useMemo(() => books.filter(isFinishedBook), [books]);
   const [picking, setPicking] = useState(false);
   const flushNote = useRef<() => void>(() => {});
   return (
-    <Section title="Signature book">
+    <Section title={t("readerCard.signatureBook")}>
       {signature && chosen ? <Text style={[typography.body, { color: colors.text }]}>{chosen.title} <Text style={{ color: colors.textDim }}>— {chosen.author}</Text></Text> : null}
-      {signature && !chosen ? <Text style={[typography.body, { color: colors.textDim }]}>No longer in your library.</Text> : null}
-      {!signature && finished.length === 0 ? <Text style={[typography.body, { color: colors.textDim }]}>Finish a book to choose your signature book.</Text> : null}
+      {signature && !chosen ? <Text style={[typography.body, { color: colors.textDim }]}>{t("readerCard.noLongerInLibrary")}</Text> : null}
+      {!signature && finished.length === 0 ? <Text style={[typography.body, { color: colors.textDim }]}>{t("readerCard.finishToChoose")}</Text> : null}
       <View style={styles.actions}>
-        {finished.length > 0 ? <Button label={signature ? "Change" : "Choose"} variant="secondary" onPress={() => setPicking(true)} /> : null}
-        {signature ? <Button label="Remove" variant="secondary" onPress={() => { flushNote.current(); void onChange({ signature: null }); }} /> : null}
+        {finished.length > 0 ? <Button label={signature ? t("readerCard.change") : t("readerCard.choose")} variant="secondary" onPress={() => setPicking(true)} /> : null}
+        {signature ? <Button label={t("tierlists.remove")} variant="secondary" onPress={() => { flushNote.current(); void onChange({ signature: null }); }} /> : null}
       </View>
       {signature && chosen ? <NoteField key={signature.bookKey} signature={signature} onChange={onChange} flushRef={flushNote} /> : null}
-      <Sheet visible={picking} title="Choose your signature book" onClose={() => setPicking(false)}>
+      <Sheet visible={picking} title={t("readerCard.chooseSignature")} onClose={() => setPicking(false)}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>
           <BookPickerList
             books={finished}
@@ -50,6 +52,7 @@ export function SignatureChoice({ books, signature, chosen, onChange }: { books:
 
 export function HighlightChoice({ books, highlight, chosen, onChange }: { books: Book[]; highlight: ChosenHighlight | null; chosen?: ReaderCardChosen["highlight"]; onChange: SaveStyle }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const withPassages = useMemo(() => books.filter((book) => bookPassages(book, locale).length > 0), [books, locale]);
   const [picking, setPicking] = useState(false);
@@ -64,20 +67,20 @@ export function HighlightChoice({ books, highlight, chosen, onChange }: { books:
     </Pressable>
   ));
   return (
-    <Section title="Highlight">
+    <Section title={t("readerCard.highlight")}>
       {highlight && chosen ? <Text style={[typography.body, styles.quote, { color: colors.text }]}>“{chosen.text}” <Text style={{ color: colors.textDim }}>— {chosen.title}</Text></Text> : null}
-      {highlight && !chosen ? <Text style={[typography.body, { color: colors.textDim }]}>No longer in your library.</Text> : null}
-      {withPassages.length === 0 ? <Text style={[typography.body, { color: colors.textDim }]}>No Kobo highlights yet.</Text> : null}
+      {highlight && !chosen ? <Text style={[typography.body, { color: colors.textDim }]}>{t("readerCard.noLongerInLibrary")}</Text> : null}
+      {withPassages.length === 0 ? <Text style={[typography.body, { color: colors.textDim }]}>{t("readerCard.noKoboHighlights")}</Text> : null}
       <View style={styles.actions}>
-        {withPassages.length > 0 ? <Button label={highlight ? "Change" : "Choose"} variant="secondary" onPress={() => setPicking(true)} /> : null}
-        {highlight ? <Button label="Remove" variant="secondary" onPress={() => void onChange({ highlight: null })} /> : null}
+        {withPassages.length > 0 ? <Button label={highlight ? t("readerCard.change") : t("readerCard.choose")} variant="secondary" onPress={() => setPicking(true)} /> : null}
+        {highlight ? <Button label={t("tierlists.remove")} variant="secondary" onPress={() => void onChange({ highlight: null })} /> : null}
       </View>
-      <Sheet visible={picking} title="Choose a highlight" onClose={close}>
+      <Sheet visible={picking} title={t("readerCard.chooseHighlight")} onClose={close}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>
-          <Input label="Search your highlights" value={query} onChangeText={setQuery} autoCapitalize="none" autoCorrect={false} returnKeyType="search" />
-          {query.trim() ? (matches.length ? list(matches) : <Text style={[typography.body, { color: colors.textDim }]}>No highlights match.</Text>) : browsing ? (
+          <Input label={t("readerCard.searchHighlights")} value={query} onChangeText={setQuery} autoCapitalize="none" autoCorrect={false} returnKeyType="search" />
+          {query.trim() ? (matches.length ? list(matches) : <Text style={[typography.body, { color: colors.textDim }]}>{t("readerCard.noHighlightsMatch")}</Text>) : browsing ? (
             <>
-              <Button label="Back to books" variant="secondary" onPress={() => setBrowsing(null)} />
+              <Button label={t("murals.backToBooks")} variant="secondary" onPress={() => setBrowsing(null)} />
               {list(bookPassages(browsing, locale))}
             </>
           ) : (

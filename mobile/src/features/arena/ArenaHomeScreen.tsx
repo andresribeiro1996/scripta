@@ -11,6 +11,7 @@ import { GameRow, type RowCover } from "../community/DiscoverRow";
 import { deleteQuiz, fetchQuizzes, type Quiz } from "../quizzes/api";
 import { deleteTierlist, fetchTierlists, fetchVotedTierlists, type Tierlist, type VotedTierlist } from "../tierlists/api";
 import { deleteTournament, fetchMyTournaments, fetchVotedTournaments, type Tournament } from "./api";
+import { useLocale, useT } from "../../i18n";
 import {
   DELETE_EFFECT,
   GAMES_TABS,
@@ -35,6 +36,8 @@ const noVoted = { data: [], isPending: false, isRefetching: false, isError: fals
 const OWNER_FILTER_ICONS: Record<OwnerFilter, IconName> = { all: "filter", mine: "profile", voted: "vote" };
 
 export function ArenaHomeScreen() {
+  const t = useT();
+  const locale = useLocale();
   const { colors } = useTheme();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<GamesTab>(GAMES_TABS[0].value);
@@ -68,7 +71,7 @@ export function ArenaHomeScreen() {
       }
       setDeleting(null);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Couldn't delete that item.");
+      setError(reason instanceof Error ? reason.message : t("arena.deleteFailed"));
     } finally {
       setBusy(false);
     }
@@ -86,22 +89,22 @@ export function ArenaHomeScreen() {
     <Stack.Screen
       options={{
         headerShown: true,
-        title: "Games",
+        title: t("shell.tabGames"),
         // The bottom tab already reads "Arena"; a large title spends a third of
         // the screen repeating it above a list that has nowhere else to go.
         headerLargeTitleEnabled: false,
-        headerRight: () => <IconButton name="champion" accessibilityLabel="Top Shelf" onPress={() => router.push("/top-shelf" as never)} />,
+        headerRight: () => <IconButton name="champion" accessibilityLabel={t("sharing.topShelf")} onPress={() => router.push("/top-shelf" as never)} />,
       }}
     />
     {error ? <Toast visible message={error} tone="error" /> : null}
     <SwipeableTabs
-      accessibilityLabel="Games section"
-      options={GAMES_TABS}
+      accessibilityLabel={t("arena.gamesSection")}
+      options={GAMES_TABS.map((option) => ({ value: option.value, label: t(option.labelKey) }))}
       value={tab}
       onChange={setTab}
       renderPage={(pageTab) => {
-        if (pageTab === "browse") return <DiscoverPane fab={<Fab label="New" accessibilityLabel="New game" onPress={() => setChoosing(true)} />} />;
-        const owned = ownedItems(pageTab, tournaments.data ?? [], tierlists.data ?? [], quizzes.data ?? []);
+        if (pageTab === "browse") return <DiscoverPane fab={<Fab label={t("arena.fabNew")} accessibilityLabel={t("arena.newGame")} onPress={() => setChoosing(true)} />} />;
+        const owned = ownedItems(pageTab, tournaments.data ?? [], tierlists.data ?? [], locale, quizzes.data ?? []);
         const voted = pageTab === "tournaments" ? votedTournaments : pageTab === "tierlists" ? votedTierlists : noVoted;
         return <ArenaList
           tab={pageTab}
@@ -115,20 +118,20 @@ export function ArenaHomeScreen() {
           onOpen={open}
           onDelete={setDeleting}
           fab={<Fab
-            label="New"
-            accessibilityLabel={pageTab === "tournaments" ? "New tournament" : pageTab === "quizzes" ? "New quiz" : "New tier list"}
+            label={t("arena.fabNew")}
+            accessibilityLabel={t(pageTab === "tournaments" ? "arena.newTournament" : pageTab === "quizzes" ? "arena.newQuiz" : "arena.newTierlist")}
             onPress={() => router.push(NEW_GAMES.find((option) => option.tab === pageTab)!.href as never)}
           />}
         />;
       }}
     />
-    <Dialog visible={deleting !== null} title={`Delete “${deleting?.name ?? ""}”?`} onClose={() => setDeleting(null)}><View style={styles.dialog}><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{deleting ? `${DELETE_EFFECT[deleting.kind]} This can't be undone.` : ""}</Text><Button label="Delete" variant="destructive" loading={busy} onPress={() => void remove()} /></View></Dialog>
-    <Sheet visible={choosing} title="New game" onClose={() => setChoosing(false)}>
+    <Dialog visible={deleting !== null} title={t("arena.deleteTitle", { name: deleting?.name ?? "" })} onClose={() => setDeleting(null)}><View style={styles.dialog}><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{deleting ? t(DELETE_EFFECT[deleting.kind]) : ""}</Text><Button label={t("library.delete")} variant="destructive" loading={busy} onPress={() => void remove()} /></View></Dialog>
+    <Sheet visible={choosing} title={t("arena.newGame")} onClose={() => setChoosing(false)}>
       <View style={styles.dialog}>
         {NEW_GAMES.map((option) => (
           <Button
             key={option.href}
-            label={option.label}
+            label={t(option.labelKey)}
             variant="secondary"
             onPress={() => {
               setChoosing(false);
@@ -169,34 +172,36 @@ function ArenaList({
   onDelete: (doomed: Doomed) => void;
   fab: ReactNode;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const { colors } = useTheme();
   const [search, setSearch] = useState("");
   const [owner, setOwner] = useState<OwnerFilter>("all");
   const filtering = rowCount > 0;
   const activeOwner = filtering ? owner : "all";
-  const visible = homeSections(tab, owned, votedTournaments, votedTierlists, activeOwner, filtering ? search : "");
-  const empty = emptyCopy(tab, filtering && search.trim() !== "", activeOwner);
+  const visible = homeSections(tab, owned, votedTournaments, votedTierlists, locale, activeOwner, filtering ? search : "");
+  const empty = emptyCopy(tab, filtering && search.trim() !== "", locale, activeOwner);
   const votedUnknown = activeOwner === "voted" && (votedQuery.isPending || votedQuery.isError);
-  const noun = tab === "tournaments" ? "tournaments" : tab === "tierlists" ? "tier lists" : "quizzes";
+  const searchLabel = t(tab === "tournaments" ? "arena.searchTournaments" : tab === "tierlists" ? "arena.searchTierlists" : "arena.searchQuizzes");
   const ownerOption = OWNER_FILTERS.find((option) => option.value === owner)!;
 
   return <SearchDock
     value={search}
     onChangeText={setSearch}
-    accessibilityLabel={`Search ${noun}`}
-    placeholder={`Search ${noun}`}
+    accessibilityLabel={searchLabel}
+    placeholder={searchLabel}
     hidden={!filtering}
     fab={filtering || query.isPending || query.isError ? fab : undefined}
     cycle={tab === "quizzes" ? undefined : {
       icon: OWNER_FILTER_ICONS[owner],
       active: owner !== "all",
-      accessibilityLabel: `Showing ${ownerOption.label.toLowerCase()}`,
-      accessibilityHint: "Switches to the next filter",
+      accessibilityLabel: t("shell.showingType", { type: t(ownerOption.labelKey).toLowerCase() }),
+      accessibilityHint: t("arena.filterHint"),
       onPress: () => setOwner(nextOwnerFilter(owner)),
     }}
   >
     {(scrollProps) => query.isPending ? <View style={styles.page}><Skeleton height={160} /></View>
-      : query.isError ? <View style={styles.page}><ErrorState body={query.error instanceof Error ? query.error.message : "Couldn't load this list."} actionLabel="Retry" onAction={() => void query.refetch()} /></View>
+      : query.isError ? <View style={styles.page}><ErrorState body={query.error instanceof Error ? query.error.message : t("arena.listLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void query.refetch()} /></View>
       : <FlatList
       {...scrollProps}
       data={visible}
@@ -208,12 +213,12 @@ function ArenaList({
         void votedQuery.refetch();
       }}
       ListEmptyComponent={votedUnknown ? undefined : <View style={styles.page}><EmptyState title={empty.title} body={empty.body} actionLabel={empty.action} onAction={empty.action ? () => router.push(NEW_GAMES.find((option) => option.tab === tab)!.href as never) : undefined} /></View>}
-      ListFooterComponent={votedQuery.isError ? <View style={styles.page}><ErrorState body="Couldn't load the games you voted in." actionLabel="Retry" onAction={() => void votedQuery.refetch()} /></View> : undefined}
+      ListFooterComponent={votedQuery.isError ? <View style={styles.page}><ErrorState body={t("arena.votedLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void votedQuery.refetch()} /></View> : undefined}
       renderItem={({ item }) => {
         if (item.kind === "header") {
           return <Text {...dynamicType} style={[typography.title, styles.sectionHeader, styles.strong, { color: colors.text }]}>{item.title}</Text>;
         }
-        const row = gameRow(item);
+        const row = gameRow(item, locale);
         if (item.kind === "owned") {
           const covers: RowCover[] = item.item.kind === "tierlist" ? tierlistRowCovers(item.item.source, byWork) : row.covers;
           return <GameRow {...row} covers={covers} onPress={() => onOpen(item.item)} onDelete={() => onDelete({ kind: item.item.kind, id: item.item.id, name: item.item.name })} />;

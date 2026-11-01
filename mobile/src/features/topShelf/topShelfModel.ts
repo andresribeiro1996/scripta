@@ -1,43 +1,46 @@
-import { tierBand, type TopShelf, type TopShelfBoard, type TopShelfGame, type TopShelfPeriod, type TopShelfView } from "@scripta/shared";
-import { getLocale } from "../../i18n";
+import { genreLabel, isBookGenre, tierBand, type TopShelf, type TopShelfBoard, type TopShelfGame, type TopShelfPeriod, type TopShelfView } from "@scripta/shared";
+import type { Locale } from "@scripta/shared/i18n";
+import { translatorFor, type MessageKey } from "../../i18n";
 
 export const BOARD_ORDER: TopShelfBoard[] = ["crowned", "tiered", "highestTier", "quizzed", "risingStar"];
 
-const TITLES: Record<Exclude<TopShelfView, "champions">, string> = {
-  crowned: "Most crowned",
-  tiered: "Most tiered",
-  highestTier: "Highest tier",
-  quizzed: "Most quizzed",
-  risingStar: "Rising star",
-  games: "Hottest games",
-};
+const TITLES = {
+  crowned: "sharing.titleCrowned",
+  tiered: "sharing.titleTiered",
+  highestTier: "sharing.titleHighestTier",
+  quizzed: "sharing.titleQuizzed",
+  risingStar: "sharing.titleRisingStar",
+  games: "sharing.hottestGames",
+} as const satisfies Record<Exclude<TopShelfView, "champions">, MessageKey>;
 
 const VIEWS: readonly string[] = [...BOARD_ORDER, "champions", "games"];
 
 export const isTopShelfView = (view: string): view is TopShelfView => VIEWS.includes(view);
 
-const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+export const genreName = (genre: string, locale: Locale) => (isBookGenre(genre) ? genreLabel(genre, locale) : genre);
 
-export function boardTitle(view: TopShelfView, genre: string | null): string {
-  if (view === "champions") return genre ? `${genre} champions` : "Champions";
-  return TITLES[view];
+export function boardTitle(view: TopShelfView, genre: string | null, locale: Locale): string {
+  const t = translatorFor(locale);
+  if (view === "champions") return genre ? t("sharing.genreChampions", { genre: genreName(genre, locale) }) : t("sharing.champions");
+  return t(TITLES[view]);
 }
 
-export function valueLabel(board: TopShelfBoard, value: number): string {
+export function valueLabel(board: TopShelfBoard, value: number, locale: Locale): string {
+  const t = translatorFor(locale);
   switch (board) {
-    case "crowned": return plural(value, "title", "titles");
-    case "tiered": return plural(value, "list", "lists");
-    case "highestTier": return tierBand(value, getLocale());
-    case "quizzed": return plural(value, "quiz", "quizzes");
-    case "risingStar": return plural(value, "game", "games");
-    case "champions": return `${value} pts`;
+    case "crowned": return t("sharing.valueCrowned", { count: value });
+    case "tiered": return t("sharing.valueTiered", { count: value });
+    case "highestTier": return tierBand(value, locale);
+    case "quizzed": return t("sharing.valueQuizzed", { count: value });
+    case "risingStar": return t("sharing.valueRisingStar", { count: value });
+    case "champions": return t("sharing.valueChampions", { count: value });
   }
 }
 
 export const gameScore = (game: TopShelfGame) => game.likes + game.votes + game.comments;
 
-export function gameScoreLabel(game: TopShelfGame): string {
-  return plural(gameScore(game), "interaction", "interactions");
+export function gameScoreLabel(game: TopShelfGame, locale: Locale): string {
+  return translatorFor(locale)("sharing.interactions", { count: gameScore(game) });
 }
 
 export function barFraction(board: TopShelfBoard, value: number, leader: number): number {

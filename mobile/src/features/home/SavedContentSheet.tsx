@@ -6,12 +6,14 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { EmptyState, ErrorState, SheetHeader, Skeleton, Toast, spacing, useTheme } from "../../ui";
 import { useAuth } from "../../core/auth";
 import { openProfile } from "../community/AuthorAvatar";
+import { useT } from "../../i18n";
 import { fetchSavedContent } from "../community/api";
 import { FeedRow, useSkipEmptyPages } from "./FeedRow";
 import { digestRoute } from "./feedRowModel";
 import { SAVED_QUERY_KEY, type HomeActions } from "./useHomeActions";
 
 export function SavedContentSheet({ actions, onClose }: { actions: HomeActions; onClose: () => void }) {
+  const t = useT();
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -21,9 +23,9 @@ export function SavedContentSheet({ actions, onClose }: { actions: HomeActions; 
   useSkipEmptyPages(query, items.length);
   return <BottomSheet isPresented onDismiss={onClose} snapPoints={["full"]} containerColor={colors.background} contentPadding={0}>
     <RNHostView><View style={{ width: Math.min(width, 560), alignSelf: "center", flexGrow: 1, height: 0, paddingBottom: Math.max(insets.bottom, spacing.lg) }}>
-      <View style={{ paddingHorizontal: spacing.lg }}><SheetHeader title="Saved for later" onClose={onClose} /></View>
+      <View style={{ paddingHorizontal: spacing.lg }}><SheetHeader title={t("community.savedForLater")} onClose={onClose} /></View>
       {actions.error ? <Toast visible message={actions.error} tone="error" /> : null}
-      <FlatList style={{ flex: 1 }} contentContainerStyle={{ paddingTop: spacing.sm, paddingBottom: spacing.md }} data={items} keyExtractor={(item) => `${item.kind}:${item.id}`} renderItem={({ item }) => <FeedRow item={item} actions={actions} isSaved onOpen={() => { onClose(); router.push(digestRoute(item) as never); }} onOpenProfile={(username) => { onClose(); openProfile(username); }} />} ListEmptyComponent={query.isPending ? <Skeleton height={80} /> : query.isError ? <ErrorState body="Couldn't load saved items." actionLabel="Retry" onAction={() => void query.refetch()} /> : query.hasNextPage ? undefined : <EmptyState title="Nothing saved yet" body="Bookmark a game or mural to find it here." />} ListFooterComponent={query.isFetchingNextPage ? <Skeleton height={48} /> : query.isFetchNextPageError ? <ErrorState body="Couldn't load more saved items." actionLabel="Retry" onAction={() => void query.fetchNextPage()} /> : undefined} onEndReached={() => { if (query.hasNextPage && !query.isFetchingNextPage && !query.isFetchNextPageError) void query.fetchNextPage(); }} />
+      <FlatList style={{ flex: 1 }} contentContainerStyle={{ paddingTop: spacing.sm, paddingBottom: spacing.md }} data={items} keyExtractor={(item) => `${item.kind}:${item.id}`} renderItem={({ item }) => <FeedRow item={item} actions={actions} isSaved onOpen={() => { onClose(); router.push(digestRoute(item) as never); }} onOpenProfile={(username) => { onClose(); openProfile(username); }} />} ListEmptyComponent={query.isPending ? <Skeleton height={80} /> : query.isError ? <ErrorState body={t("community.savedLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void query.refetch()} /> : query.hasNextPage ? undefined : <EmptyState title={t("community.nothingSavedTitle")} body={t("community.nothingSavedBody")} />} ListFooterComponent={query.isFetchingNextPage ? <Skeleton height={48} /> : query.isFetchNextPageError ? <ErrorState body={t("community.moreSavedLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void query.fetchNextPage()} /> : undefined} onEndReached={() => { if (query.hasNextPage && !query.isFetchingNextPage && !query.isFetchNextPageError) void query.fetchNextPage(); }} />
     </View></RNHostView>
   </BottomSheet>;
 }

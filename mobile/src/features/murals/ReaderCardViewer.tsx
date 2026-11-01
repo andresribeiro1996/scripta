@@ -3,12 +3,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { hasChosen, type ReaderCardBase } from "@scripta/shared";
 import { Icon, minimumTouchTarget, radii, spacing, typography, useReducedMotion, useTheme } from "../../ui";
 import { Text } from "../../ui/Text";
+import { useT } from "../../i18n";
 import { PLATE_RATIO } from "./ReaderCardImage";
 import { ReaderCardTurner } from "./ReaderCardTurner";
 
 const BACKDROP = "rgba(0, 0, 0, 0.7)";
 
 export function ReaderCardViewer({ input, onClose, onEdit }: { input: ReaderCardBase; onClose: () => void; onEdit?: () => void }) {
+  const t = useT();
   const { colors } = useTheme();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -23,10 +25,10 @@ export function ReaderCardViewer({ input, onClose, onEdit }: { input: ReaderCard
           <View style={[styles.bar, { width }]}>
             {onEdit && input.view === "owner" ? (
               <Pressable accessibilityRole="button" onPress={onEdit} style={[styles.pill, { backgroundColor: colors.surface }]}>
-                <Text style={[typography.body, { color: colors.text }]}>Edit card</Text>
+                <Text style={[typography.body, { color: colors.text }]}>{t("murals.editCard")}</Text>
               </Pressable>
             ) : <View />}
-            <Pressable accessibilityLabel="Close reader card" accessibilityRole="button" hitSlop={8} onPress={onClose} style={[styles.close, { backgroundColor: colors.surface }]}>
+            <Pressable accessibilityLabel={t("murals.closeReaderCard")} accessibilityRole="button" hitSlop={8} onPress={onClose} style={[styles.close, { backgroundColor: colors.surface }]}>
               <Icon name="close" color={colors.text} />
             </Pressable>
           </View>

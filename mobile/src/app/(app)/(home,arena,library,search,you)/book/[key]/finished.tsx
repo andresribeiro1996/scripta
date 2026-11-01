@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import type { ReadSnapshot } from "@scripta/shared";
 import { FinishedScreen } from "@/features/library/FinishedScreen";
 import { useBook } from "@/features/library/hooks/useBook";
+import { useT } from "@/i18n";
 import { ErrorState, Screen, Skeleton } from "@/ui";
 
 // Expo Router already URI-decodes route params, so `before` arrives as
@@ -20,13 +21,14 @@ function parseBefore(raw: string | undefined): ReadSnapshot | null {
 }
 
 export default function FinishedRoute() {
+  const t = useT();
   const { key, before } = useLocalSearchParams<{ key: string; before?: string }>();
   const { book, loading } = useBook(key);
   const snapshot = parseBefore(before);
   return (
     <Screen top={false}>
       {loading ? <Skeleton height={180} /> : !book ? (
-        <ErrorState title="Book not found" body="It may have been removed from your library." actionLabel="Close" onAction={() => router.back()} />
+        <ErrorState title={t("shell.bookNotFound")} body={t("shell.bookRemovedHint")} actionLabel={t("shell.close")} onAction={() => router.back()} />
       ) : <FinishedScreen book={book} before={snapshot} onClose={() => router.back()} />}
     </Screen>
   );

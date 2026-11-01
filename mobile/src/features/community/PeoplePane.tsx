@@ -8,8 +8,10 @@ import { useDebouncedValue } from "../library/lib/debounce";
 import { fetchSuggestedPeople, searchPeople } from "./api";
 import { PersonRow } from "./PersonRow";
 import { useFollowToggle } from "./useFollowToggle";
+import { useT } from "../../i18n";
 
 export function PeoplePane() {
+  const t = useT();
   const { colors } = useTheme();
   const [query, setQuery] = useState("");
   const { busyId, error, toggle } = useFollowToggle();
@@ -40,30 +42,30 @@ export function PeoplePane() {
           ListHeaderComponent={
             <>
               <Input
-                label="Search people"
+                label={t("community.searchPeople")}
                 value={query}
                 onChangeText={setQuery}
-                placeholder="Search by username"
+                placeholder={t("community.searchByUsername")}
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="search"
               />
               {needle.length === 0 && results.length > 0 ? (
                 <Text accessibilityRole="header" {...dynamicType} style={[typography.caption, styles.suggestionsCaption, { color: colors.textDim }]}>
-                  Readers you might like
+                  {t("book.readersYouMightLike")}
                 </Text>
               ) : null}
             </>
           }
           ListEmptyComponent={
             needle.length === 0 && suggested.isError ? (
-              <ErrorState title="Couldn't load suggestions." actionLabel="Retry" onAction={() => void suggested.refetch()} />
+              <ErrorState title={t("community.suggestionsLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void suggested.refetch()} />
             ) : needle.length > 0 && people.isError ? (
-              <ErrorState title="Couldn't search." actionLabel="Retry" onAction={() => void people.refetch()} />
+              <ErrorState title={t("community.searchFailed")} actionLabel={t("shell.retry")} onAction={() => void people.refetch()} />
             ) : needle.length > 0 && !people.isPending ? (
-              <EmptyState title="No people found" body="Try another username." />
+              <EmptyState title={t("community.noPeopleTitle")} body={t("community.noPeopleBody")} />
             ) : (
-              <EmptyState title="Find people" body="Search a username to follow them." />
+              <EmptyState title={t("community.findPeople")} body={t("community.findPeopleBody")} />
             )
           }
           renderItem={({ item }) => <PersonRow person={item} busy={busyId === item.user.userId} onToggleFollow={() => void toggle(item)} />}

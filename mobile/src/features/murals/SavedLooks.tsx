@@ -7,10 +7,11 @@ import { useAuth } from "../../core/auth";
 import { Button, Input } from "../../ui";
 import { Text } from "../../ui/Text";
 import { spacing, typography, useTheme } from "../../ui/theme";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export function SavedLooks({ style, onApply }: { style: BlockStyle; onApply: (style: BlockStyle) => void }) {
   const locale = useLocale();
+  const t = useT();
   const { user } = useAuth();
   const { colors } = useTheme();
   const client = useQueryClient();
@@ -24,18 +25,18 @@ export function SavedLooks({ style, onApply }: { style: BlockStyle; onApply: (st
   });
   const ready = !!user && looks.isSuccess && !looks.isFetching && !save.isPending;
   return <View style={{ gap: spacing.sm }}>
-    <Text style={[typography.caption, { color: colors.textDim }]}>Saved on this device for your account. The same name replaces a look.</Text>
-    {looks.isPending ? <Text style={typography.caption}>Loading looks…</Text> : null}
+    <Text style={[typography.caption, { color: colors.textDim }]}>{t("murals.savedLooksNote")}</Text>
+    {looks.isPending ? <Text style={typography.caption}>{t("murals.loadingLooks")}</Text> : null}
     {looks.isError ? <>
-      <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: colors.danger }]}>Could not load saved looks.</Text>
-      <Button label="Retry" variant="secondary" onPress={() => { void looks.refetch(); }} />
+      <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: colors.danger }]}>{t("murals.looksLoadFailed")}</Text>
+      <Button label={t("shell.retry")} variant="secondary" onPress={() => { void looks.refetch(); }} />
     </> : null}
     {(looks.data ?? []).map((look) => <View key={look.name} style={{ flexDirection: "row", gap: spacing.sm, alignItems: "center" }}>
       <View style={{ flex: 1 }}><Button label={look.name} variant="secondary" disabled={!ready} onPress={() => onApply({ ...look.style, cardBorderSides: { ...look.style.cardBorderSides } })} /></View>
-      <Button label="Delete" accessibilityLabel={`Delete ${look.name}`} variant="secondary" disabled={!ready} onPress={() => save.mutate(looks.data!.filter((item) => item.name !== look.name))} />
+      <Button label={t("library.delete")} accessibilityLabel={t("murals.deleteLook", { name: look.name })} variant="secondary" disabled={!ready} onPress={() => save.mutate(looks.data!.filter((item) => item.name !== look.name))} />
     </View>)}
-    <Input label="Look name" value={name} onChangeText={setName} maxLength={48} placeholder="My reading corner" />
-    <Button label="Save current look" variant="secondary" disabled={!ready || !name.trim()} onPress={() => save.mutate(saveBlockLook(looks.data!, name, style, locale))} />
-    {save.isError ? <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: colors.danger }]}>Could not save looks. Try again.</Text> : null}
+    <Input label={t("murals.lookName")} value={name} onChangeText={setName} maxLength={48} placeholder={t("murals.lookNamePlaceholder")} />
+    <Button label={t("murals.saveCurrentLook")} variant="secondary" disabled={!ready || !name.trim()} onPress={() => save.mutate(saveBlockLook(looks.data!, name, style, locale))} />
+    {save.isError ? <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: colors.danger }]}>{t("murals.looksSaveFailed")}</Text> : null}
   </View>;
 }

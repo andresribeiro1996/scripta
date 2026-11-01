@@ -32,7 +32,7 @@ import { assertSaved, attemptUpdate } from "../lib/attemptUpdate";
 import { buildMergedLibrary } from "../lib/mergeAndSave";
 import { useToast } from "../../../ui/ToastHost";
 import { useLibrary } from "./useLibrary";
-import { getLocale } from "../../../i18n";
+import { getLocale, t } from "../../../i18n";
 
 export function useLibraryActions(onError?: (message: string) => void) {
   const { updateLibrary, submit } = useLibrary();
@@ -57,7 +57,7 @@ export function useLibraryActions(onError?: (message: string) => void) {
   return {
     run,
 
-    renameLibrary: (name: string) => run((data) => ({ ...data, name }), "Couldn't save the new name."),
+    renameLibrary: (name: string) => run((data) => ({ ...data, name }), t("library.renameFailed")),
 
     merge: async (parsed: LibraryData) => {
       await updateLibrary((data) => buildMergedLibrary(data, parsed), "import");
@@ -71,44 +71,44 @@ export function useLibraryActions(onError?: (message: string) => void) {
       run((data) => {
         const books = moveUnit(data.books, data.groups ?? [], key, direction);
         return books === data.books ? data : { ...data, books };
-      }, "Couldn't save the new order."),
+      }, t("library.reorderFailed")),
 
     setStatus: (book: Record<string, unknown>, status: ReadStatus) => {
       const day = localDay();
       if (setReadStatus(book, status, day) === book) return;
-      return runChange({ kind: "book", bookKey: bookKey(book), readStatus: status, day }, "Couldn't save the status change.");
+      return runChange({ kind: "book", bookKey: bookKey(book), readStatus: status, day }, t("library.statusFailed"));
     },
 
     setRating: (book: Record<string, unknown>, rating: FinishRating) => {
       if (rateBook(book, rating) === book) return Promise.resolve(true);
-      return runChange({ kind: "book", bookKey: bookKey(book), rating }, "Couldn't save the rating.");
+      return runChange({ kind: "book", bookKey: bookKey(book), rating }, t("library.ratingFailed"));
     },
 
     addNote: (book: Record<string, unknown>, text: string) =>
-      run(mapBook(bookKey(book), (b) => addReaderNote(b, text, localDay(), newId())), "Couldn't save your note."),
+      run(mapBook(bookKey(book), (b) => addReaderNote(b, text, localDay(), newId())), t("library.noteSaveFailed")),
 
     deleteNote: (book: Record<string, unknown>, bookmarkId: string) =>
-      run(mapBook(bookKey(book), (b) => removeReaderNote(b, bookmarkId)), "Couldn't delete the note."),
+      run(mapBook(bookKey(book), (b) => removeReaderNote(b, bookmarkId)), t("library.noteDeleteFailed")),
 
     restoreRead: (book: Record<string, unknown>, before: ReadSnapshot) =>
-      run(mapBook(bookKey(book), (b) => restoreReadState(b, before)), "Couldn't undo the status change."),
+      run(mapBook(bookKey(book), (b) => restoreReadState(b, before)), t("library.undoStatusFailed")),
 
     saveBookStyle: (book: Record<string, unknown>, style: PerCardStyle | undefined) =>
-      run(mapBook(bookKey(book), (b) => ({ ...b, _style: style })), "Couldn't save the style change."),
+      run(mapBook(bookKey(book), (b) => ({ ...b, _style: style })), t("shell.styleSaveFailed")),
 
     saveBookCover: (book: Record<string, unknown>, image: GalleryImage) =>
-      run(mapBook(bookKey(book), (b) => setBookCover(b, image.id, image.url)), "Couldn't save the cover change."),
+      run(mapBook(bookKey(book), (b) => setBookCover(b, image.id, image.url)), t("library.coverSaveFailed")),
 
     saveBookCoverUrl: (book: Record<string, unknown>, url: string) =>
-      run(mapBook(bookKey(book), (b) => setBookCoverUrl(b, url)), "Couldn't save the cover change."),
+      run(mapBook(bookKey(book), (b) => setBookCoverUrl(b, url)), t("library.coverSaveFailed")),
 
     removeBookCover: (book: Record<string, unknown>) =>
-      run(mapBook(bookKey(book), (b) => clearBookCover(b)), "Couldn't save the cover change."),
+      run(mapBook(bookKey(book), (b) => clearBookCover(b)), t("library.coverSaveFailed")),
 
     deleteBooks: (keys: Set<string>, onSuccess: () => void) =>
       run(
         (data) => deleteBooks(data, keys),
-        "Couldn't delete — nothing was changed.",
+        t("library.deleteBooksFailed"),
         onSuccess,
       ),
   };

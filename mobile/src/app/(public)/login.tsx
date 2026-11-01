@@ -9,15 +9,15 @@ import { GoogleSignInCancelledError, useAuth } from "../../core/auth";
 import { ApiError, apiClient } from "../../core/api";
 import { BrandMark, Button, FormScroll, Input, Screen, Segmented } from "../../ui";
 import { spacing, typography, useTheme } from "../../ui/theme";
-import { useLocale } from "../../i18n";
-
-const AUTH_MODES = [
-  { value: "login", label: "Log in" },
-  { value: "signup", label: "Sign up" },
-] as const;
+import { useLocale, useT } from "../../i18n";
 
 export default function LoginPage() {
   const locale = useLocale();
+  const t = useT();
+  const authModes = [
+    { value: "login", label: t("shell.logIn") },
+    { value: "signup", label: t("shell.signUp") },
+  ] as const;
   const { returnTo, notice } = useLocalSearchParams<{ returnTo?: string; notice?: string }>();
   const { ready, user, signUp, signIn, signInWithGoogle } = useAuth();
   const { colors } = useTheme();
@@ -81,7 +81,7 @@ export default function LoginPage() {
       else await signIn(identifier.trim(), password);
     } catch (e) {
       if (e instanceof ApiError && e.field) setFieldErrors({ [e.field]: e.message });
-      else setError(e instanceof TypeError ? "Couldn’t connect. Check your connection and try again." : e instanceof Error ? e.message : "Sign-in failed");
+      else setError(e instanceof TypeError ? t("shell.connectFailed") : e instanceof Error ? e.message : t("shell.signInFailed"));
     } finally {
       locked.current = false;
       setBusy(false);
@@ -98,7 +98,7 @@ export default function LoginPage() {
       await signInWithGoogle();
     } catch (e) {
       if (!(e instanceof GoogleSignInCancelledError)) {
-        setError(e instanceof Error ? e.message : "Google sign-in failed");
+        setError(e instanceof Error ? e.message : t("shell.googleSignInFailed"));
       }
     } finally {
       locked.current = false;
@@ -115,20 +115,20 @@ export default function LoginPage() {
             unreachable — "server ok" is a developer's line, not a reader's. */}
         {health.isError ? (
           <Text accessibilityRole="alert" style={[styles.server, { color: colors.danger }]}>
-            Can&apos;t reach the server. Check your connection.
+            {t("shell.serverUnreachableLogin")}
           </Text>
         ) : notice === "password-changed" && !noticeDismissed ? (
           <Text accessibilityLiveRegion="polite" style={[styles.server, { color: colors.text }]}>
-            Password changed. Log in with your new password.
+            {t("shell.passwordChanged")}
           </Text>
         ) : (
-          <Text style={[styles.server, { color: colors.textDim }]}>Your bookshelf, everywhere.</Text>
+          <Text style={[styles.server, { color: colors.textDim }]}>{t("shell.tagline")}</Text>
         )}
 
         <View style={styles.modeRow}>
           <Segmented
-            accessibilityLabel="Sign in or create an account"
-            options={AUTH_MODES}
+            accessibilityLabel={t("shell.signInOrCreate")}
+            options={authModes}
             value={mode}
             onChange={(next) => { if (locked.current) return; setMode(next); setNoticeDismissed(true); setError(null); setFieldErrors({}); }}
           />
@@ -139,7 +139,7 @@ export default function LoginPage() {
             ref={identifierRef}
             editable={!busy && !googleBusy}
             error={fieldErrors.identifier}
-            label={mode === "signup" ? "Email" : "Email or username"}
+            label={mode === "signup" ? t("shell.email") : t("shell.emailOrUsername")}
             value={identifier}
             onChangeText={(value) => { setIdentifier(value); setFieldErrors({ ...fieldErrors, identifier: "" }); }}
             autoCapitalize="none"
@@ -150,7 +150,7 @@ export default function LoginPage() {
             returnKeyType="next"
             onSubmitEditing={() => (mode === "signup" ? usernameRef : passwordRef).current?.focus()}
             submitBehavior="submit"
-            placeholder={mode === "signup" ? "you@example.com" : "Email or username"}
+            placeholder={mode === "signup" ? t("shell.emailPlaceholder") : t("shell.emailOrUsername")}
           />
           {mode === "signup" ? (
             <Input
@@ -158,7 +158,7 @@ export default function LoginPage() {
               editable={!busy && !googleBusy}
               error={fieldErrors.username}
               hint={usernameHint(locale)}
-              label="Username"
+              label={t("shell.username")}
               value={username}
               onChangeText={(value) => { setUsername(value); setFieldErrors({ ...fieldErrors, username: "" }); }}
               autoCapitalize="none"
@@ -168,7 +168,7 @@ export default function LoginPage() {
               returnKeyType="next"
               onSubmitEditing={() => passwordRef.current?.focus()}
               submitBehavior="submit"
-              placeholder="username"
+              placeholder={t("shell.usernamePlaceholder")}
             />
           ) : null}
           <Input
@@ -177,7 +177,7 @@ export default function LoginPage() {
             editable={!busy && !googleBusy}
             error={fieldErrors.password}
             hint={mode === "signup" ? passwordHint(locale) : undefined}
-            label="Password"
+            label={t("shell.password")}
             value={password}
             onChangeText={(value) => { setPassword(value); setFieldErrors({ ...fieldErrors, password: "" }); }}
             secureTextEntry
@@ -187,23 +187,23 @@ export default function LoginPage() {
             textContentType={mode === "signup" ? "newPassword" : "password"}
             returnKeyType="go"
             onSubmitEditing={() => void onSubmit()}
-            placeholder={mode === "signup" ? "At least 8 characters" : "Password"}
+            placeholder={mode === "signup" ? t("shell.passwordPlaceholder") : t("shell.password")}
           />
-          {mode === "login" && <Button label="Forgot password?" variant="secondary" disabled={busy || googleBusy} onPress={() => router.push({ pathname: "/forgot-password", params: { email: identifier.includes("@") ? identifier : "" } })} />}
+          {mode === "login" && <Button label={t("shell.forgotPassword")} variant="secondary" disabled={busy || googleBusy} onPress={() => router.push({ pathname: "/forgot-password", params: { email: identifier.includes("@") ? identifier : "" } })} />}
           <Button
-            label={mode === "signup" ? "Create account" : "Sign in"}
+            label={mode === "signup" ? t("shell.createAccount") : t("shell.signIn")}
             loading={busy}
             disabled={googleBusy}
             onPress={() => void onSubmit()}
           />
           {providers.data?.google ? (
-            <Button label="Sign in with Google" variant="secondary" disabled={busy} loading={googleBusy} onPress={() => void onGoogleSignIn()} />
+            <Button label={t("shell.signInWithGoogle")} variant="secondary" disabled={busy} loading={googleBusy} onPress={() => void onGoogleSignIn()} />
           ) : null}
           {error ? (
             <Text accessibilityLiveRegion="polite" accessibilityRole="alert" style={[styles.error, { color: colors.danger }]}>{error}</Text>
           ) : null}
         </View>
-        <Button label="Play today's chapter" variant="secondary" onPress={() => router.push("/daily")} />
+        <Button label={t("shell.playTodaysChapter")} variant="secondary" onPress={() => router.push("/daily")} />
       </FormScroll>
     </Screen>
   );

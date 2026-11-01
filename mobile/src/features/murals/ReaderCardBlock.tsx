@@ -5,10 +5,11 @@ import { readerCardInputOf, type Group, type PublicReaderCard } from "@scripta/s
 import { useOwnCardStyle } from "../readerCard/useReaderCardStyle";
 import { PLATE_RATIO, ReaderCardImage } from "./ReaderCardImage";
 import { ReaderCardViewer } from "./ReaderCardViewer";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export function ReaderCardBlock({ books, groups, readerName, publicCard, editable }: { books: Array<Record<string, unknown>>; groups: Group[]; readerName: string; publicCard?: PublicReaderCard; editable?: boolean }) {
   const locale = useLocale();
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [box, setBox] = useState({ width: 0, height: 0 });
   const own = useOwnCardStyle(!publicCard);
@@ -22,7 +23,7 @@ export function ReaderCardBlock({ books, groups, readerName, publicCard, editabl
   return (
     <>
       <View pointerEvents={editable ? "none" : "auto"} onLayout={onLayout} style={styles.plateBox}>
-        {editable ? image : <Pressable accessibilityRole="button" accessibilityLabel={input.label} accessibilityHint="Opens the reader card" onPress={() => setOpen(true)} style={{ width, height: width * PLATE_RATIO }}>{image}</Pressable>}
+        {editable ? image : <Pressable accessibilityRole="button" accessibilityLabel={input.label} accessibilityHint={t("murals.opensReaderCard")} onPress={() => setOpen(true)} style={{ width, height: width * PLATE_RATIO }}>{image}</Pressable>}
       </View>
       {open ? <ReaderCardViewer input={input} onClose={() => setOpen(false)} onEdit={publicCard ? undefined : () => { setOpen(false); router.push("/reader-card" as never); }} /> : null}
     </>

@@ -1,22 +1,23 @@
 import { useState, type ReactElement } from "react";
 import { useNavigation } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
+import { useT } from "../i18n";
 import { ConfirmDialog } from "./components";
 
 type Copy = { title: string; body: string; confirmLabel: string; cancelLabel: string };
 
-const DEFAULT_COPY: Copy = { title: "Discard changes?", body: "Your unsaved changes will be lost.", confirmLabel: "Discard", cancelLabel: "Keep editing" };
-
-export function useUnsavedChangesGuard(unsaved: boolean, copy: Copy = DEFAULT_COPY): ReactElement {
+export function useUnsavedChangesGuard(unsaved: boolean, copy?: Copy): ReactElement {
+  const t = useT();
+  const shown = copy ?? { title: t("shell.discardChangesTitle"), body: t("shell.discardChangesBody"), confirmLabel: t("shell.discard"), cancelLabel: t("shell.keepEditing") };
   const navigation = useNavigation();
   const [blocked, setBlocked] = useState<Parameters<typeof navigation.dispatch>[0] | null>(null);
   usePreventRemove(unsaved, ({ data }) => setBlocked(data.action));
   return <ConfirmDialog
     visible={blocked !== null}
-    title={copy.title}
-    body={copy.body}
-    confirmLabel={copy.confirmLabel}
-    cancelLabel={copy.cancelLabel}
+    title={shown.title}
+    body={shown.body}
+    confirmLabel={shown.confirmLabel}
+    cancelLabel={shown.cancelLabel}
     destructive
     onConfirm={() => { const action = blocked; setBlocked(null); if (action) navigation.dispatch(action); }}
     onCancel={() => setBlocked(null)}

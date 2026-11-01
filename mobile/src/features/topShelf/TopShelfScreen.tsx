@@ -11,8 +11,8 @@ import { workPath } from "../works/workPath";
 import { fetchRecapIndex, fetchTopShelf } from "./api";
 import { TopShelfBar } from "./TopShelfBar";
 import { recapEntries } from "./recapModel";
-import { boardTitle, emptySections, valueLabel, visibleBoards } from "./topShelfModel";
-import { useLocale } from "../../i18n";
+import { boardTitle, emptySections, genreName, valueLabel, visibleBoards } from "./topShelfModel";
+import { useLocale, useT } from "../../i18n";
 
 function topShelfHref(view: TopShelfView, period: TopShelfPeriod, genre: string | null) {
   return { pathname: "/top-shelf/[view]", params: { view, period, ...(genre ? { genre } : {}) } } as never;
@@ -20,6 +20,7 @@ function topShelfHref(view: TopShelfView, period: TopShelfPeriod, genre: string 
 
 export function TopShelfScreen() {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const segments = useSegments();
   const params = useLocalSearchParams<{ period?: string; genre?: string }>();
@@ -37,16 +38,16 @@ export function TopShelfScreen() {
   function body() {
     if (query.isError || !data) {
       return query.isError
-        ? <View style={styles.page}><ErrorState body={query.error instanceof Error ? query.error.message : "Couldn't load Top Shelf."} actionLabel="Retry" onAction={() => void query.refetch()} /></View>
+        ? <View style={styles.page}><ErrorState body={query.error instanceof Error ? query.error.message : t("sharing.topShelfLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void query.refetch()} /></View>
         : <View style={styles.page}><Skeleton height={200} /></View>;
     }
     const empty = emptySections(data);
-    const playButton = play ? <View style={styles.recapButton}><Button label={`▶ Play ${recapMonthName(play, locale)} recap`} numberOfLines={1} onPress={() => openRecap(play)} /></View> : null;
+    const playButton = play ? <View style={styles.recapButton}><Button label={t("sharing.recapPlayButton", { month: recapMonthName(play, locale) })} numberOfLines={1} onPress={() => openRecap(play)} /></View> : null;
     const pastRecaps = past.length ? (
-      <Section title="Past recaps">
+      <Section title={t("sharing.pastRecaps")}>
         {past.map((month) => (
-          <Pressable key={month} accessibilityRole="button" accessibilityLabel={`${recapMonthName(month, locale)} recap`} onPress={() => openRecap(month)} style={[styles.recapRow, { borderColor: colors.border }]}>
-            <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{`${recapMonthName(month, locale)} recap`}</Text>
+          <Pressable key={month} accessibilityRole="button" accessibilityLabel={t("sharing.recapName", { month: recapMonthName(month, locale) })} onPress={() => openRecap(month)} style={[styles.recapRow, { borderColor: colors.border }]}>
+            <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{t("sharing.recapName", { month: recapMonthName(month, locale) })}</Text>
             <Icon name="chevronRight" size={20} color={colors.textDim} />
           </Pressable>
         ))}
@@ -56,7 +57,7 @@ export function TopShelfScreen() {
       return (
         <>
           {playButton}
-          <View style={styles.page}><EmptyState title={`Nothing here yet${data.period === "month" ? " this month" : ""} — games count once 5 people vote.`} /></View>
+          <View style={styles.page}><EmptyState title={t(data.period === "month" ? "sharing.nothingHereMonth" : "sharing.nothingHereAll")} /></View>
           {pastRecaps}
         </>
       );
@@ -64,18 +65,18 @@ export function TopShelfScreen() {
     return (
       <>
         {playButton}
-        {empty.podium ? null : <Podium books={data.boards.champions ?? []} title={data.period === "month" ? "Book of the month" : "All-time champions"} onOpen={openBook} />}
+        {empty.podium ? null : <Podium books={data.boards.champions ?? []} title={t(data.period === "month" ? "sharing.bookOfTheMonth" : "sharing.allTimeChampions")} onOpen={openBook} />}
         {empty.records ? null : (
-          <Section title="Records">
+          <Section title={t("sharing.records")}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
               {visibleBoards(data.period).flatMap((board) => {
                 const leader = data.boards[board]?.[0];
                 if (!leader) return [];
                 return [
-                  <Pressable key={board} accessibilityRole="button" accessibilityLabel={`${boardTitle(board, null)}, ${leader.title}, ${valueLabel(board, leader.value)}`} onPress={() => router.push(topShelfHref(board, period, genre))} style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-                    <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{boardTitle(board, null)}</Text>
+                  <Pressable key={board} accessibilityRole="button" accessibilityLabel={`${boardTitle(board, null, locale)}, ${leader.title}, ${valueLabel(board, leader.value, locale)}`} onPress={() => router.push(topShelfHref(board, period, genre))} style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                    <Text numberOfLines={2} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{boardTitle(board, null, locale)}</Text>
                     <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{leader.title}</Text>
-                    <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.accent }]}>{valueLabel(board, leader.value)}</Text>
+                    <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.accent }]}>{valueLabel(board, leader.value, locale)}</Text>
                   </Pressable>,
                 ];
               })}
@@ -83,11 +84,11 @@ export function TopShelfScreen() {
           </Section>
         )}
         {empty.genres || genre ? null : (
-          <Section title="Champions by genre" onMore={() => router.push(topShelfHref("champions", period, null))}>
+          <Section title={t("sharing.championsByGenre")} onMore={() => router.push(topShelfHref("champions", period, null))}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
               {data.genreChampions.map((entry) => (
-                <Pressable key={entry.genre} accessibilityRole="button" accessibilityLabel={`${entry.genre} champions, ${entry.book.title}`} onPress={() => router.push(topShelfHref("champions", period, entry.genre))} style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-                  <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{entry.genre}</Text>
+                <Pressable key={entry.genre} accessibilityRole="button" accessibilityLabel={t("sharing.genreChampionsLabel", { genre: genreName(entry.genre, locale), title: entry.book.title })} onPress={() => router.push(topShelfHref("champions", period, entry.genre))} style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                  <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{genreName(entry.genre, locale)}</Text>
                   <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{entry.book.title}</Text>
                 </Pressable>
               ))}
@@ -95,9 +96,9 @@ export function TopShelfScreen() {
           </Section>
         )}
         {empty.games ? null : (
-          <Section title="Hottest games" onMore={() => router.push(topShelfHref("games", period, genre))}>
+          <Section title={t("sharing.hottestGames")} onMore={() => router.push(topShelfHref("games", period, genre))}>
             {data.games.map((game) => (
-              <DiscoverRow key={game.item.content.id} item={game.item} linkAuthor stats={[{ value: game.likes, label: "likes" }, { value: game.votes, label: "votes" }, { value: game.comments, label: "comments" }]} />
+              <DiscoverRow key={game.item.content.id} item={game.item} linkAuthor stats={[{ value: game.likes, label: t("sharing.statLikes") }, { value: game.votes, label: t("sharing.statVotes") }, { value: game.comments, label: t("sharing.statComments") }]} />
             ))}
           </Section>
         )}
@@ -107,7 +108,7 @@ export function TopShelfScreen() {
   }
 
   return <Screen top={false}>
-    <Stack.Screen options={{ headerShown: true, title: "Top Shelf", headerLargeTitleEnabled: false }} />
+    <Stack.Screen options={{ headerShown: true, title: t("sharing.topShelf"), headerLargeTitleEnabled: false }} />
     <ScrollView stickyHeaderIndices={[0]} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.list}>
       {bar}
       {body()}
@@ -117,12 +118,13 @@ export function TopShelfScreen() {
 
 function Section({ title, onMore, children }: { title: string; onMore?: () => void; children: ReactNode }) {
   const { colors } = useTheme();
+  const t = useT();
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <Text {...dynamicType} accessibilityRole="header" style={[typography.title, styles.strong, { color: colors.text }]}>{title}</Text>
         {onMore ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={`See all ${title.toLowerCase()}`} onPress={onMore} style={styles.more}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t("sharing.seeAll", { title: title.toLowerCase() })} onPress={onMore} style={styles.more}>
             <Icon name="chevronRight" size={20} color={colors.textDim} />
           </Pressable>
         ) : null}

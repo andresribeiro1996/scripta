@@ -44,10 +44,11 @@ import { fetchMural, shareMural, unshareMural, updateMural } from "./api";
 import { MURALS_QUERY_KEY, withGrownBlocks } from "./useMurals";
 import { useAuth } from "../../core/auth";
 import { API_URL } from "../../core/config";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export function MuralEditorScreen({ id }: { id: string }) {
   const locale = useLocale();
+  const t = useT();
   const { user } = useAuth();
   const router = useRouter();
   const client = useQueryClient();
@@ -104,7 +105,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
   const mural = muralQuery.data;
   const currentBlocks = blocks ?? mural?.blocks ?? [];
-  const currentName = name ?? mural?.name ?? "Mural";
+  const currentName = name ?? mural?.name ?? t("murals.mural");
   const currentTheme = theme ?? muralThemeId(mural?.theme);
   const colors = themes[currentTheme].colors;
   const selected = currentBlocks.find((block) => block.id === selectedId) ?? null;
@@ -147,7 +148,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
     setHistory(history.slice(0, -1));
     setSelectedId(null);
     setSheetTab(null);
-    AccessibilityInfo.announceForAccessibility("Last block change undone");
+    AccessibilityInfo.announceForAccessibility(t("murals.undone"));
   }
 
   function toggleExpansion(axis: "w" | "h") {
@@ -155,7 +156,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
     const bottom = Math.floor((scrollOffset.get() + viewportHeight - dockHeight - spacing.sm - canvasTop) / MURAL_ROW_HEIGHT);
     const top = Math.max(0, Math.ceil((scrollOffset.get() - canvasTop) / MURAL_ROW_HEIGHT));
     const next = toggleMuralBlockExpansion(currentBlocks, selected.id, axis, bottom, top);
-    if (next === currentBlocks) AccessibilityInfo.announceForAccessibility("No room to expand this block");
+    if (next === currentBlocks) AccessibilityInfo.announceForAccessibility(t("murals.noRoomToExpand"));
     else changeBlocks(next);
   }
 
@@ -201,7 +202,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
     try {
       await persist();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Couldn't save this mural.");
+      setError(reason instanceof Error ? reason.message : t("murals.saveFailed"));
     } finally {
       setBusy(false);
     }
@@ -215,33 +216,33 @@ export function MuralEditorScreen({ id }: { id: string }) {
         headerLargeTitleEnabled: false,
         headerRight: () => dragging || !draftMural ? null : <MuralThemeScope theme={currentTheme}><HeaderActions>
           <SaveStateButton busy={busy} unsaved={unsaved} onPress={() => void save()} />
-          <IconButton accessibilityLabel="Mural theme" name="theme" onPress={() => setThemeOpen(true)} />
-          <IconButton accessibilityLabel="Share mural" name="share" onPress={() => setShareFor(draftMural)} />
+          <IconButton accessibilityLabel={t("murals.muralTheme")} name="theme" onPress={() => setThemeOpen(true)} />
+          <IconButton accessibilityLabel={t("murals.shareMural")} name="share" onPress={() => setShareFor(draftMural)} />
         </HeaderActions></MuralThemeScope>,
       }}
     />
   );
 
-  if (muralQuery.isPending) return <View style={styles.center}>{header}<Text>Loading mural…</Text></View>;
-  if (muralQuery.isError || !mural || !draftMural) return <>{header}<ErrorState title="Mural unavailable" body="It may have been deleted." actionLabel="Back" onAction={() => router.back()} /></>;
+  if (muralQuery.isPending) return <View style={styles.center}>{header}<Text>{t("murals.loadingMural")}</Text></View>;
+  if (muralQuery.isError || !mural || !draftMural) return <>{header}<ErrorState title={t("murals.unavailable")} body={t("murals.unavailableBody")} actionLabel={t("shell.back")} onAction={() => router.back()} /></>;
 
   const blockActions: BlockAction[] = selected ? [
-    { key: "edit", label: "Edit", accessibilityLabel: "Edit block content, style and size", icon: "edit", tone: "accent", onPress: () => setSheetTab(isConfigurable(selected.type) ? "content" : "style") },
-    { key: "more", label: "More", accessibilityLabel: "More block actions", icon: "more", onPress: () => setActionsOpen(true) },
-    { key: "done", label: "Done", accessibilityLabel: "Deselect block", icon: "confirm", onPress: () => { setSelectedId(null); setSheetTab(null); } },
+    { key: "edit", label: t("murals.edit"), accessibilityLabel: t("murals.editBlock"), icon: "edit", tone: "accent", onPress: () => setSheetTab(isConfigurable(selected.type) ? "content" : "style") },
+    { key: "more", label: t("murals.more"), accessibilityLabel: t("murals.moreBlockActions"), icon: "more", onPress: () => setActionsOpen(true) },
+    { key: "done", label: t("library.done"), accessibilityLabel: t("murals.deselectBlock"), icon: "confirm", onPress: () => { setSelectedId(null); setSheetTab(null); } },
   ] : [];
   const moreActions: Array<BlockAction & { disabled?: boolean }> = selected ? [
-    { key: "top", label: "Move to top", icon: "moveToTop", disabled: selected.layout.y === 0, onPress: () => {
+    { key: "top", label: t("murals.moveToTop"), icon: "moveToTop", disabled: selected.layout.y === 0, onPress: () => {
       changeBlocks(moveMuralBlock(currentBlocks, selected.id, { ...selected.layout, y: 0 }));
       setActionsOpen(false);
       scrollRef.current?.scrollTo({ y: 0, animated: false });
-      AccessibilityInfo.announceForAccessibility("Block moved to top");
+      AccessibilityInfo.announceForAccessibility(t("murals.movedToTop"));
     } },
-    { key: "duplicate", label: "Duplicate", icon: "duplicate", onPress: () => {
+    { key: "duplicate", label: t("murals.duplicate"), icon: "duplicate", onPress: () => {
       const copy = createDuplicateCandidate(selected, currentBlocks);
       changeBlocks([...currentBlocks, copy]); setSelectedId(copy.id); setActionsOpen(false);
     } },
-    { key: "delete", label: "Delete", icon: "delete", onPress: () => {
+    { key: "delete", label: t("library.delete"), icon: "delete", onPress: () => {
       changeBlocks(currentBlocks.filter((block) => block.id !== selected.id)); setSelectedId(null); setSheetTab(null); setActionsOpen(false);
     } },
   ] : [];
@@ -252,18 +253,18 @@ export function MuralEditorScreen({ id }: { id: string }) {
       {header}
       {error ? <Toast visible message={error} tone="error" /> : null}
       <Animated.ScrollView ref={scrollRef} onLayout={(event) => setViewportHeight(event.nativeEvent.layout.height)} onScroll={onScroll} scrollEventThrottle={16} onContentSizeChange={(_width, height) => { contentHeight.set(height); flushScroll(height); }} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.canvasScroll, { paddingBottom: Math.max(120, dockHeight + spacing.md) }]}>
-        <EditorHeading name={currentName} accessibilityLabel={`Rename mural, ${currentName}`} onRename={() => { setDraftName(currentName); setNameError(undefined); setRenaming(true); }} />
-        <Text style={[typography.caption, styles.dragHelp, { color: colors.textDim }]}>Hold a block to drag. Move to an edge to scroll.</Text>
+        <EditorHeading name={currentName} accessibilityLabel={t("murals.renameMuralLabel", { name: currentName })} onRename={() => { setDraftName(currentName); setNameError(undefined); setRenaming(true); }} />
+        <Text style={[typography.caption, styles.dragHelp, { color: colors.textDim }]}>{t("murals.dragHelp")}</Text>
         <View onLayout={(event) => setCanvasTop(event.nativeEvent.layout.y)}><MuralCanvas mural={draftMural} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlistOptions} profile={profile} editable={!busy} onDragChange={onDragChange} dragScroll={{ ref: scrollRef, offset: scrollOffset, contentHeight, bottomInset }} selectedBlockId={selectedId} onSelectBlock={(blockId) => { setSelectedId(blockId); if (blockId === null) setSheetTab(null); }} onLayoutChange={(blockId, layout) => {
           const next = moveMuralBlock(currentBlocks, blockId, layout);
-          if (next === currentBlocks) AccessibilityInfo.announceForAccessibility("Can't move there");
+          if (next === currentBlocks) AccessibilityInfo.announceForAccessibility(t("murals.cantMove"));
           else changeBlocks(next);
         }} /></View>
       </Animated.ScrollView>
-      {selected ? <View pointerEvents={blockToolsHidden ? "none" : "auto"} accessibilityElementsHidden={blockToolsHidden} importantForAccessibility={blockToolsHidden ? "no-hide-descendants" : "auto"} onLayout={(event) => { const height = event.nativeEvent.layout.height; setDockHeight(height); if (!dragging) bottomInset.set(height + spacing.md); }} style={[styles.dock, { opacity: blockToolsHidden ? 0 : 1, backgroundColor: colors.surface, borderColor: colors.border }]}><BlockActionBar actions={blockActions} disabled={busy} /></View> : !dragging ? <Fab label="Add" accessibilityLabel="Add block" onPress={() => setAdding(true)} /> : null}
-      {history.length && !blockToolsHidden ? <View style={[styles.undo, { bottom: selected ? dockHeight + spacing.md : spacing.md }]}><Button label="Undo" variant="secondary" disabled={busy} onPress={undo} /></View> : null}
-      <Dialog visible={renaming} title="Rename mural" onClose={() => setRenaming(false)}>
-        <View style={styles.dialog}><Input label="Mural name" value={draftName} maxLength={200} error={nameError} onChangeText={(text) => { setDraftName(text); setNameError(undefined); }} /><Button label="Done" onPress={() => { const trimmed = draftName.trim(); if (!trimmed) { setNameError("Name can't be empty"); return; } setName(trimmed); setRenaming(false); }} /></View>
+      {selected ? <View pointerEvents={blockToolsHidden ? "none" : "auto"} accessibilityElementsHidden={blockToolsHidden} importantForAccessibility={blockToolsHidden ? "no-hide-descendants" : "auto"} onLayout={(event) => { const height = event.nativeEvent.layout.height; setDockHeight(height); if (!dragging) bottomInset.set(height + spacing.md); }} style={[styles.dock, { opacity: blockToolsHidden ? 0 : 1, backgroundColor: colors.surface, borderColor: colors.border }]}><BlockActionBar actions={blockActions} disabled={busy} /></View> : !dragging ? <Fab label={t("library.fabAdd")} accessibilityLabel={t("murals.addBlock")} onPress={() => setAdding(true)} /> : null}
+      {history.length && !blockToolsHidden ? <View style={[styles.undo, { bottom: selected ? dockHeight + spacing.md : spacing.md }]}><Button label={t("murals.undo")} variant="secondary" disabled={busy} onPress={undo} /></View> : null}
+      <Dialog visible={renaming} title={t("murals.renameMural")} onClose={() => setRenaming(false)}>
+        <View style={styles.dialog}><Input label={t("murals.muralName")} value={draftName} maxLength={200} error={nameError} onChangeText={(text) => { setDraftName(text); setNameError(undefined); }} /><Button label={t("library.done")} onPress={() => { const trimmed = draftName.trim(); if (!trimmed) { setNameError(t("murals.nameEmpty")); return; } setName(trimmed); setRenaming(false); }} /></View>
       </Dialog>
       <MuralShareSheet mural={shareFor} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlistOptions} profile={profile} draft={unsaved} contentReady={!libraryQuery.isPending && !gallery.isPending && !tierlists.isPending} contentError={libraryQuery.error?.message ?? gallery.error?.message ?? tierlists.error?.message ?? undefined} onRetryContent={() => { void libraryQuery.refetch(); void gallery.refetch(); void tierlists.refetch(); }} onClose={() => setShareFor(null)} onEnableLink={async () => {
         if (shareFor === null) return;
@@ -277,9 +278,9 @@ export function MuralEditorScreen({ id }: { id: string }) {
         cacheMural(updated);
         setShareFor({ ...updated, name: currentName, theme: currentTheme, blocks: currentBlocks });
       }} />
-      <Sheet visible={themeOpen} title="Theme" onClose={() => setThemeOpen(false)}><ScrollView contentContainerStyle={styles.sheet}><ThemeGrid options={THEME_IDS} value={currentTheme} onChange={(next) => { setTheme(next); setThemeOpen(false); }} /></ScrollView></Sheet>
-      <Sheet visible={adding} title="Add block" onClose={() => setAdding(false)}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>{BLOCK_TYPES.map((type) => <Button key={type} label={blockLabel(type, locale)} variant="secondary" onPress={() => add(type)} />)}</ScrollView></Sheet>
-      <Sheet visible={selected !== null && actionsOpen} title={selected ? `${blockLabel(selected.type, locale)} actions` : "Block actions"} onClose={() => setActionsOpen(false)}>
+      <Sheet visible={themeOpen} title={t("settings.theme")} onClose={() => setThemeOpen(false)}><ScrollView contentContainerStyle={styles.sheet}><ThemeGrid options={THEME_IDS} value={currentTheme} onChange={(next) => { setTheme(next); setThemeOpen(false); }} /></ScrollView></Sheet>
+      <Sheet visible={adding} title={t("murals.addBlock")} onClose={() => setAdding(false)}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>{BLOCK_TYPES.map((type) => <Button key={type} label={blockLabel(type, locale)} variant="secondary" onPress={() => add(type)} />)}</ScrollView></Sheet>
+      <Sheet visible={selected !== null && actionsOpen} title={selected ? t("murals.blockActionsFor", { block: blockLabel(selected.type, locale) }) : t("murals.blockActions")} onClose={() => setActionsOpen(false)}>
         <View>
           {moreActions.map((action) => {
             const disabled = busy || action.disabled;
@@ -313,16 +314,16 @@ export function MuralEditorScreen({ id }: { id: string }) {
         /> : null}
         layout={selected ? <LayoutTab block={selected} blocks={currentBlocks} disabled={busy} onToggleExpansion={toggleExpansion} onChange={(patch) => changeBlocks(changeBlockLayout(currentBlocks, selected.id, patch))} /> : null}
       />
-      <Sheet visible={picking !== null} title={quoteBook ? "Choose a passage" : `Choose ${picking ?? "content"}`} onClose={() => { setPicking(null); setQuoteBook(null); }}>
+      <Sheet visible={picking !== null} title={quoteBook ? t("murals.choosePassage") : picking === "book" ? t("murals.chooseBook") : picking === "image" ? t("murals.chooseImage") : picking === "tierlist" ? t("murals.chooseTierlist") : t("murals.chooseContent")} onClose={() => { setPicking(null); setQuoteBook(null); }}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>
-          {quoteBook ? <><Button label="Back to books" variant="secondary" onPress={() => setQuoteBook(null)} />{(Array.isArray(quoteBook.highlights) ? quoteBook.highlights : []).filter((highlight) => highlight && typeof highlight === "object" && typeof highlight.BookmarkID === "string").map((highlight) => <Button key={String(highlight.BookmarkID)} label={String(highlight.Text ?? highlight.Annotation ?? "Untitled passage")} variant="secondary" onPress={() => {
+          {quoteBook ? <><Button label={t("murals.backToBooks")} variant="secondary" onPress={() => setQuoteBook(null)} />{(Array.isArray(quoteBook.highlights) ? quoteBook.highlights : []).filter((highlight) => highlight && typeof highlight === "object" && typeof highlight.BookmarkID === "string").map((highlight) => <Button key={String(highlight.BookmarkID)} label={String(highlight.Text ?? highlight.Annotation ?? t("murals.untitledPassage"))} variant="secondary" onPress={() => {
             const ref = { bookKey: bookKey(quoteBook), highlightId: String(highlight.BookmarkID) };
             updateSelected((block) => block.type === "quote" ? { ...block, ...ref, mode: undefined } : block.type === "quoteCollection" ? { ...block, quotes: block.quotes.some((quote) => quote.bookKey === ref.bookKey && quote.highlightId === ref.highlightId) ? block.quotes : [...block.quotes, ref] } : block);
             setQuoteBook(null); setPicking(null);
-          }} />)}{!Array.isArray(quoteBook.highlights) || quoteBook.highlights.length === 0 ? <Text style={{ color: colors.text }}>No saved passages in this book.</Text> : null}</> : null}
+          }} />)}{!Array.isArray(quoteBook.highlights) || quoteBook.highlights.length === 0 ? <Text style={{ color: colors.text }}>{t("murals.noSavedPassages")}</Text> : null}</> : null}
           {picking === "book" && !quoteBook ? <BookPickerList
             books={books}
-            label="Search books"
+            label={t("murals.searchBooks")}
             isSelected={selected?.type === "shelf" ? (book) => selected.bookKeys.includes(bookKey(book)) : undefined}
             onSelect={(book) => {
               if (selected?.type === "quote" || selected?.type === "quoteCollection") { setQuoteBook(book); return; }
@@ -335,9 +336,9 @@ export function MuralEditorScreen({ id }: { id: string }) {
               if (selected?.type !== "shelf") setPicking(null);
             }}
           /> : null}
-          {picking === "image" ? (gallery.data ?? []).map((image) => <Pressable accessibilityLabel={`Choose ${image.filename}`} accessibilityRole="button" key={image.id} onPress={() => { updateSelected((block) => block.type === "image" ? { ...block, imageId: image.id } : block); setPicking(null); }}><Text style={[typography.body, { color: colors.text }]}>{image.filename}</Text></Pressable>) : null}
+          {picking === "image" ? (gallery.data ?? []).map((image) => <Pressable accessibilityLabel={t("murals.chooseFile", { filename: image.filename })} accessibilityRole="button" key={image.id} onPress={() => { updateSelected((block) => block.type === "image" ? { ...block, imageId: image.id } : block); setPicking(null); }}><Text style={[typography.body, { color: colors.text }]}>{image.filename}</Text></Pressable>) : null}
           {picking === "tierlist" ? tierlistOptions.map((tierlist) => <Button key={tierlist.id} label={tierlist.name} variant="secondary" onPress={() => { updateSelected((block) => block.type === "tierlist" ? { ...block, tierlistId: tierlist.id } : block); setPicking(null); }} />) : null}
-          {picking && ((picking === "book" && books.length === 0) || (picking === "image" && !gallery.data?.length) || (picking === "tierlist" && !tierlistOptions.length)) ? <EmptyState title="Nothing available" /> : null}
+          {picking && ((picking === "book" && books.length === 0) || (picking === "image" && !gallery.data?.length) || (picking === "tierlist" && !tierlistOptions.length)) ? <EmptyState title={t("murals.nothingAvailable")} /> : null}
         </ScrollView>
       </Sheet>
     </MuralScreen>

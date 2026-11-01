@@ -10,7 +10,7 @@ import type { useFollowToggle } from "../community/useFollowToggle";
 import { CoverImage } from "../library/components/CoverImage";
 import { workPath } from "../works/workPath";
 import { SCOPE_OF, SECTION_ERRORS, SECTION_TITLES, libraryStatus, type ResultSection, type SearchRow, type SearchScope } from "./searchModel";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export type ResultActions = {
   query: string;
@@ -24,14 +24,15 @@ export type ResultActions = {
 };
 
 export function SearchResultRow({ row, actions }: { row: SearchRow; actions: ResultActions }) {
+  const t = useT();
   const { colors } = useTheme();
   switch (row.kind) {
     case "header":
       return (
         <SectionTitle
-          title={SECTION_TITLES[row.section]}
-          caption={row.section === "books" ? "Tap for details, + to add" : undefined}
-          action={row.seeAll ? { label: "See all", onPress: () => actions.onSeeAll(SCOPE_OF[row.section]) } : undefined}
+          title={t(SECTION_TITLES[row.section])}
+          caption={row.section === "books" ? t("book.tapForDetails") : undefined}
+          action={row.seeAll ? { label: t("book.seeAll"), onPress: () => actions.onSeeAll(SCOPE_OF[row.section]) } : undefined}
         />
       );
     case "library":
@@ -49,31 +50,31 @@ export function SearchResultRow({ row, actions }: { row: SearchRow; actions: Res
     case "loading":
       return <View style={styles.pad}><Skeleton height={60} /></View>;
     case "failed":
-      return <View style={styles.pad}><ErrorState body={SECTION_ERRORS[row.section]} actionLabel="Retry" onAction={() => actions.onRetry(row.section)} /></View>;
+      return <View style={styles.pad}><ErrorState body={t(SECTION_ERRORS[row.section])} actionLabel={t("shell.retry")} onAction={() => actions.onRetry(row.section)} /></View>;
     case "catalogEmpty":
       return (
         <View style={[styles.pad, styles.stack]}>
-          <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Nothing in the catalog yet.</Text>
-          <Button label="Search Open Library" variant="secondary" onPress={actions.onSearchOpenLibrary} />
+          <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("book.catalogEmpty")}</Text>
+          <Button label={t("book.searchOpenLibrary")} variant="secondary" onPress={actions.onSearchOpenLibrary} />
         </View>
       );
     case "openLibrary":
       return row.state === "pending" ? (
-        <Text {...dynamicType} style={[typography.caption, styles.pad, styles.line, { color: colors.textDim }]}>Still searching Open Library…</Text>
+        <Text {...dynamicType} style={[typography.caption, styles.pad, styles.line, { color: colors.textDim }]}>{t("book.stillSearchingOpenLibrary")}</Text>
       ) : (
         <View style={[styles.pad, styles.stack]}>
-          <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Couldn't reach Open Library.</Text>
-          <Button label="Retry" variant="secondary" onPress={actions.onRetryOpenLibrary} />
+          <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("book.openLibraryUnreachable")}</Text>
+          <Button label={t("shell.retry")} variant="secondary" onPress={actions.onRetryOpenLibrary} />
         </View>
       );
     case "addByHand":
       return (
         <Pressable accessibilityRole="link" onPress={() => router.push(`/add-book?q=${encodeURIComponent(actions.query)}` as never)} style={[styles.pad, styles.link]}>
-          <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text, textDecorationLine: "underline" }]}>Not here? Add it by hand</Text>
+          <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text, textDecorationLine: "underline" }]}>{t("book.addByHand")}</Text>
         </Pressable>
       );
     case "noResults":
-      return <Text {...dynamicType} style={[typography.body, styles.pad, styles.line, { color: colors.textDim }]}>No results for “{actions.query}”.</Text>;
+      return <Text {...dynamicType} style={[typography.body, styles.pad, styles.line, { color: colors.textDim }]}>{t("book.noResults", { query: actions.query })}</Text>;
   }
 }
 
@@ -93,14 +94,15 @@ export function SectionTitle({ title, caption, action }: { title: string; captio
 }
 
 function LibraryResultRow({ book, onOpen }: { book: LibraryBook; onOpen: () => void }) {
+  const t = useT();
   const { colors } = useTheme();
-  const title = String(book.Title ?? "Untitled");
-  const author = String(book.Attribution ?? "Unknown author");
+  const title = String(book.Title ?? t("library.untitled"));
+  const author = String(book.Attribution ?? t("library.unknownAuthor"));
   const status = libraryStatus(book);
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${title} by ${author}, ${status.label}`}
+      accessibilityLabel={t("book.libraryRowLabel", { title, author, status: status.label })}
       onPress={() => {
         onOpen();
         router.push(`/book/${encodeURIComponent(bookKey(book))}` as never);
@@ -119,6 +121,7 @@ function LibraryResultRow({ book, onOpen }: { book: LibraryBook; onOpen: () => v
 
 function BookResultRow({ result, onOpen, onAdd }: { result: BookSearchResult; onOpen: () => void; onAdd: (result: BookSearchResult) => void }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const segments = useSegments();
   const byline = searchResultByline(result);
@@ -142,7 +145,7 @@ function BookResultRow({ result, onOpen, onAdd }: { result: BookSearchResult; on
           {byline ? <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{byline}</Text> : null}
         </View>
       </Pressable>
-      <IconButton name="add" accessibilityLabel={`Add ${result.title}`} onPress={() => onAdd(result)} />
+      <IconButton name="add" accessibilityLabel={t("book.addTitle", { title: result.title })} onPress={() => onAdd(result)} />
     </View>
   );
 }

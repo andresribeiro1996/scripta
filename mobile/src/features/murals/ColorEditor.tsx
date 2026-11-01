@@ -7,12 +7,13 @@ import { Platform, StyleSheet, View } from "react-native";
 import { Button, Input } from "../../ui";
 import { Text } from "../../ui/Text";
 import { radii, spacing, typography, useTheme } from "../../ui/theme";
+import { useT, type MessageKey } from "../../i18n";
 
 const CHANNELS = [
-  { key: "r", label: "Red" },
-  { key: "g", label: "Green" },
-  { key: "b", label: "Blue" },
-] as const;
+  { key: "r", labelKey: "murals.channelRed" },
+  { key: "g", labelKey: "murals.channelGreen" },
+  { key: "b", labelKey: "murals.channelBlue" },
+] as const satisfies readonly { key: string; labelKey: MessageKey }[];
 
 export function ColorEditor({ color, onChange, onDone, onCancel }: {
   color: string;
@@ -20,6 +21,7 @@ export function ColorEditor({ color, onChange, onDone, onCancel }: {
   onDone: () => void;
   onCancel: () => void;
 }) {
+  const t = useT();
   const { colors, mode } = useTheme();
   const [text, setText] = useState(color);
   const typed = normalizeHexColor(text);
@@ -36,15 +38,15 @@ export function ColorEditor({ color, onChange, onDone, onCancel }: {
   return (
     <View style={[styles.editor, { borderColor: colors.border, backgroundColor: colors.surface }]}>
       <View style={styles.top}>
-        <View accessibilityLabel={`Sample ${color}`} style={[styles.sample, { backgroundColor: color, borderColor: colors.border }]} />
+        <View accessibilityLabel={t("murals.sampleColor", { color })} style={[styles.sample, { backgroundColor: color, borderColor: colors.border }]} />
         <View style={styles.grow}>
-          <Input label="Hex" value={text} onChangeText={edit} autoCapitalize="none" autoCorrect={false} maxLength={7} error={text.trim() !== "" && !typed ? "Use a color like #1a2b3c" : undefined} />
+          <Input label={t("murals.hex")} value={text} onChangeText={edit} autoCapitalize="none" autoCorrect={false} maxLength={7} error={text.trim() !== "" && !typed ? t("murals.hexError") : undefined} />
         </View>
       </View>
       {Platform.OS === "ios" ? (
         <Host matchContents={{ vertical: true }} colorScheme={mode}>
           <ColorPicker
-            label="Color"
+            label={t("tierlists.color")}
             selection={color}
             supportsOpacity={false}
             onSelectionChange={(value) => {
@@ -54,10 +56,10 @@ export function ColorEditor({ color, onChange, onDone, onCancel }: {
           />
         </Host>
       ) : (
-        CHANNELS.map(({ key, label }) => (
+        CHANNELS.map(({ key, labelKey }) => (
           <View key={key} style={styles.channel}>
             <View style={styles.channelHead}>
-              <Text style={[typography.body, { color: colors.text }]}>{label}</Text>
+              <Text style={[typography.body, { color: colors.text }]}>{t(labelKey)}</Text>
               <Text style={[typography.body, { color: colors.textDim }]}>{rgb[key]}</Text>
             </View>
             <Host matchContents={{ vertical: true }} colorScheme={mode}>
@@ -67,8 +69,8 @@ export function ColorEditor({ color, onChange, onDone, onCancel }: {
         ))
       )}
       <View style={styles.actions}>
-        <Button label="Done" disabled={!typed} onPress={onDone} />
-        <Button label="Cancel" variant="secondary" onPress={onCancel} />
+        <Button label={t("library.done")} disabled={!typed} onPress={onDone} />
+        <Button label={t("shell.cancel")} variant="secondary" onPress={onCancel} />
       </View>
     </View>
   );

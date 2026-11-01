@@ -8,10 +8,11 @@ import { ErrorState, Screen, Skeleton, spacing } from "../../ui";
 import { fetchWork, fetchWorkStats } from "./api";
 import { StatsSections } from "./BookStats";
 import { workStatsPath } from "./workPath";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export function WorkStatsScreen({ id }: { id: string }) {
   const locale = useLocale();
+  const t = useT();
   const segments = useSegments();
   const work = useQuery({ queryKey: ["works", id], queryFn: () => fetchWork(id), retry: false });
   const canonicalId = work.data?.work.id;
@@ -23,7 +24,7 @@ export function WorkStatsScreen({ id }: { id: string }) {
     if (canonicalPath) router.replace(canonicalPath as never);
   }, [canonicalPath]);
 
-  const untitled = <Stack.Screen options={{ headerShown: true, title: "Stats" }} />;
+  const untitled = <Stack.Screen options={{ headerShown: true, title: t("book.statsTitle") }} />;
   const failed = work.isError && !work.data ? work : stats.isError && !stats.data ? stats : null;
   if (failed) {
     const permanent = isPermanentError(failed.error);
@@ -31,9 +32,9 @@ export function WorkStatsScreen({ id }: { id: string }) {
       <Screen bottom top={false} style={styles.centered}>
         {untitled}
         <ErrorState
-          title="Stats unavailable"
-          body={failed.error instanceof Error ? failed.error.message : "Couldn't load these stats."}
-          actionLabel={permanent ? "Back" : "Retry"}
+          title={t("book.statsUnavailable")}
+          body={failed.error instanceof Error ? failed.error.message : t("book.statsLoadFailed")}
+          actionLabel={permanent ? t("shell.back") : t("shell.retry")}
           onAction={permanent ? () => (router.canGoBack() ? router.back() : router.replace("/")) : () => void failed.refetch()}
         />
       </Screen>

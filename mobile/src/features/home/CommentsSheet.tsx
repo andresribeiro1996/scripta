@@ -11,10 +11,11 @@ import { addActivityComment, deleteActivityComment, fetchActivityComments } from
 import { useSkipEmptyPages } from "./FeedRow";
 import { relativeTime } from "@scripta/shared/community";
 import { ENGAGEMENT_QUERY_KEY } from "./useHomeActions";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export function CommentsSheet({ id, title, onClose }: { id: string; title: string; onClose: () => void }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -31,15 +32,15 @@ export function CommentsSheet({ id, title, onClose }: { id: string; title: strin
   const error = send.error ?? remove.error;
   return <BottomSheet isPresented onDismiss={onClose} snapPoints={["full"]} containerColor={colors.surface} contentPadding={0} shouldDismissOnBackPress={!send.isPending} shouldDismissOnClickOutside={!send.isPending}>
     <RNHostView><KeyboardAvoidingView behavior={process.env.EXPO_OS === "ios" ? "padding" : "height"} style={{ width: Math.min(width, 560), alignSelf: "center", flexGrow: 1, height: 0, paddingHorizontal: spacing.lg, paddingBottom: Math.max(insets.bottom, spacing.lg) }}>
-      <SheetHeader title="Comments" onClose={onClose} />
+      <SheetHeader title={t("community.comments")} onClose={onClose} />
       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim, paddingBottom: spacing.md }]}>{title}</Text>
       <FlatList style={styles.list} data={items} keyExtractor={(item) => item.id} keyboardShouldPersistTaps="handled" renderItem={({ item }) => <View style={[styles.comment, { borderBottomColor: colors.border }]}>
         <AuthorAvatar username={item.author.username} avatarUrl={item.author.avatarUrl} />
         <View style={styles.copy}><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{item.author.username} · {relativeTime(item.createdAt, locale)}</Text><Text selectable {...dynamicType} style={[typography.body, { color: colors.text }]}>{item.text}</Text></View>
-        {item.own ? <IconButton name="delete" accessibilityLabel="Delete your comment" disabled={remove.isPending} onPress={() => remove.mutate(item.id)} /> : null}
-      </View>} ListEmptyComponent={query.isPending ? <Skeleton height={80} /> : query.isError ? <ErrorState body="Couldn't load comments." actionLabel="Retry" onAction={() => void query.refetch()} /> : query.hasNextPage ? undefined : <EmptyState title="Start the conversation" body="Be the first to comment." />} ListFooterComponent={query.isFetchingNextPage ? <Skeleton height={48} /> : query.isFetchNextPageError ? <ErrorState body="Couldn't load more comments." actionLabel="Retry" onAction={() => void query.fetchNextPage()} /> : undefined} onEndReached={() => { if (query.hasNextPage && !query.isFetchingNextPage && !query.isFetchNextPageError) void query.fetchNextPage(); }} />
-      {error ? <Text accessibilityRole="alert" style={{ color: colors.danger }}>{error instanceof Error ? error.message : "Couldn't save your comment."}</Text> : null}
-      <View style={styles.composer}><Input accessibilityLabel="Your comment" placeholder="Write a comment…" multiline numberOfLines={3} style={{ minHeight: minimumTouchTarget + 2, maxHeight: 120 }} maxLength={1500} value={draft} editable={!send.isPending} onChangeText={setDraft} /><Button label="Post comment" loading={send.isPending} disabled={!draft.trim() || send.isPending} onPress={() => send.mutate()} /></View>
+        {item.own ? <IconButton name="delete" accessibilityLabel={t("community.deleteComment")} disabled={remove.isPending} onPress={() => remove.mutate(item.id)} /> : null}
+      </View>} ListEmptyComponent={query.isPending ? <Skeleton height={80} /> : query.isError ? <ErrorState body={t("community.commentsLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void query.refetch()} /> : query.hasNextPage ? undefined : <EmptyState title={t("community.startConversation")} body={t("community.beFirstToComment")} />} ListFooterComponent={query.isFetchingNextPage ? <Skeleton height={48} /> : query.isFetchNextPageError ? <ErrorState body={t("community.moreCommentsLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void query.fetchNextPage()} /> : undefined} onEndReached={() => { if (query.hasNextPage && !query.isFetchingNextPage && !query.isFetchNextPageError) void query.fetchNextPage(); }} />
+      {error ? <Text accessibilityRole="alert" style={{ color: colors.danger }}>{error instanceof Error ? error.message : t("community.commentSaveFailed")}</Text> : null}
+      <View style={styles.composer}><Input accessibilityLabel={t("community.yourComment")} placeholder={t("community.commentPlaceholder")} multiline numberOfLines={3} style={{ minHeight: minimumTouchTarget + 2, maxHeight: 120 }} maxLength={1500} value={draft} editable={!send.isPending} onChangeText={setDraft} /><Button label={t("community.postComment")} loading={send.isPending} disabled={!draft.trim() || send.isPending} onPress={() => send.mutate()} /></View>
     </KeyboardAvoidingView></RNHostView>
   </BottomSheet>;
 }

@@ -2,15 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View, type ScrollViewInstance } from "react-native";
 import Animated, { useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, type SharedValue } from "react-native-reanimated";
 import { Text } from "../../ui/Text";
-import { bracketShape, countdownLabel, duelWinner, needsVote, roundLabel, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
+import { bracketShape, duelWinner, needsVote, roundLabel, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
 import { Icon, Sheet, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";
 import { DuelSideRow } from "./DuelSideRow";
-import { BRACKET_MATCH_WIDTH, bracketMapLayout } from "./arenaView";
+import { BRACKET_MATCH_WIDTH, bracketMapLayout, matchHeading } from "./arenaView";
 import type { TournamentView } from "./api";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 function MatchSide({ side, isWinner, decided, onPick, busy, coverWidth }: { side: DuelSide; isWinner: boolean; decided: boolean; onPick?: () => void; busy: boolean; coverWidth: number }) {
+  const t = useT();
   const { colors } = useTheme();
   return (
     <View style={styles.tileSide}>
@@ -21,17 +22,17 @@ function MatchSide({ side, isWinner, decided, onPick, busy, coverWidth }: { side
       </View>
       <Text {...dynamicType} numberOfLines={2} style={[typography.caption, styles.bookTitle, isWinner && styles.bold, { color: colors.text }]}>{side.title}</Text>
       <View style={styles.sideResult}>
-        {isWinner ? <><Icon name="confirm" size={12} color={colors.accent} /><Text {...dynamicType} style={[typography.caption, { color: colors.text }]}>Winner</Text></> : null}
+        {isWinner ? <><Icon name="confirm" size={12} color={colors.accent} /><Text {...dynamicType} style={[typography.caption, { color: colors.text }]}>{t("arena.winner")}</Text></> : null}
       </View>
       {onPick ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${side.title} wins the tiebreak`}
+          accessibilityLabel={t("arena.winsTiebreak", { title: side.title })}
           disabled={busy}
           onPress={(event) => { event.stopPropagation(); onPick(); }}
           style={({ pressed }) => [styles.tiebreakPill, { backgroundColor: pressed ? colors.surfacePressed : colors.accentSoft, opacity: busy ? 0.5 : 1 }]}
         >
-          <Text {...dynamicType} style={[typography.caption, styles.bold, styles.center, { color: colors.text }]}>Choose winner</Text>
+          <Text {...dynamicType} style={[typography.caption, styles.bold, styles.center, { color: colors.text }]}>{t("arena.chooseWinner")}</Text>
         </Pressable>
       ) : null}
     </View>
@@ -39,18 +40,19 @@ function MatchSide({ side, isWinner, decided, onPick, busy, coverWidth }: { side
 }
 
 function EmptyTile({ coverWidth }: { coverWidth: number }) {
+  const t = useT();
   const { colors } = useTheme();
   return (
     <View style={[styles.tileCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.matchHeading}>
-        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Awaiting winners</Text>
+        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("arena.awaitingWinners")}</Text>
       </View>
       <View style={styles.tile}>
         <View style={styles.tileSide}>
           <View style={[styles.tileCoverOuter, { width: coverWidth }]}>
             <View style={[styles.tileCoverImage, styles.emptyCover, { backgroundColor: colors.border }]} />
           </View>
-          <Text {...dynamicType} numberOfLines={2} style={[typography.caption, styles.bookTitle, { color: colors.textDim }]}>To be decided</Text>
+          <Text {...dynamicType} numberOfLines={2} style={[typography.caption, styles.bookTitle, { color: colors.textDim }]}>{t("arena.toBeDecided")}</Text>
           <View style={styles.sideResult} />
         </View>
         <View style={styles.vsWrap}>
@@ -60,7 +62,7 @@ function EmptyTile({ coverWidth }: { coverWidth: number }) {
           <View style={[styles.tileCoverOuter, { width: coverWidth }]}>
             <View style={[styles.tileCoverImage, styles.emptyCover, { backgroundColor: colors.border }]} />
           </View>
-          <Text {...dynamicType} numberOfLines={2} style={[typography.caption, styles.bookTitle, { color: colors.textDim }]}>To be decided</Text>
+          <Text {...dynamicType} numberOfLines={2} style={[typography.caption, styles.bookTitle, { color: colors.textDim }]}>{t("arena.toBeDecided")}</Text>
           <View style={styles.sideResult} />
         </View>
       </View>
@@ -87,12 +89,13 @@ function MatchTile({
   onTiebreak: (duelId: string, workId: string) => void;
   isFinal?: boolean;
 }) {
+  const t = useT();
   const { colors } = useTheme();
   if (!duel) return <EmptyTile coverWidth={coverWidth} />;
   const decided = duel.status === "settled";
   const winner = duelWinner(duel);
   const tiebreak = isOwner && duel.status === "tied_pending_tiebreak";
-  const stateLabel = duel.status === "active" ? (duel.hasVoted ? "Voted" : "Vote open") : decided ? "Settled" : "Tiebreak";
+  const stateLabel = t(duel.status === "active" ? (duel.hasVoted ? "arena.voted" : "arena.voteOpen") : decided ? "arena.settled" : "arena.tiebreak");
   const pick = (side: DuelSide) => {
     const workId = side.workId;
     return tiebreak && workId ? () => onTiebreak(duel.id, workId) : undefined;
@@ -100,15 +103,15 @@ function MatchTile({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${duel.bookA.title} versus ${duel.bookB.title}${winner ? `, ${winner.title} won` : ""}`}
+      accessibilityLabel={winner ? t("arena.versusWonLabel", { first: duel.bookA.title, second: duel.bookB.title, winner: winner.title }) : t("arena.versusLabel", { first: duel.bookA.title, second: duel.bookB.title })}
       onPress={() => onOpen(duel)}
       style={({ pressed }) => [styles.tileCard, { backgroundColor: pressed ? colors.surfacePressed : colors.surface, borderColor: isFinal ? colors.accent : colors.border }]}
     >
       <View style={styles.matchHeading}>
-        <Text {...dynamicType} style={[typography.caption, styles.bold, styles.matchNumber, { color: colors.textDim }]}>Match {duel.duelIndex + 1}</Text>
+        <Text {...dynamicType} style={[typography.caption, styles.bold, styles.matchNumber, { color: colors.textDim }]}>{t("arena.matchNumber", { number: duel.duelIndex + 1 })}</Text>
         {isOwner && duel.status === "active" ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="Settle this match now" disabled={busy} onPress={(event) => { event.stopPropagation(); onSettle(duel.id); }} style={({ pressed }) => [styles.settleButton, { backgroundColor: pressed ? colors.surfacePressed : colors.accentSoft, opacity: busy ? 0.5 : 1 }]}>
-            <Text {...dynamicType} style={[typography.caption, styles.bold, { color: colors.text }]}>Settle</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel={t("arena.settleNow")} disabled={busy} onPress={(event) => { event.stopPropagation(); onSettle(duel.id); }} style={({ pressed }) => [styles.settleButton, { backgroundColor: pressed ? colors.surfacePressed : colors.accentSoft, opacity: busy ? 0.5 : 1 }]}>
+            <Text {...dynamicType} style={[typography.caption, styles.bold, { color: colors.text }]}>{t("arena.settle")}</Text>
           </Pressable>
         ) : <Text {...dynamicType} style={[typography.caption, styles.matchState, { color: needsVote(duel) ? colors.accent : colors.textDim }]}>{stateLabel}</Text>}
       </View>
@@ -163,10 +166,11 @@ function RoundRow({
   onSettle: (duelId: string) => void;
   onTiebreak: (duelId: string, workId: string) => void;
 }) {
+  const t = useT();
   const { colors } = useTheme();
   return (
     <View>
-      <RoundHeading title={label} detail={`${slots.length} ${slots.length === 1 ? "match" : "matches"}`} width={viewportWidth} offset={headingOffset} />
+      <RoundHeading title={label} detail={t("arena.matchesCount", { count: slots.length })} width={viewportWidth} offset={headingOffset} />
       <View style={styles.row}>
         {slots.map((duel, i) => (
           <View key={`${label}-${i}`} style={styles.cell}>
@@ -205,6 +209,7 @@ export function BracketMap({
   onTiebreak: (duelId: string, workId: string) => void;
 }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const [openId, setOpenId] = useState<string | null>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
@@ -238,7 +243,7 @@ export function BracketMap({
 
   return (
     <View style={styles.map} onLayout={(event) => setViewportWidth(event.nativeEvent.layout.width)}>
-      {mapWidth > viewportWidth ? <Text {...dynamicType} style={[typography.caption, styles.panHint, { color: colors.textDim }]}>Swipe sideways to explore the bracket</Text> : null}
+      {mapWidth > viewportWidth ? <Text {...dynamicType} style={[typography.caption, styles.panHint, { color: colors.textDim }]}>{t("arena.swipeToExplore")}</Text> : null}
       <Animated.ScrollView ref={horizontal} horizontal nestedScrollEnabled directionalLockEnabled onScroll={onPan} scrollEventThrottle={16} style={styles.horizontal}>
         <View style={{ width: mapWidth }}>
           {top.map((slots, roundIdx) => (
@@ -262,7 +267,7 @@ export function BracketMap({
 
           {hasCentre ? (
             <View>
-              <RoundHeading title="Final" detail="The deciding match" width={viewportWidth} offset={headingOffset} isFinal />
+              <RoundHeading title={t("arena.final")} detail={t("arena.finalDetail")} width={viewportWidth} offset={headingOffset} isFinal />
               <View style={styles.finalCell}>
                 <View style={[styles.stub, styles.stubTop, { backgroundColor: colors.border }]} />
                 <View style={[styles.stub, styles.stubBottom, { backgroundColor: colors.border }]} />
@@ -272,7 +277,7 @@ export function BracketMap({
                     <View style={[styles.champion, { backgroundColor: colors.accentSoft }]}>
                       <Icon name="champion" size={20} color={colors.accent} />
                       <View style={styles.championText}>
-                        <Text {...dynamicType} style={[typography.caption, { color: colors.text }]}>Tournament winner</Text>
+                        <Text {...dynamicType} style={[typography.caption, { color: colors.text }]}>{t("arena.tournamentWinner")}</Text>
                         <Text {...dynamicType} numberOfLines={2} style={[typography.body, styles.bold, { color: colors.text }]}>{champion.title}</Text>
                       </View>
                     </View>
@@ -309,11 +314,11 @@ export function BracketMap({
       {/* Read-only: bigger covers and the exact tallies a tile has no room
        *  for. Acting (vote, settle, tiebreak) happens on the tile itself,
        *  not here — see the file header. */}
-      <Sheet visible={Boolean(openDuel)} title="Match" onClose={() => setOpenId(null)}>
+      <Sheet visible={Boolean(openDuel)} title={t("arena.matchTitle")} onClose={() => setOpenId(null)}>
         {openDuel ? (
           <ScrollView style={styles.sheetScroll} contentContainerStyle={styles.sheetBody}>
             <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>
-              Round {openDuel.roundNumber} · Match {openDuel.duelIndex + 1} · {openDuel.status === "active" ? countdownLabel(openDuel.closesAt, locale) : openDuel.status === "tied_pending_tiebreak" ? "Owner tiebreak needed" : "Settled"}
+              {matchHeading(openDuel, locale)}
             </Text>
             <DuelSideRow side={openDuel.bookA} duel={openDuel} character={tournament.subject !== null} onClose={() => setOpenId(null)} />
             <DuelSideRow side={openDuel.bookB} duel={openDuel} character={tournament.subject !== null} onClose={() => setOpenId(null)} />

@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { statusLabel } from "@scripta/shared";
 import { catalogMismatches } from "@scripta/shared/i18n";
 import { reconcileAppearance, type AccountAppearance } from "@scripta/shared/themes";
 import { en } from "./messages/en";
 import { ptPT } from "./messages/pt-PT";
+import { authorizationCodeFromGoogleRedirect } from "../features/auth/googleSignInResult";
 import { getLocale, getLocalePreference, setDeviceLocaleTags, setLocalePreference, t } from "./index";
 
 test("the mobile catalog has no placeholder mismatches", () => {
@@ -32,6 +34,20 @@ test("an explicit pt-PT pick switches t()", () => {
   assert.equal(t("settings.language"), "Language");
 });
 
+test("the shell strings and the sign-in redirect error follow the pick", () => {
+  assert.equal(t("shell.signIn"), "Sign in");
+  assert.throws(() => authorizationCodeFromGoogleRedirect("scripta://oauth-redirect?state=wrong", "nonce"), /did not match the request/);
+  setLocalePreference("pt-PT");
+  try {
+    assert.equal(t("shell.signIn"), "Iniciar sessão");
+    assert.equal(t("shell.tabYou"), "Perfil");
+    assert.equal(t("shell.resendIn", { seconds: 30 }), "Reenviar em 30s");
+    assert.throws(() => authorizationCodeFromGoogleRedirect("scripta://oauth-redirect?state=wrong", "nonce"), /não corresponde ao pedido/);
+  } finally {
+    setLocalePreference("auto");
+  }
+});
+
 test("a locale from the account is applied to the device pick and the device pick is what gets reconciled", () => {
   const account: AccountAppearance = { theme: null, displayFont: null, textFont: null, locale: "pt-PT" };
   const device = { theme: "system", displayFont: "theme", textFont: "theme", locale: getLocalePreference() } as const;
@@ -42,6 +58,86 @@ test("a locale from the account is applied to the device pick and the device pic
   try {
     assert.equal(getLocalePreference(), "pt-PT");
     assert.deepEqual(reconcileAppearance({ ...account, locale: null }, { ...device, locale: getLocalePreference() }).upload, { theme: "system", displayFont: "theme", textFont: "theme", locale: "pt-PT" });
+  } finally {
+    setLocalePreference("auto");
+  }
+});
+
+test("counts pick the singular in Portuguese and keep today's English at every count", () => {
+  const cases: Array<[Parameters<typeof t>[0], Record<string, number | string>, string, string, string]> = [
+    ["murals.countFinished", { count: 1 }, "1 finished", "1 lido", "2 lidos"],
+    ["quizzes.statStreak", { count: 1 }, "day streak", "dia seguido", "dias seguidos"],
+    ["quizzes.statPerfect", { count: 1 }, "perfect", "perfeito", "perfeitos"],
+    ["book.castSelected", { count: 1 }, "1 characters", "1 personagem", "2 personagens"],
+    ["tierlists.rankLeft", { count: 1 }, "Rank · 1 left", "Classificar · falta 1", "Classificar · faltam 2"],
+  ];
+  for (const [key, vars, english, one, other] of cases) {
+    assert.equal(t(key, vars), english);
+    setLocalePreference("pt-PT");
+    try {
+      assert.equal(t(key, vars), one);
+      assert.equal(t(key, { ...vars, count: 2 }), other);
+    } finally {
+      setLocalePreference("auto");
+    }
+  }
+  assert.equal(t("book.castSelected", { count: 2 }), "2 characters");
+  assert.equal(t("quizzes.statStreak", { count: 5 }), "day streak");
+});
+
+test("the Daily Chapter summaries compose per-count plurals", () => {
+  const vars = (played: number, streak: number) => ({ played: t("quizzes.playedCount", { count: played }), streak: t("quizzes.dayStreakCount", { count: streak }) });
+  assert.equal(t("quizzes.chaptersLink", vars(1, 1)), "Your chapters · 1 played · 1 day streak ›");
+  assert.equal(t("quizzes.chaptersLinkLabel", vars(3, 2)), "Your chapters, 3 played, 2 day streak");
+  assert.equal(t("quizzes.completedSummary", { completed: t("quizzes.completedCount", { count: 4 }), streak: t("quizzes.dayStreakCount", { count: 1 }) }), "4 completed · 1 day streak");
+  assert.equal(t("quizzes.themeStats", { completed: 2, eligible: 5, since: "1 Oct", correct: 8, answered: 10, count: 1 }), "2/5 editions since 1 Oct · 8/10 correct · 1 perfect");
+  setLocalePreference("pt-PT");
+  try {
+    assert.equal(t("quizzes.chaptersLink", vars(1, 1)), "Os seus capítulos · 1 jogado · sequência de 1 dia ›");
+    assert.equal(t("quizzes.chaptersLinkLabel", vars(3, 2)), "Os seus capítulos, 3 jogados, sequência de 2 dias");
+    assert.equal(t("quizzes.completedSummary", { completed: t("quizzes.completedCount", { count: 1 }), streak: t("quizzes.dayStreakCount", { count: 3 }) }), "1 concluído · sequência de 3 dias");
+    assert.equal(t("quizzes.themeStats", { completed: 2, eligible: 5, since: "1 out", correct: 8, answered: 10, count: 1 }), "2/5 edições desde 1 out · 8/10 certas · 1 perfeita");
+  } finally {
+    setLocalePreference("auto");
+  }
+});
+
+test("the add-book status pickers use the shared labels", () => {
+  assert.deepEqual([1, 0, 2].map((status) => statusLabel(status, "en")), ["Reading", "To read", "Finished"]);
+  assert.deepEqual([1, 0, 2].map((status) => statusLabel(status, "pt-PT")), ["A ler", "Quero ler", "Lido"]);
+});
+
+test("brackets are chaves in Portuguese", () => {
+  setLocalePreference("pt-PT");
+  try {
+    assert.equal(t("arena.bracketMetaBooks", { size: 8 }), "Chave de 8 livros");
+    assert.equal(t("arena.tabBracket"), "Chave");
+  } finally {
+    setLocalePreference("auto");
+  }
+});
+
+test("the arena books sheet title is one message per subject", () => {
+  setLocalePreference("pt-PT");
+  try {
+    assert.equal(t("arena.booksSheetTitle", { name: "Fantasia" }), "Livros: Fantasia");
+    assert.equal(t("arena.charactersSheetTitle", { name: "Dune" }), "Personagens: Dune");
+  } finally {
+    setLocalePreference("auto");
+  }
+  assert.equal(t("arena.booksSheetTitle", { name: "Fantasy" }), "Fantasy books");
+  assert.equal(t("arena.charactersSheetTitle", { name: "Dune" }), "Dune characters");
+});
+
+test("badge labels pick the singular in Portuguese, including a capped badge", () => {
+  assert.equal(t("shell.badgeNew", { label: "Atividade", badge: "1", count: 1 }), "Atividade, 1 new");
+  assert.equal(t("shell.badgeRemaining", { label: "Votar", badge: 3, count: 3 }), "Votar, 3 remaining");
+  setLocalePreference("pt-PT");
+  try {
+    assert.equal(t("shell.badgeNew", { label: "Atividade", badge: "1", count: 1 }), "Atividade, 1 novo");
+    assert.equal(t("shell.badgeNew", { label: "Atividade", badge: "99+", count: Number.parseInt("99+", 10) }), "Atividade, 99+ novos");
+    assert.equal(t("shell.badgeRemaining", { label: "Votar", badge: 1, count: 1 }), "Votar, 1 restante");
+    assert.equal(t("shell.badgeRemaining", { label: "Votar", badge: 3, count: 3 }), "Votar, 3 restantes");
   } finally {
     setLocalePreference("auto");
   }

@@ -6,10 +6,11 @@ import { personCaption, type PersonResult, type SuggestedReader } from "@scripta
 import { BookCover } from "../arena/BookCover";
 import { AuthorAvatar, openProfile } from "./AuthorAvatar";
 import { ReaderGlyph } from "./ReaderGlyph";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export function PersonRow({ person, busy, onToggleFollow, onOpen }: { person: PersonResult | SuggestedReader; busy: boolean; onToggleFollow: () => void; onOpen?: () => void }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const glyphLabel = readerGlyphLabel(person.user.readerGlyph, locale);
   const suggestion = "sharedCount" in person ? person : null;
@@ -18,7 +19,7 @@ export function PersonRow({ person, busy, onToggleFollow, onOpen }: { person: Pe
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={[`Open ${person.user.username}'s profile`, glyphLabel, caption].filter(Boolean).join(", ")}
+        accessibilityLabel={[t("book.openProfile", { username: person.user.username }), glyphLabel, caption].filter(Boolean).join(", ")}
         onPress={() => {
           onOpen?.();
           openProfile(person.user.username);
@@ -48,7 +49,7 @@ export function PersonRow({ person, busy, onToggleFollow, onOpen }: { person: Pe
         ) : null}
       </Pressable>
       {person.private ? null : (
-        <Button label={person.viewerFollows ? "Following" : "Follow"} variant={person.viewerFollows ? "secondary" : "primary"} loading={busy} onPress={onToggleFollow} />
+        <Button label={person.viewerFollows ? t("book.following") : t("book.follow")} variant={person.viewerFollows ? "secondary" : "primary"} loading={busy} onPress={onToggleFollow} />
       )}
     </View>
   );

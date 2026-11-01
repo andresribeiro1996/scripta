@@ -6,6 +6,7 @@ import { Redirect, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../core/auth";
 import { Button, Input, Screen } from "../ui";
 import { spacing, typography, useTheme } from "../ui/theme";
+import { useT } from "../i18n";
 
 /** A Google sign-in with no username yet (`user.username === null`) is
  *  routed here by (app)/_layout.tsx's own guard before it's treated as
@@ -15,6 +16,7 @@ import { spacing, typography, useTheme } from "../ui/theme";
  *  set up"). A top-level route, not nested under (app)'s Tabs, so it
  *  never shows up as a tab. */
 export default function ChooseUsernamePage() {
+  const t = useT();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const { ready, user, setUsername } = useAuth();
   const { colors } = useTheme();
@@ -44,7 +46,7 @@ export default function ChooseUsernamePage() {
     try {
       await setUsername(trimmed);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save that username");
+      setError(e instanceof TypeError ? t("shell.connectFailedShort") : e instanceof Error ? e.message : t("shell.usernameSaveFailed"));
     } finally {
       setBusy(false);
     }
@@ -54,11 +56,11 @@ export default function ChooseUsernamePage() {
     <Screen bottom>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.flex}>
         <View style={styles.center}>
-          <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>Choose a username</Text>
-          <Text style={[styles.sub, { color: colors.textDim }]}>One more step before your library loads.</Text>
+          <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>{t("shell.chooseUsername")}</Text>
+          <Text style={[styles.sub, { color: colors.textDim }]}>{t("shell.chooseUsernameHint")}</Text>
           <View style={styles.form}>
             <Input
-              label="Username"
+              label={t("shell.username")}
               value={value}
               onChangeText={setValue}
               autoCapitalize="none"
@@ -67,10 +69,10 @@ export default function ChooseUsernamePage() {
               textContentType="username"
               returnKeyType="done"
               onSubmitEditing={() => { if (!tooShort && !busy) void onSubmit(); }}
-              placeholder="username"
+              placeholder={t("shell.usernamePlaceholder")}
               error={error ?? undefined}
             />
-            <Button label="Continue" loading={busy} disabled={tooShort} onPress={() => void onSubmit()} />
+            <Button label={t("shell.continue")} loading={busy} disabled={tooShort} onPress={() => void onSubmit()} />
           </View>
         </View>
       </KeyboardAvoidingView>

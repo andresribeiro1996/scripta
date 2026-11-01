@@ -12,6 +12,7 @@ import { Image } from "expo-image";
 import { normalizeImageId, normalizeIsbn, type CoverSize } from "@scripta/shared";
 import { useTheme } from "../../../ui/theme";
 import { API_URL } from "../../../core/config";
+import { useT } from "../../../i18n";
 import { coverUrlForApi } from "../lib/coverUrl";
 import { ensureCoversHydrated, forgetResolvedCover, peekResolvedCover, resolveCover, type ResolveCoverParams } from "../api/covers";
 
@@ -40,6 +41,7 @@ export function CoverImage({
   contentFit?: "cover" | "contain";
   size?: CoverSize;
 }) {
+  const t = useT();
   const { colors } = useTheme();
   const confirmedUrl = typeof book._coverUrl === "string" ? book._coverUrl : null;
   const [confirmedFailed, setConfirmedFailed] = useState(false);
@@ -92,7 +94,7 @@ export function CoverImage({
   }, [useAuto, currentSrc, resolving, onLoadEnd]);
 
   if (!currentSrc) {
-    return <View style={[StyleSheet.absoluteFill, styles.placeholder, { backgroundColor: colors.border }]}>{onLoadEnd && !resolving ? <Text style={{ color: colors.textDim, fontSize: 11, textAlign: "center" }}>Cover unavailable</Text> : null}</View>;
+    return <View style={[StyleSheet.absoluteFill, styles.placeholder, { backgroundColor: colors.border }]}>{onLoadEnd && !resolving ? <Text style={{ color: colors.textDim, fontSize: 11, textAlign: "center" }}>{t("library.coverUnavailable")}</Text> : null}</View>;
   }
 
   return (

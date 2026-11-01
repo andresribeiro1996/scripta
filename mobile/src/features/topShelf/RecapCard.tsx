@@ -8,6 +8,7 @@ import type { TopShelfRecapCard } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { MARK_VIEWBOX } from "@scripta/shared/themes";
 import { MarkRects, cardFontFamily, dynamicType, minimumTouchTarget, radii, spacing, typography } from "../../ui";
+import { useLocale, useT } from "../../i18n";
 import { recapCta, recapNumber, recapTitle } from "./recapModel";
 
 export const RECAP_COLORS = { gold: "#d9a54a", text: "#e8ece9", dim: "#9aa79f", border: "#5a4a24", deep: "#3d2f12", mid: "#1a2a22", base: "#0f1512" } as const;
@@ -58,13 +59,15 @@ function CoverImage({ uri, title, width, onSettled }: { uri: string | null; titl
 }
 
 export function RecapCard({ card, month, currentMonth, url, sharing = false, onOpen, onCoversReady }: { card: TopShelfRecapCard; month: string; currentMonth: string; url?: string | null; sharing?: boolean; onOpen?: () => void; onCoversReady?: () => void }) {
+  const t = useT();
+  const locale = useLocale();
   const insets = useSafeAreaInsets();
   const covers = recapCovers(card);
   const [settled, setSettled] = useState(0);
   const onSettled = useState(() => () => setSettled((count) => count + 1))[0];
   useEffect(() => { if (settled >= covers.length) onCoversReady?.(); }, [settled, covers.length, onCoversReady]);
   const title = card.kind === "book" ? card.book.title : card.kind === "hottestGame" ? card.game.item.content.name : "";
-  const subtitle = card.kind === "book" ? card.book.author : card.kind === "hottestGame" ? `by ${card.game.item.author.username}` : "";
+  const subtitle = card.kind === "book" ? card.book.author : card.kind === "hottestGame" ? t("book.byAuthor", { author: card.game.item.author.username }) : "";
   const [coverSpace, setCoverSpace] = useState<number | null>(null);
   const coverHeightCap = card.kind === "hottestGame" ? 120 : 255;
   const coverWidth = Math.max(1, Math.floor(Math.min(coverSpace ?? coverHeightCap, coverHeightCap) / 1.5));
@@ -77,14 +80,14 @@ export function RecapCard({ card, month, currentMonth, url, sharing = false, onO
       </View>
     </View>
   );
-  const numbersText = <Text {...dynamicType} style={[summary ? styles.summaryNumbers : styles.number, { fontFamily: SERIF }]}>{recapNumber(card)}</Text>;
-  const numbers = card.kind === "dailyChapter" && onOpen ? <Pressable accessibilityRole="button" accessibilityHint="Opens today's Daily Chapter" onPress={onOpen} style={styles.numbersPress}>{numbersText}</Pressable> : numbersText;
+  const numbersText = <Text {...dynamicType} style={[summary ? styles.summaryNumbers : styles.number, { fontFamily: SERIF }]}>{recapNumber(card, locale)}</Text>;
+  const numbers = card.kind === "dailyChapter" && onOpen ? <Pressable accessibilityRole="button" accessibilityHint={t("sharing.recapOpensDaily")} onPress={onOpen} style={styles.numbersPress}>{numbersText}</Pressable> : numbersText;
   return (
     <View style={[styles.card, sharing ? styles.sharing : styles.full, { paddingTop: sharing ? spacing.xxxl : insets.top + 64, paddingBottom: sharing ? spacing.lg : insets.bottom + spacing.xxxl }]}>
       <Background />
       <View style={[styles.main, sharing && styles.mainSharing]}>
-        <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.label]}>{recapTitle(card, month)}</Text>
-        {summary ? null : onOpen ? <Pressable accessibilityRole="button" accessibilityLabel={`Open ${title}`} onPress={onOpen} style={styles.coverPress}>{body}</Pressable> : body}
+        <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.label]}>{recapTitle(card, month, locale)}</Text>
+        {summary ? null : onOpen ? <Pressable accessibilityRole="button" accessibilityLabel={t("community.openTitle", { title })} onPress={onOpen} style={styles.coverPress}>{body}</Pressable> : body}
         {summary ? null : <View style={styles.titles}>
           <Text numberOfLines={3} style={[styles.title, { fontFamily: SERIF }]}>{title}</Text>
           <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: RECAP_COLORS.dim, alignSelf: "stretch", textAlign: "center" }]}>{subtitle}</Text>
@@ -94,10 +97,10 @@ export function RecapCard({ card, month, currentMonth, url, sharing = false, onO
       {sharing ? <View style={styles.strip}>
         {url ? <View style={styles.qr}><QRCode value={url} size={72} quietZone={4} backgroundColor="white" color="black" /></View> : null}
         <View style={styles.stripText}>
-          <Text numberOfLines={3} {...dynamicType} style={[typography.body, { color: RECAP_COLORS.text, fontWeight: "600" }]}>{recapCta(card, currentMonth)}</Text>
+          <Text numberOfLines={3} {...dynamicType} style={[typography.body, { color: RECAP_COLORS.text, fontWeight: "600" }]}>{recapCta(card, currentMonth, locale)}</Text>
           <Svg accessibilityLabel="Atmyshelf" width={20} height={20} viewBox={MARK_VIEWBOX}><MarkRects fill={RECAP_COLORS.gold} /></Svg>
         </View>
-      </View> : <Text numberOfLines={2} {...dynamicType} style={[typography.caption, styles.hint]}>{recapCta(card, currentMonth)}</Text>}
+      </View> : <Text numberOfLines={2} {...dynamicType} style={[typography.caption, styles.hint]}>{recapCta(card, currentMonth, locale)}</Text>}
     </View>
   );
 }

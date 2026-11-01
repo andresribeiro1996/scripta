@@ -6,8 +6,10 @@ import { Text } from "../../../ui/Text";
 import { Button } from "../../../ui/components";
 import { radii, spacing, typography, useTheme } from "../../../ui/theme";
 import { isbnFromBarcode } from "../lib/isbnBarcode";
+import { useT } from "../../../i18n";
 
 export function IsbnScanner({ hint, onIsbn }: { hint: string; onIsbn: (isbn: string) => void }) {
+  const t = useT();
   const { colors } = useTheme();
   const [permission, requestPermission] = useCameraPermissions();
   const [requesting, setRequesting] = useState(false);
@@ -25,7 +27,7 @@ export function IsbnScanner({ hint, onIsbn }: { hint: string; onIsbn: (isbn: str
   const ask = useCallback(() => {
     setRequesting(true);
     requestPermission()
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Couldn't access the camera. Type the ISBN instead."))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : t("library.cameraAccessFailed")))
       .finally(() => setRequesting(false));
   }, [requestPermission]);
 
@@ -36,20 +38,20 @@ export function IsbnScanner({ hint, onIsbn }: { hint: string; onIsbn: (isbn: str
   }, [permission, ask]);
 
   if (error) return <Text selectable accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{error}</Text>;
-  if (!permission || requesting) return <View style={styles.pending}><ActivityIndicator accessibilityLabel="Starting the camera" color={colors.accent} /></View>;
+  if (!permission || requesting) return <View style={styles.pending}><ActivityIndicator accessibilityLabel={t("library.startingCamera")} color={colors.accent} /></View>;
   if (!permission.granted) {
     return (
       <View style={styles.message}>
         <Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>
           {permission.canAskAgain
-            ? "Allow camera access to scan a book, or type the ISBN instead."
-            : "Camera access is disabled. Enable it in Settings, or type the ISBN instead."}
+            ? t("library.allowCameraBody")
+            : t("library.cameraDisabled")}
         </Text>
         {permission.canAskAgain ? (
-          <Button label="Allow camera" variant="secondary" onPress={ask} />
+          <Button label={t("library.allowCamera")} variant="secondary" onPress={ask} />
         ) : (
-          <Button label="Open Settings" variant="secondary" onPress={() => {
-            void Linking.openSettings().catch((err: unknown) => setError(err instanceof Error ? err.message : "Couldn't open Settings."));
+          <Button label={t("library.openSettings")} variant="secondary" onPress={() => {
+            void Linking.openSettings().catch((err: unknown) => setError(err instanceof Error ? err.message : t("library.openSettingsFailed")));
           }} />
         )}
       </View>
@@ -72,7 +74,7 @@ export function IsbnScanner({ hint, onIsbn }: { hint: string; onIsbn: (isbn: str
             }}
             onMountError={({ message }) => {
               consumed.current = true;
-              setError(message || "Couldn't start the camera. Type the ISBN instead.");
+              setError(message || t("library.cameraStartFailed"));
             }}
           />
         ) : null}

@@ -3,10 +3,12 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { bookKey } from "@scripta/shared";
 import { Input, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../../ui";
 import { Text } from "../../../ui/Text";
+import { useT } from "../../../i18n";
 
 type Book = Record<string, unknown>;
 
-export function BookPickerList({ books, onSelect, isSelected, label = "Search your library" }: { books: Book[]; onSelect: (book: Book) => void; isSelected?: (book: Book) => boolean; label?: string }) {
+export function BookPickerList({ books, onSelect, isSelected, label }: { books: Book[]; onSelect: (book: Book) => void; isSelected?: (book: Book) => boolean; label?: string }) {
+  const t = useT();
   const { colors } = useTheme();
   const [search, setSearch] = useState("");
   const filtered = useMemo(() => {
@@ -15,8 +17,8 @@ export function BookPickerList({ books, onSelect, isSelected, label = "Search yo
   }, [books, search]);
   return (
     <View style={styles.list}>
-      <Input label={label} value={search} onChangeText={setSearch} autoCapitalize="none" autoCorrect={false} returnKeyType="search" />
-      {filtered.length === 0 ? <Text style={[typography.body, { color: colors.textDim }]}>No books match.</Text> : null}
+      <Input label={label ?? t("library.searchYourLibrary")} value={search} onChangeText={setSearch} autoCapitalize="none" autoCorrect={false} returnKeyType="search" />
+      {filtered.length === 0 ? <Text style={[typography.body, { color: colors.textDim }]}>{t("library.noBooksMatch")}</Text> : null}
       {filtered.map((book, i) => {
         const selected = isSelected?.(book) ?? false;
         return (
@@ -24,12 +26,12 @@ export function BookPickerList({ books, onSelect, isSelected, label = "Search yo
             key={`${bookKey(book)}:${i}`}
             accessibilityRole={isSelected ? "checkbox" : "button"}
             accessibilityState={isSelected ? { checked: selected } : undefined}
-            accessibilityLabel={String(book.Title ?? "Untitled")}
+            accessibilityLabel={String(book.Title ?? t("library.untitled"))}
             onPress={() => onSelect(book)}
             style={[styles.row, { backgroundColor: selected ? colors.accentSoft : "transparent" }]}
           >
             <Text style={[typography.body, styles.grow, { color: colors.text }]} numberOfLines={1}>
-              {String(book.Title ?? "Untitled")} — <Text style={{ color: colors.textDim }}>{String(book.Attribution ?? "Unknown author")}</Text>
+              {String(book.Title ?? t("library.untitled"))} — <Text style={{ color: colors.textDim }}>{String(book.Attribution ?? t("library.unknownAuthor"))}</Text>
             </Text>
             <Text style={{ color: colors.accent, fontWeight: "700" }}>{selected ? "✓" : ""}</Text>
           </Pressable>

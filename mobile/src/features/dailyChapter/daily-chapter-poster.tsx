@@ -1,11 +1,12 @@
 import { useId } from "react";
 import { StyleSheet, View } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
-import { DAILY_CHAPTER_THEMES, recapMonthName, type DailyChapterPlayerSummary } from "@scripta/shared";
+import { dailyThemeName, recapMonthName, type DailyChapterPlayerSummary } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { cardFontFamily, radii, spacing, typography } from "../../ui";
 import { DailyChapterCalendar, POSTER_COLORS } from "./daily-chapter-calendar";
-import { useLocale } from "../../i18n";
+import { decimalText } from "@scripta/shared/i18n";
+import { useLocale, useT } from "../../i18n";
 
 const SERIF = cardFontFamily("serif");
 
@@ -17,10 +18,11 @@ function Stat({ value, label }: { value: string; label: string }) {
 }
 
 export function DailyChapterPoster({ summary }: { summary: DailyChapterPlayerSummary }) {
+  const t = useT();
   const locale = useLocale();
   const gradientId = useId();
   const best = summary.bestTheme;
-  const themeName = best ? DAILY_CHAPTER_THEMES.find((theme) => theme.id === best.themeId)?.name ?? best.themeId : "";
+  const themeName = best ? dailyThemeName(best.themeId, locale) : "";
   return <View style={styles.poster}>
     <Svg style={StyleSheet.absoluteFill} preserveAspectRatio="none">
       <Defs><LinearGradient id={gradientId} x1="0.3" y1="0" x2="0.7" y2="1">
@@ -29,15 +31,15 @@ export function DailyChapterPoster({ summary }: { summary: DailyChapterPlayerSum
       </LinearGradient></Defs>
       <Rect width="100%" height="100%" fill={`url(#${gradientId})`} />
     </Svg>
-    <Text style={styles.eyebrow}>The Daily Chapter</Text>
-    <Text style={[styles.month, { fontFamily: SERIF }]}>My {recapMonthName(summary.month, locale)}</Text>
+    <Text style={styles.eyebrow}>{t("quizzes.theDailyChapter")}</Text>
+    <Text style={[styles.month, { fontFamily: SERIF }]}>{t("quizzes.posterMonth", { month: recapMonthName(summary.month, locale) })}</Text>
     <DailyChapterCalendar days={summary.days} tone="poster" numbers={false} />
     <View style={styles.stats}>
-      <Stat value={String(summary.streak)} label="streak" />
-      <Stat value={String(summary.average)} label="avg / 5" />
-      {best ? <Stat value={`${best.percent}%`} label={`at ${themeName}`} /> : null}
+      <Stat value={String(summary.streak)} label={t("quizzes.posterStreak")} />
+      <Stat value={decimalText(summary.average, locale)} label={t("quizzes.statAverage")} />
+      {best ? <Stat value={`${best.percent}%`} label={t("quizzes.posterBestAt", { theme: themeName })} /> : null}
     </View>
-    <Text style={styles.footer}>atmyshelf · play today's chapter</Text>
+    <Text style={styles.footer}>{t("quizzes.posterFooter")}</Text>
   </View>;
 }
 

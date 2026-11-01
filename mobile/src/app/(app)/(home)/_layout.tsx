@@ -1,4 +1,5 @@
 import { Stack } from "expo-router";
+import { useT } from "@/i18n";
 import { useScreenOptions, useSheetOptions } from "@/ui/navigation";
 
 export const unstable_settings = {
@@ -6,16 +7,17 @@ export const unstable_settings = {
 };
 
 export default function HomeLayout() {
+  const t = useT();
   const sheet = useSheetOptions();
   return (
     <Stack screenOptions={useScreenOptions()}>
       <Stack.Screen name="index" />
-      <Stack.Screen name="add-book" options={{ ...sheet, title: "Add a book" }} />
-      <Stack.Screen name="import" options={{ ...sheet, title: "Import library" }} />
+      <Stack.Screen name="add-book" options={{ ...sheet, title: t("shell.addBook") }} />
+      <Stack.Screen name="import" options={{ ...sheet, title: t("shell.importLibrary") }} />
       <Stack.Screen name="book/[key]/index" options={{ title: "" }} />
-      <Stack.Screen name="book/[key]/style" options={{ ...sheet, title: "Card style" }} />
-      <Stack.Screen name="book/[key]/cover" options={{ ...sheet, title: "Cover" }} />
-      <Stack.Screen name="book/[key]/finished" options={{ ...sheet, title: "Finished" }} />
+      <Stack.Screen name="book/[key]/style" options={{ ...sheet, title: t("shell.cardStyle") }} />
+      <Stack.Screen name="book/[key]/cover" options={{ ...sheet, title: t("shell.cover") }} />
+      <Stack.Screen name="book/[key]/finished" options={{ ...sheet, title: t("shell.finished") }} />
     </Stack>
   );
 }

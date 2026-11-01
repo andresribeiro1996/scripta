@@ -12,7 +12,7 @@ import { HighlightChoice, SignatureChoice } from "./ReaderCardChoices";
 import { FrontOptions, GroupHeader, LayoutOption, ReaderCardPanel, useMotto, type PanelId } from "./ReaderCardOptions";
 import { ReaderGlyphSetting } from "./ReaderGlyphSetting";
 import { useOwnCardStyle, useReaderCardStyle, useSaveReaderCardStyle } from "./useReaderCardStyle";
-import { getLocale, useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 const NO_BOOKS: Array<Record<string, unknown>> = [];
 const PREVIEW_MAX = 280;
@@ -22,9 +22,10 @@ const PIN_CHROME = minimumTouchTarget + spacing.md + spacing.sm * 2;
 
 export function ReaderCardEditorScreen() {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const { user } = useAuth();
-  const readerName = user?.username ?? "reader";
+  const readerName = user?.username ?? t("community.readerFallback");
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const { data: library } = useLibrary();
   const books = library?.data.books ?? NO_BOOKS;
@@ -45,7 +46,7 @@ export function ReaderCardEditorScreen() {
       await save(patch);
       return true;
     } catch (reason) {
-      setError(saveFailureMessage(reason, "Couldn't save your reader card.", getLocale()));
+      setError(saveFailureMessage(reason, t("readerCard.saveFailed"), locale));
       return false;
     }
   };
@@ -67,8 +68,8 @@ export function ReaderCardEditorScreen() {
   };
 
   if (!style) {
-    if (isPending) return <Text style={[typography.body, styles.pad, { color: colors.textDim }]}>Loading your reader card…</Text>;
-    return <View style={styles.pad}><Button label="Couldn't load your reader card. Try again" onPress={() => void refetch()} /></View>;
+    if (isPending) return <Text style={[typography.body, styles.pad, { color: colors.textDim }]}>{t("readerCard.loading")}</Text>;
+    return <View style={styles.pad}><Button label={t("readerCard.loadFailed")} onPress={() => void refetch()} /></View>;
   }
 
   return (
@@ -80,13 +81,13 @@ export function ReaderCardEditorScreen() {
       <View style={styles.options}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.page} accessibilityElementsHidden={panel !== null} importantForAccessibility={panel === null ? "auto" : "no-hide-descendants"}>
           {input.card.state === "unwritten" && input.missing ? <Text style={[typography.body, { color: colors.textDim }]}>{input.missing}</Text> : null}
-          <GroupHeader title="Front" />
+          <GroupHeader title={t("readerCard.groupFront")} />
           <FrontOptions input={input} motto={motto} onChange={change} onOpen={openPanel} />
-          <GroupHeader title="Back" />
+          <GroupHeader title={t("readerCard.groupBack")} />
           <LayoutOption layout={input.style.layout} onChange={change} />
           <SignatureChoice books={books} signature={style.signature} chosen={input.card.chosen?.signature} onChange={change} />
           <HighlightChoice books={books} highlight={style.highlight} chosen={input.card.chosen?.highlight} onChange={change} />
-          <GroupHeader title="Your glyph" />
+          <GroupHeader title={t("readerCard.yourGlyph")} />
           <ReaderGlyphSetting username={readerName} books={books} groups={groups} />
         </ScrollView>
         {panel === null ? null : <ReaderCardPanel panel={panel} input={input} motto={motto} onChange={change} onClose={() => setPanel(null)} />}

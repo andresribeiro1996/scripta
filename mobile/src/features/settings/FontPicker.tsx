@@ -7,7 +7,7 @@ import { Text } from "../../ui/Text";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
 import { isAppearanceSyncFailure, saveAccountAppearance } from "./appearanceSync";
 import { SWATCH } from "./ThemePicker";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 function sampleStyle(font: FontId, slot: FontSlot) {
   return fontStyleFor(font, slot, typography.title) ?? { fontFamily: SYSTEM_FAMILY };
@@ -15,6 +15,7 @@ function sampleStyle(font: FontId, slot: FontSlot) {
 
 export function FontPicker({ slot }: { slot: FontSlot }) {
   const locale = useLocale();
+  const t = useT();
   const { id, colors, displayFont, textFont, setFontPreference } = useTheme();
   const selected = slot === "display" ? displayFont : textFont;
   const themeDefault = resolveFonts(id, "theme", "theme")[slot];
@@ -26,21 +27,21 @@ export function FontPicker({ slot }: { slot: FontSlot }) {
     setError(null);
     saveAccountAppearance(slot === "display" ? { displayFont: next } : { textFont: next }).catch((err: unknown) => {
       if (!isAppearanceSyncFailure(err)) throw err;
-      setError("Couldn't save to your account. Try again.");
+      setError(t("settings.languageSaveFailed"));
     });
   }
 
   return (
     <View style={styles.wrap}>
       <Text {...dynamicType} style={[typography.caption, styles.heading, { color: colors.textDim }]}>
-        {slot === "display" ? "Headings" : "Text"}
+        {slot === "display" ? t("settings.headings") : t("settings.text")}
       </Text>
-      <View accessibilityRole="radiogroup" accessibilityLabel={slot === "display" ? "Heading font" : "Text font"} style={styles.grid}>
+      <View accessibilityRole="radiogroup" accessibilityLabel={slot === "display" ? t("settings.headingFont") : t("settings.textFont")} style={styles.grid}>
         {options.map((option) => {
           const checked = option === selected;
           const shown = option === "theme" ? themeDefault : option;
-          const label = option === "theme" ? "Default" : fontLabel(option, locale);
-          const a11yLabel = option === "theme" ? `Theme default · ${fontLabel(themeDefault, locale)}` : label;
+          const label = option === "theme" ? t("settings.fontDefault") : fontLabel(option, locale);
+          const a11yLabel = option === "theme" ? t("settings.fontThemeDefault", { font: fontLabel(themeDefault, locale) }) : label;
           return (
             <Pressable
               key={option}

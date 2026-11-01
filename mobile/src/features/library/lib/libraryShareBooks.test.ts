@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { LibraryBook } from "@scripta/shared";
+import { setLocalePreference, t } from "../../../i18n";
 import {
   LIBRARY_SHARE_LAYOUTS,
   newestFinished,
@@ -65,9 +66,21 @@ test("shelfShareBooks applies shelf, search and sort", () => {
 
 test("LIBRARY_SHARE_LAYOUTS lists the four layouts in order", () => {
   assert.deepEqual(
-    LIBRARY_SHARE_LAYOUTS.map((layout) => layout.label),
+    LIBRARY_SHARE_LAYOUTS.map((layout) => t(layout.labelKey)),
     ["Wall", "Summary", "Reading", "Shelf"]
   );
+});
+
+test("LIBRARY_SHARE_LAYOUTS labels follow the Portuguese pick", () => {
+  setLocalePreference("pt-PT");
+  try {
+    assert.deepEqual(
+      LIBRARY_SHARE_LAYOUTS.map((layout) => t(layout.labelKey)),
+      ["Parede", "Resumo", "A ler", "Estante"]
+    );
+  } finally {
+    setLocalePreference("auto");
+  }
 });
 
 test("wallColumns grows with the library to bound wall height", () => {

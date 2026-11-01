@@ -25,9 +25,10 @@ import { Button, ErrorState, Skeleton } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { uploadImportPreview } from "../../import/api";
 import { parseLibraryJson } from "../lib/localImport";
+import { useT } from "../../../i18n";
 
 export function ImportForm({
-  title = "Import library",
+  title,
   onMerge,
   onClose,
 }: {
@@ -37,6 +38,7 @@ export function ImportForm({
   onMerge: (data: LibraryData) => Promise<void>;
   onClose: () => void;
 }) {
+  const t = useT();
   const { colors } = useTheme();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,12 +51,12 @@ export function ImportForm({
     setError(null);
     setSavingTemplate(true);
     try {
-      if (!await Sharing.isAvailableAsync()) throw new Error("Saving files is unavailable on this device.");
+      if (!await Sharing.isAvailableAsync()) throw new Error(t("library.savingFilesUnavailable"));
       const file = new File(Paths.cache, "atmyshelf-library.csv");
       await file.write(LIBRARY_CSV_TEMPLATE);
-      await Sharing.shareAsync(file.uri, { mimeType: "text/csv", UTI: "public.comma-separated-values-text", dialogTitle: "Save CSV template" });
+      await Sharing.shareAsync(file.uri, { mimeType: "text/csv", UTI: "public.comma-separated-values-text", dialogTitle: t("library.saveCsvTemplate") });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't save the CSV template.");
+      setError(err instanceof Error ? err.message : t("library.saveCsvTemplateFailed"));
     } finally {
       setSavingTemplate(false);
     }
@@ -77,7 +79,7 @@ export function ImportForm({
         setWarnings(uploaded.warnings);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't read that file.");
+      setError(err instanceof Error ? err.message : t("library.couldntReadFile"));
     } finally {
       setBusy(false);
     }
@@ -92,7 +94,7 @@ export function ImportForm({
       setPreview(null);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't save the imported library.");
+      setError(err instanceof Error ? err.message : t("library.importSaveFailed"));
     } finally {
       setMerging(false);
     }
@@ -102,26 +104,19 @@ export function ImportForm({
     <>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xl }}>
         <Text style={[typography.body, { color: colors.textDim }]}>
-          A <Text style={{ fontWeight: "700" }}>library.json</Text> from the exporter CLI, a{" "}
-          <Text style={{ fontWeight: "700" }}>KoboReader.sqlite</Text> straight off your device, a Goodreads library CSV
-          export, a StoryGraph library CSV export, a Calibre CSV catalog, a LibraryThing TSV export, a BookWyrm book-list CSV, or a spreadsheet CSV. Matching books are merged with what's already here, not
-          duplicated.
+          {t("library.importIntro").split("**").map((part, index) => (index % 2 ? <Text key={index} style={{ fontWeight: "700" }}>{part}</Text> : part))}
         </Text>
-        <Text style={[typography.caption, { color: colors.textDim }]}>
-          LibraryThing: More → Import/Export → Tab-Delimited Text. BookWyrm: Settings → Export Book List → CSV.
-        </Text>
-        <Text style={[typography.caption, { color: colors.textDim }]}>
-          For Calibre, export a CSV catalog with title and authors. For spreadsheets, use the template: Title and Author are required; other fields are optional. Status: to-read, reading, or read. Rating: 0–5. Dates: YYYY-MM-DD. Blank fields keep your saved values.
-        </Text>
-        <Button label="Save CSV template" variant="secondary" loading={savingTemplate} disabled={busy || merging} onPress={() => void saveTemplate()} />
-        <Button label={busy ? "Reading…" : "Choose a file…"} loading={busy} disabled={merging || savingTemplate} onPress={() => void handleChoose()} />
+        <Text style={[typography.caption, { color: colors.textDim }]}>{t("library.importSourcesNote")}</Text>
+        <Text style={[typography.caption, { color: colors.textDim }]}>{t("library.importSpreadsheetNote")}</Text>
+        <Button label={t("library.saveCsvTemplate")} variant="secondary" loading={savingTemplate} disabled={busy || merging} onPress={() => void saveTemplate()} />
+        <Button label={busy ? t("library.readingFile") : t("library.chooseFile")} loading={busy} disabled={merging || savingTemplate} onPress={() => void handleChoose()} />
         {busy && (
           <View style={{ gap: spacing.sm }}>
             <Skeleton height={18} />
             <Skeleton height={18} width="70%" />
           </View>
         )}
-        {error && <ErrorState body={error} actionLabel="Choose another file" onAction={() => void handleChoose()} />}
+        {error && <ErrorState body={error} actionLabel={t("library.chooseAnotherFile")} onAction={() => void handleChoose()} />}
         {warnings.map((w) => (
           <Text key={w} style={[typography.caption, { color: colors.danger }]}>
             {w}
@@ -129,14 +124,14 @@ export function ImportForm({
         ))}
         {preview && (
           <View style={{ gap: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: spacing.lg }}>
-            <Text style={[typography.title, { color: colors.text, fontWeight: "700" }]}>Ready to import</Text>
-            <Text style={[typography.body, { color: colors.textDim }]}>{preview.books.length} book{preview.books.length === 1 ? "" : "s"} found</Text>
+            <Text style={[typography.title, { color: colors.text, fontWeight: "700" }]}>{t("library.readyToImport")}</Text>
+            <Text style={[typography.body, { color: colors.textDim }]}>{t("library.booksFound", { count: preview.books.length })}</Text>
             {preview.books.slice(0, 5).map((book, i) => (
               <Text key={i} numberOfLines={1} style={[typography.body, { color: colors.text }]}>
-                {String(book.Title ?? "Untitled")}
+                {String(book.Title ?? t("library.untitled"))}
               </Text>
             ))}
-            <Button label={merging ? "Importing…" : "Merge into my library"} loading={merging} onPress={() => void handleConfirm()} />
+            <Button label={merging ? t("library.importing") : t("library.mergeIntoLibrary")} loading={merging} onPress={() => void handleConfirm()} />
           </View>
         )}
       </ScrollView>

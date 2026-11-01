@@ -17,6 +17,7 @@
 // localImport.test.ts's own top comment.
 
 import type { LibraryData } from "@scripta/shared";
+import { t } from "../../../i18n";
 
 export class InvalidLibraryJsonError extends Error {}
 
@@ -25,10 +26,10 @@ export function parseLibraryJson(text: string): LibraryData {
   try {
     parsed = JSON.parse(text);
   } catch {
-    throw new InvalidLibraryJsonError("That file isn't valid JSON.");
+    throw new InvalidLibraryJsonError(t("library.invalidJson"));
   }
   if (typeof parsed !== "object" || parsed === null || !Array.isArray((parsed as { books?: unknown }).books)) {
-    throw new InvalidLibraryJsonError('That JSON doesn\'t look like a kobo-export library file (missing a "books" array).');
+    throw new InvalidLibraryJsonError(t("library.missingBooksArray"));
   }
   return parsed as LibraryData;
 }

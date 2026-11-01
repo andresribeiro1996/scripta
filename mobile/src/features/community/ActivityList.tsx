@@ -7,17 +7,18 @@ import { EmptyState, ErrorState, Icon, Skeleton, dynamicType, radii, spacing, ty
 import { fetchActivity } from "./api";
 import { renderableActivity } from "./communityHome";
 import { CoverFan, SLOT_HEIGHT, SLOT_WIDTH } from "./CoverFan";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export function ActivityList({ username }: { username: string }) {
   const locale = useLocale();
+  const t = useT();
   const activity = useInfiniteQuery({
     queryKey: ["community", "activity", username],
     queryFn: ({ pageParam }) => fetchActivity(username, pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
-  const items = renderableActivity(activity.data?.pages.flatMap((page) => page.items) ?? []);
+  const items = renderableActivity(activity.data?.pages.flatMap((page) => page.items) ?? [], locale);
 
   if (activity.isPending)
     return (
@@ -28,7 +29,7 @@ export function ActivityList({ username }: { username: string }) {
   if (activity.isError)
     return (
       <View style={styles.body}>
-        <ErrorState body="Couldn't load activity." actionLabel="Retry" onAction={() => void activity.refetch()} />
+        <ErrorState body={t("community.activityLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void activity.refetch()} />
       </View>
     );
 
@@ -44,7 +45,7 @@ export function ActivityList({ username }: { username: string }) {
         if (activity.hasNextPage && !activity.isFetchingNextPage) void activity.fetchNextPage();
       }}
       onEndReachedThreshold={0.4}
-      ListEmptyComponent={<View style={styles.body}><EmptyState title="No activity yet" body="Publishing and reading will show up here." /></View>}
+      ListEmptyComponent={<View style={styles.body}><EmptyState title={t("community.noActivityTitle")} body={t("community.noActivityBody")} /></View>}
       ListFooterComponent={activity.isFetchingNextPage ? <View style={styles.body}><Skeleton height={80} /></View> : undefined}
       renderItem={({ item, index }) => {
         const day = activityDay(item.createdAt, locale);
@@ -75,6 +76,7 @@ function iconFor(item: ActivityItem): IconName {
 
 function ActivityRowView({ item, day }: { item: ActivityItem; day: string | null }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const row = activityRow(item, locale);
   if (!row) return null;
@@ -126,7 +128,7 @@ function ActivityRowView({ item, day }: { item: ActivityItem; day: string | null
         </Text>
       ) : null}
       {target ? (
-        <Pressable accessibilityRole="link" accessibilityLabel={`${row.label}: ${row.title}`} onPress={() => router.push(target as never)}>
+        <Pressable accessibilityRole="link" accessibilityLabel={t("community.labelWithName", { label: row.label, name: row.title })} onPress={() => router.push(target as never)}>
           {({ pressed }) => content(pressed)}
         </Pressable>
       ) : (

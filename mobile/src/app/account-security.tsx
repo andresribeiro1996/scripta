@@ -8,10 +8,11 @@ import { apiClient } from "../core/api";
 import { useAuth } from "../core/auth";
 import { Button, Input, Screen, useToast } from "../ui";
 import { spacing, typography, useTheme } from "../ui/theme";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
 export default function AccountSecurityPage() {
   const locale = useLocale();
+  const t = useT();
   const { user, ready, signOut } = useAuth();
   const { colors } = useTheme();
   const { show } = useToast();
@@ -33,16 +34,16 @@ export default function AccountSecurityPage() {
   async function run(action: "verify" | "password" | "email") {
     if (busy) return;
     setError(""); setMessage(""); setConfirmError("");
-    if (action === "password" && password !== confirm) { setConfirmError("Passwords don’t match."); return; }
+    if (action === "password" && password !== confirm) { setConfirmError(t("shell.passwordsMismatch")); return; }
     setBusy(true);
     try {
       await apiClient.request(action === "password" ? "/auth/change-password" : "/auth/verification-email", {
         method: "POST", auth: true, body: action === "verify" ? {} : { currentPassword: current, password, email: action === "email" ? email : undefined },
       });
       if (action === "password") { await signOut(); router.replace({ pathname: "/login", params: { notice: "password-changed" } }); }
-      else { setMessage(action === "email" ? "Check the new address to confirm it. Your current email stays active until then." : "Check your inbox and spam folder. You can resend in a minute."); setMode(null); }
+      else { setMessage(action === "email" ? t("shell.checkNewAddress") : t("shell.checkInbox")); setMode(null); }
       setCurrent(""); setPassword(""); setConfirm("");
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Please try again."); }
+    } catch (reason) { setError(reason instanceof TypeError ? t("shell.connectFailedShort") : reason instanceof Error ? reason.message : t("shell.pleaseTryAgain")); }
     finally { setBusy(false); }
   }
 
@@ -53,44 +54,44 @@ export default function AccountSecurityPage() {
       await apiClient.request("/auth/delete-account", { method: "POST", auth: true, body: account.data?.hasPassword ? { password: confirmation } : { confirmation } });
       await signOut();
       router.replace("/login");
-      show("Your account and everything in it have been deleted.", "success");
-    } catch (reason) { setDeleteError(reason instanceof Error ? reason.message : "Please try again."); }
+      show(t("shell.accountDeleted"), "success");
+    } catch (reason) { setDeleteError(reason instanceof TypeError ? t("shell.connectFailedShort") : reason instanceof Error ? reason.message : t("shell.pleaseTryAgain")); }
     finally { setBusy(false); }
   }
 
-  return <Screen top={false} bottom><Stack.Screen options={{ headerShown: true, title: "Account" }} />
+  return <Screen top={false} bottom><Stack.Screen options={{ headerShown: true, title: t("shell.account") }} />
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: spacing.xl, gap: spacing.lg }}>
-        {account.isPending ? <Text style={{ color: colors.text }}>Loading account…</Text> : account.isError ? <Button label="Couldn’t load account. Try again" onPress={() => void account.refetch()} /> : <>
-          <Text selectable style={[typography.body, { color: colors.text }]}>{account.data.email} · {account.data.emailVerified ? "Verified" : "Not verified"}</Text>
-          {!account.data.emailEnabled && <Text style={{ color: colors.textDim }}>Email delivery is temporarily unavailable.</Text>}
-          {!mode && !account.data.emailVerified && <Button label="Send verification email" variant="secondary" disabled={busy || !account.data.emailEnabled} onPress={() => void run("verify")} />}
-          {account.data.hasPassword ? <Button label="Change password" variant="secondary" disabled={busy} onPress={() => { setMode("password"); setError(""); setConfirmError(""); }} /> : <Text style={{ color: colors.textDim }}>Your password is managed by Google.</Text>}
-          {account.data.canChangeEmail && <Button label="Correct email" variant="secondary" disabled={busy || !account.data.emailEnabled} onPress={() => { setEmail(account.data.email); setMode("email"); setError(""); setConfirmError(""); }} />}
+        {account.isPending ? <Text style={{ color: colors.text }}>{t("shell.accountLoading")}</Text> : account.isError ? <Button label={t("shell.accountLoadFailed")} onPress={() => void account.refetch()} /> : <>
+          <Text selectable style={[typography.body, { color: colors.text }]}>{t(account.data.emailVerified ? "shell.accountEmailVerified" : "shell.accountEmailNotVerified", { email: account.data.email })}</Text>
+          {!account.data.emailEnabled && <Text style={{ color: colors.textDim }}>{t("shell.emailDeliveryUnavailable")}</Text>}
+          {!mode && !account.data.emailVerified && <Button label={t("shell.sendVerificationEmail")} variant="secondary" disabled={busy || !account.data.emailEnabled} onPress={() => void run("verify")} />}
+          {account.data.hasPassword ? <Button label={t("shell.changePassword")} variant="secondary" disabled={busy} onPress={() => { setMode("password"); setError(""); setConfirmError(""); }} /> : <Text style={{ color: colors.textDim }}>{t("shell.passwordManagedByGoogle")}</Text>}
+          {account.data.canChangeEmail && <Button label={t("shell.correctEmail")} variant="secondary" disabled={busy || !account.data.emailEnabled} onPress={() => { setEmail(account.data.email); setMode("email"); setError(""); setConfirmError(""); }} />}
         </>}
         {message ? <Text accessibilityLiveRegion="polite" style={{ color: colors.text }}>{message}</Text> : null}
         {!mode && error ? <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>{error}</Text> : null}
         {mode && <View style={{ gap: spacing.md }}>
-          <Input label="Current password" secureTextEntry autoComplete="current-password" textContentType="password" value={current} onChangeText={setCurrent} editable={!busy} />
-          {mode === "email" ? <Input label="New email" autoComplete="email" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" value={email} onChangeText={setEmail} editable={!busy} /> : <>
-            <Input label="New password" secureTextEntry autoComplete="new-password" textContentType="newPassword" hint={passwordHint(locale)} value={password} onChangeText={setPassword} editable={!busy} />
-            <Input label="Confirm new password" secureTextEntry autoComplete="new-password" textContentType="newPassword" error={confirmError} value={confirm} onChangeText={(value) => { setConfirm(value); setConfirmError(""); }} editable={!busy} />
-            <Text style={{ color: colors.textDim }}>Changing your password signs you out on every device. Then log in with your new password.</Text>
+          <Input label={t("shell.currentPassword")} secureTextEntry autoComplete="current-password" textContentType="password" value={current} onChangeText={setCurrent} editable={!busy} />
+          {mode === "email" ? <Input label={t("shell.newEmail")} autoComplete="email" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" value={email} onChangeText={setEmail} editable={!busy} /> : <>
+            <Input label={t("shell.newPassword")} secureTextEntry autoComplete="new-password" textContentType="newPassword" hint={passwordHint(locale)} value={password} onChangeText={setPassword} editable={!busy} />
+            <Input label={t("shell.confirmNewPassword")} secureTextEntry autoComplete="new-password" textContentType="newPassword" error={confirmError} value={confirm} onChangeText={(value) => { setConfirm(value); setConfirmError(""); }} editable={!busy} />
+            <Text style={{ color: colors.textDim }}>{t("shell.changePasswordNotice")}</Text>
           </>}
           {error ? <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>{error}</Text> : null}
-          <Button label={mode === "email" ? "Send confirmation" : "Save new password"} loading={busy} onPress={() => void run(mode)} />
-          <Button label="Cancel" variant="secondary" disabled={busy} onPress={() => { setMode(null); setError(""); setConfirmError(""); setCurrent(""); setPassword(""); setConfirm(""); }} />
+          <Button label={mode === "email" ? t("shell.sendConfirmation") : t("shell.saveNewPassword")} loading={busy} onPress={() => void run(mode)} />
+          <Button label={t("shell.cancel")} variant="secondary" disabled={busy} onPress={() => { setMode(null); setError(""); setConfirmError(""); setCurrent(""); setPassword(""); setConfirm(""); }} />
         </View>}
         {account.data && <View style={{ gap: spacing.md, marginTop: spacing.xl }}>
-          <Text accessibilityRole="header" style={[typography.title, { color: colors.text }]}>Delete account</Text>
-          <Text style={[typography.body, { color: colors.textDim }]}>Permanently deletes your account and everything in it: your library and highlights, murals, gallery images, tier lists, tournaments, follows and connected accounts. Share links stop working. This can’t be undone.</Text>
-          {!deleting ? <Button label="Delete account…" variant="destructive" disabled={busy} onPress={() => { setDeleting(true); setDeleteError(""); }} /> : <>
+          <Text accessibilityRole="header" style={[typography.title, { color: colors.text }]}>{t("shell.deleteAccount")}</Text>
+          <Text style={[typography.body, { color: colors.textDim }]}>{t("shell.deleteAccountWarning")}</Text>
+          {!deleting ? <Button label={t("shell.deleteAccountEllipsis")} variant="destructive" disabled={busy} onPress={() => { setDeleting(true); setDeleteError(""); }} /> : <>
             {account.data.hasPassword
-              ? <Input label="Enter your password to confirm" secureTextEntry autoComplete="current-password" textContentType="password" value={confirmation} onChangeText={setConfirmation} editable={!busy} />
-              : <Input label={`Type ${user?.username ?? account.data.email} to confirm`} autoCapitalize="none" autoCorrect={false} value={confirmation} onChangeText={setConfirmation} editable={!busy} />}
+              ? <Input label={t("shell.deleteEnterPassword")} secureTextEntry autoComplete="current-password" textContentType="password" value={confirmation} onChangeText={setConfirmation} editable={!busy} />
+              : <Input label={t("shell.deleteTypeToConfirm", { name: user?.username ?? account.data.email })} autoCapitalize="none" autoCorrect={false} value={confirmation} onChangeText={setConfirmation} editable={!busy} />}
             {deleteError ? <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>{deleteError}</Text> : null}
-            <Button label="Delete my account" variant="destructive" loading={busy} disabled={!confirmation} onPress={() => void deleteAccount()} />
-            <Button label="Cancel" variant="secondary" disabled={busy} onPress={() => { setDeleting(false); setConfirmation(""); setDeleteError(""); }} />
+            <Button label={t("shell.deleteMyAccount")} variant="destructive" loading={busy} disabled={!confirmation} onPress={() => void deleteAccount()} />
+            <Button label={t("shell.cancel")} variant="secondary" disabled={busy} onPress={() => { setDeleting(false); setConfirmation(""); setDeleteError(""); }} />
           </>}
         </View>}
       </ScrollView>

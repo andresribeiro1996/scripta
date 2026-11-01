@@ -5,19 +5,21 @@ import { duelWinner, sharePercent, type Duel, type DuelSide } from "@scripta/sha
 import { Button, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { workPath } from "../works/workPath";
 import { BookCover } from "./BookCover";
+import { useT } from "../../i18n";
 
 export function DuelSideRow({ side, duel, character = false, onClose }: { side: DuelSide; duel: Duel; character?: boolean; onClose: () => void }) {
+  const t = useT();
   const { colors } = useTheme();
   const percent = sharePercent(side.votes, duel);
   const segments = useSegments();
   return (
-    <View accessibilityLabel={character ? side.title : `${side.title} by ${side.author}`} style={[styles.side, { borderColor: duelWinner(duel) === side ? colors.success : colors.border }]}>
+    <View accessibilityLabel={character ? side.title : t("arena.titleByAuthor", { title: side.title, author: side.author })} style={[styles.side, { borderColor: duelWinner(duel) === side ? colors.success : colors.border }]}>
       <BookCover cover={side.cover} title={side.title} width={46} height={66} />
       <View style={styles.grow}>
         <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{side.title}</Text>
         {character ? null : <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{side.author}</Text>}
-        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{side.votes} votes{percent === null ? "" : ` · ${percent}%`}</Text>
-        {side.workId && !character ? <Button label="About this book" accessibilityLabel={`About ${side.title}`} variant="secondary" onPress={() => { onClose(); router.push(workPath(side.workId!, segments) as never); }} /> : null}
+        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{percent === null ? t("arena.votesLine", { count: side.votes }) : t("arena.votesLinePercent", { count: side.votes, percent })}</Text>
+        {side.workId && !character ? <Button label={t("arena.aboutBook")} accessibilityLabel={t("arena.aboutTitle", { title: side.title })} variant="secondary" onPress={() => { onClose(); router.push(workPath(side.workId!, segments) as never); }} /> : null}
       </View>
     </View>
   );

@@ -12,10 +12,11 @@ import { ReaderGlyph } from "../community/ReaderGlyph";
 import { MuralThumbnail } from "../murals/MuralCanvas";
 import { ReaderCardImage } from "../murals/ReaderCardImage";
 import { muralPreviewOf } from "../public/adapters";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export function ReaderPortraitCard({ person, width, canvasWidth, busy, onToggleFollow }: { person: SuggestedReader; width: number; canvasWidth: number; busy: boolean; onToggleFollow: () => void }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const fadeId = useId();
   const payload = person.private ? null : person.mural;
@@ -30,7 +31,7 @@ export function ReaderPortraitCard({ person, width, canvasWidth, busy, onToggleF
   const palette = preview ? themes[preview.mural.theme].colors : colors;
   return (
     <View style={[styles.card, { width, backgroundColor: colors.surface }]}>
-      <Pressable accessibilityRole="button" accessibilityLabel={[`Open ${person.user.username}'s profile`, glyphLabel, caption].filter(Boolean).join(", ")} onPress={() => openProfile(person.user.username)} style={({ pressed }) => [styles.open, { opacity: pressed ? 0.75 : 1 }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={[t("book.openProfile", { username: person.user.username }), glyphLabel, caption].filter(Boolean).join(", ")} onPress={() => openProfile(person.user.username)} style={({ pressed }) => [styles.open, { opacity: pressed ? 0.75 : 1 }]}>
         <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.preview, { height: width * 0.8, backgroundColor: palette.background }]}>
           {preview?.mural.coverImageUrl ? <Image source={{ uri: preview.mural.coverImageUrl }} contentFit="cover" style={StyleSheet.absoluteFill} /> : preview?.mural.blocks.length ? (
             <MuralThumbnail mural={preview.mural} canvasWidth={canvasWidth} books={preview.books} images={preview.images} tierlists={preview.tierlists} profile={person.user} shelfThemeOverride={payload?.library.shelfTheme} readerCardOverride={payload?.library.readerCard ?? fallback.card} statsOverride={payload?.library.stats} />
@@ -54,7 +55,7 @@ export function ReaderPortraitCard({ person, width, canvasWidth, busy, onToggleF
           <Text numberOfLines={2} {...dynamicType} style={[typography.caption, styles.caption, { color: colors.textDim }]}>{caption}</Text>
         </View>
       </Pressable>
-      {person.private ? null : <View style={styles.action}><Button label={person.viewerFollows ? "Following" : "Follow"} accessibilityLabel={`${person.viewerFollows ? "Unfollow" : "Follow"} ${person.user.username}`} variant="secondary" loading={busy} onPress={onToggleFollow} /></View>}
+      {person.private ? null : <View style={styles.action}><Button label={person.viewerFollows ? t("book.following") : t("book.follow")} accessibilityLabel={t(person.viewerFollows ? "book.unfollowUser" : "book.followUser", { username: person.user.username })} variant="secondary" loading={busy} onPress={onToggleFollow} /></View>}
     </View>
   );
 }

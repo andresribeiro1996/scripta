@@ -10,12 +10,13 @@ import { useLibrary } from "../library/hooks/useLibrary";
 import { fetchRecentAwards } from "../works/api";
 import { seriesSearchHref, workPath } from "../works/workPath";
 import { awardCardModel, awardKey, firstUndismissed } from "@scripta/shared";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export const RECENT_AWARDS_QUERY_KEY = ["recentAwards"] as const;
 
 export function AwardHomeCard() {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const segments = useSegments();
   const library = useLibrary();
@@ -56,7 +57,7 @@ export function AwardHomeCard() {
           {model.shelfLine ? <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.accent }]}>{model.shelfLine}</Text> : null}
         </View>
       </Pressable>
-      <IconButton name="close" accessibilityLabel={`Dismiss ${model.title}`} onPress={dismiss} />
+      <IconButton name="close" accessibilityLabel={t("book.dismissTitle", { title: model.title })} onPress={dismiss} />
     </View>
   );
 }

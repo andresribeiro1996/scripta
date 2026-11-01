@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { router, useGlobalSearchParams, usePathname, useSegments } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { localDay, saveFailureMessage, searchResultByline, toRecommendation } from "@scripta/shared";
+import { localDay, saveFailureMessage, searchResultByline, statusLabel, toRecommendation } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { Button, Sheet, Toast, dynamicType, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
@@ -13,13 +13,9 @@ import { LIBRARY_QUERY_KEY, useLibrary } from "../library/hooks/useLibrary";
 import { ownedEntry } from "../search/searchModel";
 import { pathWithQuery } from "../auth/navigation";
 import { workPath } from "../works/workPath";
-import { getLocale } from "../../i18n";
+import { useLocale, useT, type MessageKey } from "../../i18n";
 
-const STATUS_OPTIONS: ReadonlyArray<{ value: 0 | 1 | 2; label: string }> = [
-  { value: 0, label: "To read" },
-  { value: 1, label: "Reading" },
-  { value: 2, label: "Finished" },
-];
+const STATUS_VALUES = [0, 1, 2] as const;
 
 export function AddBookSheet({
   book,
@@ -28,6 +24,8 @@ export function AddBookSheet({
   book: { title: string; author: string; isbn?: string | null; coverUrl?: string | null; year?: number | null; publisher?: string | null; workId?: string };
   onClose: () => void;
 }) {
+  const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const { user } = useAuth();
   const pathname = usePathname();
@@ -43,10 +41,10 @@ export function AddBookSheet({
 
   if (!user) {
     return (
-      <Sheet visible title="Add to library" onClose={onClose}>
+      <Sheet visible title={t("addBook.addToLibrary")} onClose={onClose}>
         <View style={styles.signedOut}>
-          <Text {...dynamicType} style={[typography.body, { color: colors.textDim, textAlign: "center" }]}>Sign in to add books to your library.</Text>
-          <Button label="Sign in" onPress={() => router.push({ pathname: "/(public)/login", params: { returnTo: pathWithQuery(pathname, params) } } as never)} />
+          <Text {...dynamicType} style={[typography.body, { color: colors.textDim, textAlign: "center" }]}>{t("community.addToLibrarySignIn")}</Text>
+          <Button label={t("shell.signIn")} onPress={() => router.push({ pathname: "/(public)/login", params: { returnTo: pathWithQuery(pathname, params) } } as never)} />
         </View>
       </Sheet>
     );
@@ -61,7 +59,7 @@ export function AddBookSheet({
       if (readStatus === 2) {
         const { data, error: reloadError } = await library.refetch();
         if (reloadError) {
-          setToast({ message: "Added to your library, but couldn't open the finish step.", tone: "error" });
+          setToast({ message: t("community.addedFinishStepFailed"), tone: "error" });
           setTimeout(onClose, 1600);
           return;
         }
@@ -71,10 +69,10 @@ export function AddBookSheet({
           return;
         }
       }
-      setToast({ message: updated ? "Updated in your library." : "Added to your library.", tone: "success" });
+      setToast({ message: updated ? t("community.updatedInLibrary") : t("community.addedToLibrary"), tone: "success" });
       setTimeout(onClose, 1600);
     } catch (error) {
-      setToast({ message: saveFailureMessage(error, "Could not add the book.", getLocale()), tone: "error" });
+      setToast({ message: saveFailureMessage(error, t("book.addBookFailed"), locale), tone: "error" });
     } finally {
       setBusyStatus(null);
     }
@@ -82,7 +80,7 @@ export function AddBookSheet({
 
   if (finished) {
     return (
-      <Sheet visible title="Finished" onClose={onClose}>
+      <Sheet visible title={t("shell.finished")} onClose={onClose}>
         <FinishedScreen book={finished} before={null} onClose={onClose} />
       </Sheet>
     );
@@ -90,7 +88,7 @@ export function AddBookSheet({
 
   const workId = book.workId;
   return (
-    <Sheet visible title={existing ? "Update status" : "Add to library"} onClose={onClose}>
+    <Sheet visible title={existing ? t("community.updateStatus") : t("addBook.addToLibrary")} onClose={onClose}>
       <View style={styles.book}>
         <BookCover cover={book.coverUrl ?? null} title={book.title} width={96} height={138} />
         <View style={styles.text}>
@@ -98,16 +96,16 @@ export function AddBookSheet({
           <Text numberOfLines={2} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{searchResultByline({ authors: [book.author], publisher: book.publisher ?? null, year: book.year ?? null })}</Text>
         </View>
       </View>
-      <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.textDim }]}>{existing ? "Move it to" : "Add to your library as"}</Text>
+      <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.textDim }]}>{existing ? t("community.moveItTo") : t("community.addAs")}</Text>
       <View style={styles.actions}>
-        {STATUS_OPTIONS.map((option) => (
+        {STATUS_VALUES.map((value) => (
           <Button
-            key={option.value}
-            label={option.label}
-            variant={option.value === currentStatus ? "primary" : "secondary"}
-            loading={busyStatus === option.value}
+            key={value}
+            label={statusLabel(value, locale)}
+            variant={value === currentStatus ? "primary" : "secondary"}
+            loading={busyStatus === value}
             disabled={busyStatus !== null}
-            onPress={() => void handleAdd(option.value)}
+            onPress={() => void handleAdd(value)}
           />
         ))}
       </View>
@@ -120,7 +118,7 @@ export function AddBookSheet({
           }}
           style={styles.link}
         >
-          <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text, textDecorationLine: "underline" }]}>See the book page first</Text>
+          <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text, textDecorationLine: "underline" }]}>{t("community.seeBookPage")}</Text>
         </Pressable>
       ) : null}
       {toast ? <Toast visible message={toast.message} tone={toast.tone} /> : null}

@@ -51,13 +51,14 @@ import { LibraryGrid } from "./components/LibraryGrid";
 import { LibraryShareImage } from "./components/LibraryShareImage";
 import { ShareLayoutPicker } from "./components/ShareLayoutPicker";
 import { LIBRARY_SHARE_LAYOUTS, shelfShareBooks, type LibraryShareLayout } from "./lib/libraryShareBooks";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 type LibraryTab = LibraryStatusTab | "collections";
 
 export function LibraryScreen() {
   const locale = useLocale();
-  const libraryTabs: readonly { value: LibraryTab; label: string }[] = [...libraryStatusTabs(locale), { value: "collections", label: "Collections" }];
+  const t = useT();
+  const libraryTabs: readonly { value: LibraryTab; label: string }[] = [...libraryStatusTabs(locale), { value: "collections", label: t("library.collections") }];
   const { colors } = useTheme();
   const { data: library, isPending, isError, error, refetch, isRefetching, share, unshare } = useLibrary();
   const actions = useLibraryActions();
@@ -134,7 +135,7 @@ export function LibraryScreen() {
     const keys = selectedKeys;
     setConfirmingDelete(false);
     void actions.deleteBooks(keys, () => {
-      void murals.scrubBooks(keys).catch(() => show("The books were deleted, but some mural references couldn't be updated.", "error"));
+      void murals.scrubBooks(keys).catch(() => show(t("library.muralScrubFailed"), "error"));
       setSelectedKeys(new Set());
       setSelectionMode(false);
     });
@@ -153,15 +154,15 @@ export function LibraryScreen() {
 
   const actionGroups: ActionItem[][] = [
     [
-      { label: "Rename library", icon: "edit", onPress: startRenamingLibrary },
-      ...(books.length > 1 ? [{ label: "Reorder", icon: "reorder" as const, onPress: () => router.push("/reorder" as never) }] : []),
-      ...(!onCollectionsTab && books.length > 0 ? [{ label: "Select", icon: "select" as const, onPress: () => setSelectionMode(true) }] : []),
+      { label: t("library.renameLibrary"), icon: "edit", onPress: startRenamingLibrary },
+      ...(books.length > 1 ? [{ label: t("library.reorder"), icon: "reorder" as const, onPress: () => router.push("/reorder" as never) }] : []),
+      ...(!onCollectionsTab && books.length > 0 ? [{ label: t("library.select"), icon: "select" as const, onPress: () => setSelectionMode(true) }] : []),
     ],
     [
-      { label: "Library style", icon: "style", onPress: () => router.push("/style" as never) },
-      { label: "Import library", icon: "sync", onPress: () => router.push("/import" as never) },
+      { label: t("shell.libraryStyle"), icon: "style", onPress: () => router.push("/style" as never) },
+      { label: t("shell.importLibrary"), icon: "sync", onPress: () => router.push("/import" as never) },
     ],
-    [{ label: "Share", icon: "share", onPress: startSharing }],
+    [{ label: t("library.share"), icon: "share", onPress: startSharing }],
   ];
 
   const sortLabel = sortOptions(locale).find((option) => option.value === sortKey)?.label ?? sortKey;
@@ -177,10 +178,10 @@ export function LibraryScreen() {
         options={selectionMode
           ? {
               headerShown: true,
-              title: `${selectedKeys.size} selected`,
+              title: t("library.selectedCount", { count: selectedKeys.size }),
               headerTitle: () => (
                 <Text display accessibilityRole="header" numberOfLines={1} {...dynamicType} style={[styles.selectionTitle, { color: colors.text }]}>
-                  {`${selectedKeys.size} selected`}
+                  {t("library.selectedCount", { count: selectedKeys.size })}
                 </Text>
               ),
               // Selection is a mode, not a place — its own back is Cancel, so
@@ -189,13 +190,13 @@ export function LibraryScreen() {
               headerLeft: () => (
                 <IconButton
                   name="close"
-                  accessibilityLabel="Cancel selection"
+                  accessibilityLabel={t("library.cancelSelection")}
                   onPress={() => { setSelectionMode(false); setSelectedKeys(new Set()); }}
                 />
               ),
               headerRight: () => (
                 <IconButton
-                  accessibilityLabel={`Delete ${selectedKeys.size} selected`}
+                  accessibilityLabel={t("library.deleteSelected", { count: selectedKeys.size })}
                   name="delete"
                   disabled={selectedKeys.size === 0}
                   onPress={handleDeleteSelected}
@@ -205,14 +206,14 @@ export function LibraryScreen() {
             }
           : {
               headerShown: true,
-              title: library?.data.name || "Library",
+              title: library?.data.name || t("shell.tabLibrary"),
               headerLargeTitleEnabled: false,
               headerBackVisible: undefined,
               headerTitle: undefined,
               headerLeft: undefined,
               headerRight: () => (
-                <ActionSheet title={library?.data.name || "Library"} groups={actionGroups}>
-                  {(open) => <IconButton accessibilityLabel="Library actions" name="more" onPress={open} />}
+                <ActionSheet title={library?.data.name || t("shell.tabLibrary")} groups={actionGroups}>
+                  {(open) => <IconButton accessibilityLabel={t("library.libraryActions")} name="more" onPress={open} />}
                 </ActionSheet>
               ),
             }}
@@ -233,15 +234,15 @@ export function LibraryScreen() {
           </View>
         </View>
       )}
-      {isError && <ErrorState body={error instanceof Error ? error.message : "Couldn't load your library."} actionLabel="Retry" onAction={() => refetch()} />}
+      {isError && <ErrorState body={error instanceof Error ? error.message : t("shell.libraryLoadFailed")} actionLabel={t("shell.retry")} onAction={() => refetch()} />}
 
       {!isPending && !isError && books.length === 0 && (
         <EmptyState
-          title="Start your library"
-          body="Import your existing collection, or find a book by title or barcode."
-          actionLabel="Import library"
+          title={t("library.startTitle")}
+          body={t("library.startBody")}
+          actionLabel={t("shell.importLibrary")}
           onAction={() => router.push("/import" as never)}
-          secondaryActionLabel="Add a book"
+          secondaryActionLabel={t("shell.addBook")}
           onSecondaryAction={() => setAddingBook(true)}
         />
       )}
@@ -250,35 +251,35 @@ export function LibraryScreen() {
         <SearchDock
           value={onCollectionsTab ? groupQuery : query}
           onChangeText={onCollectionsTab ? setGroupQuery : setQuery}
-          accessibilityLabel={onCollectionsTab ? "Search collections" : "Search title or author"}
-          placeholder={onCollectionsTab ? "Search collections" : "Search title or author"}
+          accessibilityLabel={onCollectionsTab ? t("shell.searchCollections") : t("library.searchTitleOrAuthor")}
+          placeholder={onCollectionsTab ? t("shell.searchCollections") : t("library.searchTitleOrAuthor")}
           cycle={
             onCollectionsTab
               ? {
                   icon: typeFilterOption.icon,
                   active: typeFilter !== "all",
-                  accessibilityLabel: `Showing ${typeFilterOption.label.toLowerCase()}`,
-                  accessibilityHint: "Switches to the next type",
+                  accessibilityLabel: t("shell.showingType", { type: t(typeFilterOption.labelKey).toLowerCase() }),
+                  accessibilityHint: t("shell.switchesToNextType"),
                   onPress: () => setTypeFilter(nextTypeFilter.value),
                 }
               : {
                   icon: "filter",
                   active: sortKey !== "manual",
-                  accessibilityLabel: `Sort books, currently ${sortLabel}`,
-                  menu: { title: "Sort books", items: sortItems },
+                  accessibilityLabel: t("library.sortBooksCurrently", { sort: sortLabel }),
+                  menu: { title: t("library.sortBooks"), items: sortItems },
                 }
           }
           fab={
             selectionMode ? undefined : onCollectionsTab ? (
-              <Fab label="New" accessibilityLabel="New collection" onPress={() => groupsView.current?.startCreating()} />
+              <Fab label={t("library.fabNew")} accessibilityLabel={t("shell.newCollection")} onPress={() => groupsView.current?.startCreating()} />
             ) : (
-              <Fab label="Add" accessibilityLabel="Add book" onPress={() => setAddingBook(true)} />
+              <Fab label={t("library.fabAdd")} accessibilityLabel={t("library.addBook")} onPress={() => setAddingBook(true)} />
             )
           }
         >
           {(scrollProps) => (
             <SwipeableTabs
-              accessibilityLabel="Library shelf"
+              accessibilityLabel={t("library.shelfTabs")}
               options={libraryTabs}
               value={statusFilter}
               onChange={setStatusFilter}
@@ -303,7 +304,7 @@ export function LibraryScreen() {
                             style={({ pressed }) => [styles.sortPill, { borderColor: colors.border }, pressed ? { backgroundColor: colors.surfacePressed } : null]}
                           >
                             <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.text }]}>
-                              {possibleDuplicates.length === 1 ? "1 possible duplicate · Review" : `${possibleDuplicates.length} possible duplicates · Review`}
+                              {t("library.possibleDuplicates", { count: possibleDuplicates.length })}
                             </Text>
                           </Pressable>
                         </View>
@@ -312,13 +313,13 @@ export function LibraryScreen() {
                     ListEmptyComponent={
                       query.trim() ? (
                         <EmptyState
-                          title="No books match."
-                          body="Every book is still here — the search below just doesn't match any of them."
-                          actionLabel="Clear search and sort"
+                          title={t("library.noBooksMatch")}
+                          body={t("library.noBooksMatchBody")}
+                          actionLabel={t("library.clearSearchAndSort")}
                           onAction={clearSearchAndFilters}
                         />
                       ) : (
-                        <EmptyState title="Nothing on this shelf yet." />
+                        <EmptyState title={t("library.shelfEmpty")} />
                       )
                     }
                     renderItem={(book) => {
@@ -345,18 +346,18 @@ export function LibraryScreen() {
 
       {addingBook ? <AddBookOptionsSheet onClose={() => setAddingBook(false)} /> : null}
 
-      <Sheet visible={editingName} title="Rename library" onClose={() => setEditingName(false)}>
-        <Input label="Library name" autoFocus value={nameDraft} maxLength={200} onChangeText={setNameDraft} onSubmitEditing={() => void handleRenameLibrary()} onBlur={() => void handleRenameLibrary()} />
+      <Sheet visible={editingName} title={t("library.renameLibrary")} onClose={() => setEditingName(false)}>
+        <Input label={t("library.libraryName")} autoFocus value={nameDraft} maxLength={200} onChangeText={setNameDraft} onSubmitEditing={() => void handleRenameLibrary()} onBlur={() => void handleRenameLibrary()} />
       </Sheet>
 
-      <Sheet visible={reviewingDuplicates && possibleDuplicates.length > 0} title="Possible duplicates" onClose={() => setReviewingDuplicates(false)}>
+      <Sheet visible={reviewingDuplicates && possibleDuplicates.length > 0} title={t("library.possibleDuplicatesTitle")} onClose={() => setReviewingDuplicates(false)}>
         {library ? <DuplicatesSheetBody groups={possibleDuplicates} library={library} /> : null}
       </Sheet>
 
       <ContentShareSheet
         visible={sharing}
         onClose={() => setSharing(false)}
-        title={library?.data.name || "Library"}
+        title={library?.data.name || t("shell.tabLibrary")}
         url={library?.shareUrl ?? null}
         onEnableLink={async () => (await share()).shareUrl ?? undefined}
         onDisableLink={async () => { await unshare(); }}
@@ -364,7 +365,7 @@ export function LibraryScreen() {
         linkActions={library?.shareUrl ? <ShareActions message={library.shareUrl} /> : null}
         previewControls={
           <ShareLayoutPicker
-            options={LIBRARY_SHARE_LAYOUTS.filter((layout) => !(onCollectionsTab && layout.value === "shelf"))}
+            options={LIBRARY_SHARE_LAYOUTS.filter((layout) => !(onCollectionsTab && layout.value === "shelf")).map((layout) => ({ value: layout.value, label: t(layout.labelKey) }))}
             value={shareLayout}
             onChange={(next) => {
               setShareImageReady(false);
@@ -376,7 +377,7 @@ export function LibraryScreen() {
         <LibraryShareImage
           key={shareLayout}
           layout={shareLayout}
-          name={library?.data.name || "Library"}
+          name={library?.data.name || t("shell.tabLibrary")}
           ordered={ordered}
           shelf={onCollectionsTab ? null : { label: libraryTabs.find((tab) => tab.value === statusFilter)!.label, query, books: shelfShareBooks(ordered, query, statusFilter, sortKey) }}
           style={style}
@@ -387,9 +388,9 @@ export function LibraryScreen() {
 
       <ConfirmDialog
         visible={confirmingDelete}
-        title={`Delete ${selectedKeys.size} book${selectedKeys.size === 1 ? "" : "s"}?`}
-        body="This can't be undone."
-        confirmLabel="Delete"
+        title={t("library.deleteBooksTitle", { count: selectedKeys.size })}
+        body={t("library.cantBeUndone")}
+        confirmLabel={t("library.delete")}
         destructive
         onConfirm={confirmDeleteSelected}
         onCancel={() => setConfirmingDelete(false)}

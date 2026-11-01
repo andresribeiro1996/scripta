@@ -8,10 +8,12 @@ import { API_URL } from "../../core/config";
 import { ActionSheet, Button, Icon, IconButton, Input, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { AuthorAvatar } from "../community/AuthorAvatar";
 import { fetchOwnProfile } from "../community/api";
+import { useT } from "../../i18n";
 
 const BADGE = 28;
 
 export function ProfileHeader() {
+  const t = useT();
   const { colors } = useTheme();
   const { user, setUsername, uploadAvatar, removeAvatar } = useAuth();
   const own = useQuery({ queryKey: ["community", "own-profile"], queryFn: fetchOwnProfile });
@@ -21,20 +23,20 @@ export function ProfileHeader() {
   const [error, setError] = useState<string | null>(null);
   const username = user?.username ?? "";
   const avatarUrl = user?.avatarId ? `${API_URL}/auth/avatar/${user.avatarId}/file` : null;
-  const status = own.data ? `${own.data.published ? "Published" : "Private"} · ${user?.email}` : user?.email;
+  const status = own.data ? t(own.data.published ? "shell.profileStatusPublished" : "shell.profileStatusPrivate", { email: user?.email ?? "" }) : user?.email;
 
   async function run(action: () => Promise<void>): Promise<boolean> {
     setBusy(true);
     setError(null);
     try { await action(); return true; }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "Something went wrong."); return false; }
+    catch (reason) { setError(reason instanceof Error ? reason.message : t("shell.somethingWentWrongSentence")); return false; }
     finally { setBusy(false); }
   }
 
   async function pickAvatar() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      setError("Photo library access is off. Enable it in device Settings to change your picture.");
+      setError(t("shell.photoAccessOffChange"));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsEditing: true, aspect: [1, 1], quality: 0.9 });
@@ -54,16 +56,16 @@ export function ProfileHeader() {
       <View>
         <AuthorAvatar username={username} avatarUrl={avatarUrl} size={96} />
         <ActionSheet
-          title="Profile picture"
+          title={t("shell.profilePicture")}
           groups={[[
-            { label: "Change picture", icon: "image", onPress: () => void pickAvatar() },
-            { label: "Remove picture", icon: "delete", destructive: true, onPress: () => void run(removeAvatar) },
+            { label: t("shell.changePicture"), icon: "image", onPress: () => void pickAvatar() },
+            { label: t("shell.removePicture"), icon: "delete", destructive: true, onPress: () => void run(removeAvatar) },
           ]]}
         >
           {(open) => (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={avatarUrl ? "Edit picture" : "Add picture"}
+              accessibilityLabel={avatarUrl ? t("shell.editPicture") : t("shell.addPicture")}
               accessibilityState={{ disabled: busy }}
               disabled={busy}
               hitSlop={(minimumTouchTarget - BADGE) / 2}
@@ -77,16 +79,16 @@ export function ProfileHeader() {
       </View>
       {editing ? (
         <View style={styles.edit}>
-          <Input label="Username" value={draft} onChangeText={setDraft} autoCapitalize="none" autoCorrect={false} />
+          <Input label={t("shell.username")} value={draft} onChangeText={setDraft} autoCapitalize="none" autoCorrect={false} />
           <View style={styles.actions}>
-            <Button label="Cancel" variant="secondary" onPress={cancelEdit} />
-            <Button label="Save" loading={busy} disabled={draft.trim().length < 3} onPress={() => void run(() => setUsername(draft.trim())).then((saved) => { if (saved) setEditing(false); })} />
+            <Button label={t("shell.cancel")} variant="secondary" onPress={cancelEdit} />
+            <Button label={t("shell.save")} loading={busy} disabled={draft.trim().length < 3} onPress={() => void run(() => setUsername(draft.trim())).then((saved) => { if (saved) setEditing(false); })} />
           </View>
         </View>
       ) : (
         <View style={styles.nameRow}>
           <Text {...dynamicType} numberOfLines={1} style={[typography.title, styles.name, { color: colors.text }]}>@{username}</Text>
-          <IconButton name="edit" accessibilityLabel="Change username" onPress={() => { setDraft(username); setEditing(true); }} />
+          <IconButton name="edit" accessibilityLabel={t("shell.changeUsername")} onPress={() => { setDraft(username); setEditing(true); }} />
         </View>
       )}
       <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{status}</Text>

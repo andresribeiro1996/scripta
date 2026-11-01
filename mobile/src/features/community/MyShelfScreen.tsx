@@ -20,13 +20,13 @@ import { FeedSettingsDialog } from "./FeedSettingsDialog";
 import { ShelfPreview } from "./ShelfPreview";
 import { fetchOwnProfile, publishProfile, setShelfMural, unpublishProfile } from "./api";
 import { MuralPicker } from "./ProfileScreen";
-import { useLocale } from "../../i18n";
+import { useLocale, useT, type MessageKey } from "../../i18n";
 
 const MY_SHELF_TABS = [
-  { value: "shelf", label: "Shelf" },
-  { value: "activity", label: "Activity" },
-  { value: "daily", label: "Daily" },
-] as const;
+  { value: "shelf", labelKey: "community.tabShelf" },
+  { value: "activity", labelKey: "community.activity" },
+  { value: "daily", labelKey: "community.tabDaily" },
+] as const satisfies readonly { value: string; labelKey: MessageKey }[];
 
 type MyShelfTab = (typeof MY_SHELF_TABS)[number]["value"];
 
@@ -34,6 +34,7 @@ let lastTab: MyShelfTab = "shelf";
 
 export function MyShelfScreen() {
   const locale = useLocale();
+  const t = useT();
   const { colors, id: theme } = useTheme();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -89,7 +90,7 @@ export function MyShelfScreen() {
       await queryClient.invalidateQueries({ queryKey: ["community", "activity", username] });
       return true;
     } catch {
-      setError("Something went wrong. Try again.");
+      setError(t("community.somethingWentWrongRetry"));
       await queryClient.invalidateQueries({ queryKey: ["community", "own-profile"] });
       await queryClient.invalidateQueries({ queryKey: ["murals"] });
       return false;
@@ -107,7 +108,7 @@ export function MyShelfScreen() {
   if (own.isPending) {
     return (
       <Screen top={false}>
-        <Stack.Screen options={{ headerShown: true, title: "My shelf" }} />
+        <Stack.Screen options={{ headerShown: true, title: t("community.myShelf") }} />
         <View style={styles.tabPad}><Skeleton height={180} /></View>
       </Screen>
     );
@@ -116,8 +117,8 @@ export function MyShelfScreen() {
   if (own.isError) {
     return (
       <Screen top={false}>
-        <Stack.Screen options={{ headerShown: true, title: "My shelf" }} />
-        <ErrorState title="Shelf unavailable" body="Couldn't load your shelf." actionLabel="Retry" onAction={() => void own.refetch()} />
+        <Stack.Screen options={{ headerShown: true, title: t("community.myShelf") }} />
+        <ErrorState title={t("community.shelfUnavailable")} body={t("community.shelfLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void own.refetch()} />
       </Screen>
     );
   }
@@ -127,7 +128,7 @@ export function MyShelfScreen() {
   const muralHasBlocks = Boolean(mural.data && mural.data.blocks.length > 0);
 
   async function shelfTargetId() {
-    const id = ownData.muralId ?? pendingShelf.current ?? (await murals.create("My shelf", theme)).id;
+    const id = ownData.muralId ?? pendingShelf.current ?? (await murals.create(t("community.myShelf"), theme)).id;
     pendingShelf.current = id;
     return id;
   }
@@ -173,39 +174,39 @@ export function MyShelfScreen() {
 
   const menuGroups: ActionItem[][] = [
     [
-      ...(hasMural ? [{ label: "Edit shelf", icon: "edit" as const, onPress: () => router.push(`/murals/${ownData.muralId}` as never) }] : []),
-      { label: "Switch shelf mural", icon: "murals", onPress: () => setSwitchingMural(true) },
+      ...(hasMural ? [{ label: t("community.editShelf"), icon: "edit" as const, onPress: () => router.push(`/murals/${ownData.muralId}` as never) }] : []),
+      { label: t("community.switchShelfMural"), icon: "murals", onPress: () => setSwitchingMural(true) },
     ],
-    [{ label: "Feed settings", icon: "settings", onPress: () => setSettingsOpen(true) }],
+    [{ label: t("community.feedSettings"), icon: "settings", onPress: () => setSettingsOpen(true) }],
   ];
 
   const headerRight = () => (
     <HeaderActions>
       <IconButton
         name={ownData.published ? "public" : "lock"}
-        accessibilityLabel={ownData.published ? "Published. Tap to unpublish" : "Private. Tap to publish"}
+        accessibilityLabel={ownData.published ? t("community.publishedTapUnpublish") : t("community.privateTapPublish")}
         onPress={handleChipPress}
       />
-      <ActionSheet title="My shelf" groups={menuGroups}>
-        {(open) => <IconButton accessibilityLabel="Shelf options" name="more" onPress={open} />}
+      <ActionSheet title={t("community.myShelf")} groups={menuGroups}>
+        {(open) => <IconButton accessibilityLabel={t("community.shelfOptions")} name="more" onPress={open} />}
       </ActionSheet>
     </HeaderActions>
   );
 
   return (
     <Screen top={false}>
-      <Stack.Screen options={{ headerShown: true, title: "My shelf", headerRight }} />
+      <Stack.Screen options={{ headerShown: true, title: t("community.myShelf"), headerRight }} />
       {error ? <Toast visible message={error} tone="error" /> : null}
       <SwipeableTabs
-        accessibilityLabel="My shelf sections"
-        options={MY_SHELF_TABS}
+        accessibilityLabel={t("community.myShelfSections")}
+        options={MY_SHELF_TABS.map((tab) => ({ value: tab.value, label: t(tab.labelKey) }))}
         value={tab}
         onChange={handleTabChange}
         renderPage={(value) => {
           if (value === "daily") return <DailyChapterProfileSection userId={user!.id} own />;
           if (value === "activity") return <ActivityList username={username} />;
           if (hasMural && mural.isPending) return <View style={styles.tabPad}><Skeleton height={240} /></View>;
-          if (hasMural && mural.isError) return <ErrorState body="Couldn't load your shelf." actionLabel="Retry" onAction={() => void mural.refetch()} />;
+          if (hasMural && mural.isError) return <ErrorState body={t("community.shelfLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void mural.refetch()} />;
           if (hasMural && muralHasBlocks) {
             return (
               <ScrollView contentContainerStyle={styles.canvasScroll}>
@@ -221,15 +222,15 @@ export function MyShelfScreen() {
             );
           }
           if (libraryQuery.isPending) return <View style={styles.tabPad}><Skeleton height={240} /></View>;
-          if (libraryQuery.isError) return <ErrorState body="Couldn't load your library." actionLabel="Retry" onAction={() => void libraryQuery.refetch()} />;
+          if (libraryQuery.isError) return <ErrorState body={t("shell.libraryLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void libraryQuery.refetch()} />;
           if (!books.length) {
             return (
               <EmptyState
-                title="Start your library"
-                body="Import your existing collection, or add your first book manually."
-                actionLabel="Import library"
+                title={t("library.startTitle")}
+                body={t("community.startLibraryManualBody")}
+                actionLabel={t("shell.importLibrary")}
                 onAction={() => router.push("/import" as never)}
-                secondaryActionLabel="Add a book"
+                secondaryActionLabel={t("shell.addBook")}
                 onSecondaryAction={() => router.push("/add-book" as never)}
               />
             );
@@ -240,9 +241,9 @@ export function MyShelfScreen() {
       <MuralPicker
         visible={switchingMural}
         busy={busy}
-        title="Choose your shelf"
-        description="Pick the mural that becomes your shelf."
-        actionLabel="Use this mural"
+        title={t("community.chooseShelf")}
+        description={t("community.chooseShelfBody")}
+        actionLabel={t("community.useThisMural")}
         error={error}
         onClose={() => setSwitchingMural(false)}
         onPick={(muralId) => void run(async () => {
@@ -250,27 +251,27 @@ export function MyShelfScreen() {
           setSwitchingMural(false);
         })}
       />
-      <Dialog visible={confirmingPublish} title="Publish your shelf?" onClose={() => setConfirmingPublish(false)}>
+      <Dialog visible={confirmingPublish} title={t("community.publishShelfTitle")} onClose={() => setConfirmingPublish(false)}>
         <View style={styles.dialogGap}>
           <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>
-            {`It becomes a public page at /u/${username} with your library, and readers can find and follow you.`}
+            {t("community.publishShelfBody", { username })}
           </Text>
           <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>
-            Share what you add and finish on your page and with followers?
+            {t("community.shareReadingQuestion")}
           </Text>
           {error ? <Toast visible message={error} tone="error" /> : null}
-          <Button label="Share my reading" variant="secondary" loading={answer === true} disabled={busy} onPress={() => void publish(true)} />
-          <Button label="Don't share my reading" variant="secondary" loading={answer === false} disabled={busy} onPress={() => void publish(false)} />
+          <Button label={t("community.shareMyReading")} variant="secondary" loading={answer === true} disabled={busy} onPress={() => void publish(true)} />
+          <Button label={t("community.dontShareMyReading")} variant="secondary" loading={answer === false} disabled={busy} onPress={() => void publish(false)} />
         </View>
       </Dialog>
-      <Dialog visible={confirmingUnpublish} title="Unpublish your profile?" onClose={() => setConfirmingUnpublish(false)}>
+      <Dialog visible={confirmingUnpublish} title={t("community.unpublishTitle")} onClose={() => setConfirmingUnpublish(false)}>
         <View style={styles.dialogGap}>
           <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>
-            Your page disappears and people stop finding you in search. You can publish again any time.
+            {t("community.unpublishBody")}
           </Text>
           {error ? <Toast visible message={error} tone="error" /> : null}
           <Button
-            label="Unpublish"
+            label={t("community.unpublish")}
             variant="destructive"
             loading={busy}
             onPress={() => void run(async () => {

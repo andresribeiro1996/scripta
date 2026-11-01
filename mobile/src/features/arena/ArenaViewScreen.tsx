@@ -20,12 +20,13 @@ import { BracketViewToggle, type BracketView } from "./BracketViewToggle";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import { publicContentUrl } from "../sharing/links";
 import { ChampionBanner } from "./ChampionBanner";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 const TOKEN_KEY = "arena-voter-token";
 
 export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => void }) {
   const locale = useLocale();
+  const t = useT();
   const { user } = useAuth();
   const { colors } = useTheme();
   const queryClient = useQueryClient();
@@ -77,7 +78,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
       await run();
       await queryClient.invalidateQueries({ queryKey: ["arena"] });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "That action failed.");
+      setError(reason instanceof Error ? reason.message : t("arena.actionFailed"));
     } finally {
       setBusy(null);
     }
@@ -89,13 +90,13 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
   }
 
   if (!token || tournament.isPending) return <Screen bottom top={false} style={styles.centered}><Skeleton height={160} /></Screen>;
-  if (tournament.isError || !data) return <Screen bottom top={false} style={styles.centered}><ErrorState title="Tournament unavailable" body={tournament.error instanceof Error ? tournament.error.message : "No such tournament."} actionLabel={isPermanentError(tournament.error) ? "Go to Atmyshelf" : "Retry"} onAction={isPermanentError(tournament.error) ? () => router.replace("/") : () => void tournament.refetch()} /></Screen>;
+  if (tournament.isError || !data) return <Screen bottom top={false} style={styles.centered}><ErrorState title={t("shell.tournamentUnavailable")} body={tournament.error instanceof Error ? tournament.error.message : t("arena.noSuchTournament")} actionLabel={isPermanentError(tournament.error) ? t("shell.notFoundAction") : t("shell.retry")} onAction={isPermanentError(tournament.error) ? () => router.replace("/") : () => void tournament.refetch()} /></Screen>;
 
   const votable = votableDuels(data.duels);
   const next = votable[0];
   const champion = tournamentChampion(data.bracketSize, data.duels);
   const refresh = () => void tournament.refetch();
-  const tabs = arenaViewTabs(data.status);
+  const tabs = arenaViewTabs(data.status, locale);
   // Open on the pane with something to do: the deck when there are votes to
   // cast, the bracket otherwise — landing a finished tournament on "No
   // matches" wasted the one screen that had anything to show.
@@ -104,7 +105,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
   const activeTab = tabs.some((option) => option.value === chosen) ? chosen : tabs[0]!.value;
 
   const matchPane = () => {
-    const empty = matchEmptyCopy(data.status, data.duels.length > 0);
+    const empty = matchEmptyCopy(data.status, data.duels.length > 0, locale);
     // A vote deck owns vertical pan gestures for its own swipe-to-vote, so
     // (unlike the other panes) it can't also sit inside a pull-to-refresh
     // ScrollView — the two would compete for the same drag. It already
@@ -140,7 +141,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
     if (data.status === "seeding") {
       return (
         <ScrollView style={styles.grow} contentContainerStyle={styles.pane} refreshControl={<RefreshControl refreshing={tournament.isRefetching} onRefresh={refresh} />}>
-          <EmptyState title="Tournament is being seeded" body="Pull to refresh for updates." />
+          <EmptyState title={t("arena.beingSeeded")} body={t("arena.pullToRefresh")} />
         </ScrollView>
       );
     }
@@ -188,15 +189,15 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
           title: data.name,
           headerRight: () => (
             <HeaderActions>
-            <IconButton name="share" accessibilityLabel="Share tournament" onPress={() => void action("share", async () => setShareUrl(await publicContentUrl(`/arena/${encodeURIComponent(id)}`)))} />
+            <IconButton name="share" accessibilityLabel={t("arena.shareTournament")} onPress={() => void action("share", async () => setShareUrl(await publicContentUrl(`/arena/${encodeURIComponent(id)}`)))} />
             <ActionSheet
               title={data.name}
               groups={[
-                [{ label: data.slots.length ? `See all ${data.slots.length} ${itemNoun(data.subject, data.slots.length, locale)}` : data.subject ? "View characters" : "View book pool", icon: "book", onPress: () => setBooksOpen(true) }],
-                ...(isOwner ? [[{ label: "Rename", icon: "edit" as const, onPress: () => { setName(data.name); setRenaming(true); } }]] : []),
+                [{ label: data.slots.length ? t("arena.seeAllItems", { count: data.slots.length, noun: itemNoun(data.subject, data.slots.length, locale) }) : t(data.subject ? "arena.viewCharacters" : "arena.viewBookPool"), icon: "book", onPress: () => setBooksOpen(true) }],
+                ...(isOwner ? [[{ label: t("arena.rename"), icon: "edit" as const, onPress: () => { setName(data.name); setRenaming(true); } }]] : []),
               ]}
             >
-              {(open) => <IconButton accessibilityLabel={`Actions for ${data.name}`} name="more" onPress={open} />}
+              {(open) => <IconButton accessibilityLabel={t("arena.actionsFor", { name: data.name })} name="more" onPress={open} />}
             </ActionSheet>
             </HeaderActions>
           ),
@@ -205,7 +206,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
       {error ? <Toast visible message={error} tone="error" /> : null}
       {data.subject ? <View style={styles.subjectHeader}><CharacterHeader subject={data.subject} /></View> : null}
       <SwipeableTabs
-        accessibilityLabel="Tournament view"
+        accessibilityLabel={t("arena.tournamentView")}
         options={tabs.map((option) => option.value === "match" ? { ...option, badge: votable.length } : option)}
         value={activeTab}
         onChange={setTab}
@@ -214,8 +215,8 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
       <ContentShareSheet visible={shareUrl !== null} onClose={() => setShareUrl(null)} title={data.name} url={shareUrl} />
       <ArenaBooksSheet id={booksOpen ? id : null} name={data.name} character={Boolean(data.subject)} onAddBook={openAddBook} onClose={() => setBooksOpen(false)} />
       {addBook ? <AddBookSheet book={addBook} onClose={() => setAddBook(null)} /> : null}
-      <Dialog visible={renaming} title="Rename tournament" onClose={() => setRenaming(false)}><View style={styles.dialog}><Input label="Tournament name" value={name} onChangeText={setName} maxLength={200} /><Button label="Save name" disabled={!name.trim()} loading={busy === "rename"} onPress={() => void action("rename", async () => { await renameTournament(id, name.trim()); setRenaming(false); })} /></View></Dialog>
-      <ConfirmDialog visible={settling !== null} title="Settle this match now?" body="Voting closes and the current votes decide the winner. A tie comes back to you to break." confirmLabel="Settle" destructive loading={settling !== null && busy === settling} onConfirm={() => settling && void settle(settling)} onCancel={() => setSettling(null)} />
+      <Dialog visible={renaming} title={t("arena.renameTournament")} onClose={() => setRenaming(false)}><View style={styles.dialog}><Input label={t("arena.tournamentName")} value={name} onChangeText={setName} maxLength={200} /><Button label={t("arena.saveName")} disabled={!name.trim()} loading={busy === "rename"} onPress={() => void action("rename", async () => { await renameTournament(id, name.trim()); setRenaming(false); })} /></View></Dialog>
+      <ConfirmDialog visible={settling !== null} title={t("arena.settleTitle")} body={t("arena.settleBody")} confirmLabel={t("arena.settle")} destructive loading={settling !== null && busy === settling} onConfirm={() => settling && void settle(settling)} onCancel={() => setSettling(null)} />
     </Screen>
   );
 }

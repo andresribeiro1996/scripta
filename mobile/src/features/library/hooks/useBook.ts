@@ -9,6 +9,7 @@ import {
   seriesGroupByBookKey,
   type LibraryStyleSettings,
 } from "@scripta/shared";
+import { useT } from "../../../i18n";
 import { useLibrary } from "./useLibrary";
 
 export function useBook(key: string | undefined): {
@@ -21,6 +22,7 @@ export function useBook(key: string | undefined): {
   loading: boolean;
   workId: string | null;
 } {
+  const t = useT();
   const { data: library, isPending } = useLibrary();
 
   return useMemo(() => {
@@ -32,9 +34,9 @@ export function useBook(key: string | undefined): {
     return {
       book,
       seedStyle: effectiveCardStyle(libraryStyle, seriesGroup?.style),
-      inheritedFrom: seriesGroup?.style ? `series “${seriesGroup.name}”` : library?.data.name ? `library “${library.data.name}”` : "your library",
+      inheritedFrom: seriesGroup?.style ? t("library.inheritedSeries", { name: seriesGroup.name }) : library?.data.name ? t("library.inheritedLibrary", { name: library.data.name }) : t("library.inheritedYourLibrary"),
       loading: isPending,
       workId: (key && library?.works?.[key]) || null,
     };
-  }, [isPending, key, library]);
+  }, [isPending, key, library, t]);
 }

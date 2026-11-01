@@ -26,12 +26,13 @@ import { DuelButton } from "./components/DuelButton";
 import { FeelingChips } from "./components/FeelingChips";
 import { useLibrary } from "./hooks/useLibrary";
 import { useLibraryActions } from "./hooks/useLibraryActions";
-import { getLocale, useLocale } from "../../i18n";
+import { getLocale, useLocale, useT } from "../../i18n";
 
 type Shelf = { blocks: MuralBlock[]; landed: Landing[] };
 
 export function FinishedScreen({ book, before, onClose }: { book: Record<string, unknown>; before: ReadSnapshot | null; onClose: () => void }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const { show } = useToast();
   const { setRating, addNote, restoreRead } = useLibraryActions((message) => {
@@ -63,8 +64,8 @@ export function FinishedScreen({ book, before, onClose }: { book: Record<string,
   // fails after Done/Undo already closed it (a queued finish/promote settling
   // late) has no banner left to show it, so that case also gets a toast.
   function reportShelfError() {
-    if (mounted.current) setShelfError("Couldn't update your shelf.");
-    else show("Couldn't update your shelf.", "error");
+    if (mounted.current) setShelfError(t("library.shelfUpdateFailed"));
+    else show(t("library.shelfUpdateFailed"), "error");
   }
 
   useEffect(() => {
@@ -132,7 +133,7 @@ export function FinishedScreen({ book, before, onClose }: { book: Record<string,
     }
     const shelfOk = (await sessionRef.current?.restore()) ?? true;
     if (!shelfOk) {
-      setShelfError("Couldn't update your shelf.");
+      setShelfError(t("library.shelfUpdateFailed"));
       return;
     }
     onClose();
@@ -148,16 +149,16 @@ export function FinishedScreen({ book, before, onClose }: { book: Record<string,
   const footer = landed.length === 0
     ? null
     : landed.includes("favourites")
-      ? "Added to Finished on your shelf, and to Favourites"
-      : "Added to Finished on your shelf";
+      ? t("library.addedToFinishedFavourites")
+      : t("library.addedToFinished");
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
       {shelfError ? <Toast visible message={shelfError} tone="error" /> : null}
 
       <View style={styles.header}>
-        <Text {...dynamicType} style={[typography.caption, styles.eyebrow, { color: colors.textDim }]}>{`Finished · ${day}`}</Text>
-        <Button label="Done" onPress={handleDone} />
+        <Text {...dynamicType} style={[typography.caption, styles.eyebrow, { color: colors.textDim }]}>{t("library.finishedOn", { day })}</Text>
+        <Button label={t("library.done")} onPress={handleDone} />
       </View>
 
       <View style={styles.bookRow}>
@@ -165,45 +166,45 @@ export function FinishedScreen({ book, before, onClose }: { book: Record<string,
           <CoverImage book={book} />
         </View>
         <View style={styles.bookText}>
-          <Text style={[typography.heading, { color: colors.text }]} numberOfLines={2}>{String(book.Title ?? "Untitled")}</Text>
-          <Text style={[typography.body, { color: colors.textDim, marginTop: 2 }]}>{String(book.Attribution ?? "Unknown author")}</Text>
+          <Text style={[typography.heading, { color: colors.text }]} numberOfLines={2}>{String(book.Title ?? t("library.untitled"))}</Text>
+          <Text style={[typography.body, { color: colors.textDim, marginTop: 2 }]}>{String(book.Attribution ?? t("library.unknownAuthor"))}</Text>
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={[typography.title, { color: colors.text }]}>How did it land?</Text>
+        <Text style={[typography.title, { color: colors.text }]}>{t("library.howDidItLand")}</Text>
         <FeelingChips value={typeof book.Rating === "number" ? book.Rating : null} onChange={(rating) => void handleRatingChange(rating)} />
-        {savedRating ? <Text style={[typography.caption, { color: colors.textDim }]}>Saved as your rating</Text> : null}
+        {savedRating ? <Text style={[typography.caption, { color: colors.textDim }]}>{t("library.savedAsRating")}</Text> : null}
       </View>
 
       <View style={styles.section}>
-        <Text style={[typography.title, { color: colors.text }]}>A thought to keep.</Text>
+        <Text style={[typography.title, { color: colors.text }]}>{t("library.thoughtToKeep")}</Text>
         <Input
           multiline
           numberOfLines={4}
           value={note}
           onChangeText={(text) => { setNote(text); noteRef.current = text; }}
-          placeholder="What stuck with you?"
-          accessibilityLabel="A thought to keep"
+          placeholder={t("library.thoughtPlaceholder")}
+          accessibilityLabel={t("library.thoughtLabel")}
           style={{ minHeight: 96 }}
         />
       </View>
 
       {opponentBook && !favouriteChoiceMade ? (
         <View style={styles.section}>
-          <Text style={[typography.title, { color: colors.text }]}>Against your favourite.</Text>
+          <Text style={[typography.title, { color: colors.text }]}>{t("library.againstFavourite")}</Text>
           <View style={styles.opponentRow}>
             <View style={styles.opponentItem}>
               <View style={[styles.opponentCover, { backgroundColor: colors.border }]}>
                 <CoverImage book={book} />
               </View>
-              <DuelButton label="This one" onPress={() => void chooseThisOne()} />
+              <DuelButton label={t("library.thisOne")} onPress={() => void chooseThisOne()} />
             </View>
             <View style={styles.opponentItem}>
               <View style={[styles.opponentCover, { backgroundColor: colors.border }]}>
                 <CoverImage book={opponentBook} />
               </View>
-              <DuelButton label={`Still ${String(opponentBook.Title ?? "this one")}`} onPress={() => setFavouriteChoiceMade(true)} />
+              <DuelButton label={t("library.stillTitle", { title: String(opponentBook.Title ?? t("library.stillThisOne")) })} onPress={() => setFavouriteChoiceMade(true)} />
             </View>
           </View>
         </View>
@@ -211,7 +212,7 @@ export function FinishedScreen({ book, before, onClose }: { book: Record<string,
 
       {footer ? <Text style={[typography.body, { color: colors.textDim }]}>{footer}</Text> : null}
 
-      {before && <Button label="Not finished? Undo" variant="secondary" onPress={() => void undo(before)} />}
+      {before && <Button label={t("library.notFinishedUndo")} variant="secondary" onPress={() => void undo(before)} />}
     </ScrollView>
   );
 }

@@ -4,15 +4,16 @@ import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text } from "../../ui/Text";
 import { itemNoun, quizClueHeading, readerGlyphLabel, type QuizPreview } from "@scripta/shared";
 import { ActionSheet, Icon, IconButton, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
-import type { ContentTone, DiscoverItem, PublishedContent } from "@scripta/shared/community";
+import { contentStatusBadge, type ContentTone, type DiscoverItem, type PublishedContent } from "@scripta/shared/community";
 import { TIER_LADDER, contentStats, contentStatus, contentTarget, gameActionLabel } from "./communityHome";
 import { AuthorAvatar, openProfile } from "./AuthorAvatar";
 import { ReaderGlyph } from "./ReaderGlyph";
 import { GameTicketArt } from "./GameTicketArt";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export function DiscoverRow({ item, linkAuthor, stats, onPreviewBooks, onOpen }: { item: DiscoverItem; linkAuthor: boolean; stats?: Array<{ value: number; label: string }>; onPreviewBooks?: (tournament: { id: string; name: string; character: boolean }) => void; onOpen?: () => void }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const { content, author } = item;
   const status = contentStatus(content, locale);
@@ -41,7 +42,7 @@ export function DiscoverRow({ item, linkAuthor, stats, onPreviewBooks, onOpen }:
           ) : (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={glyphLabel ? `Open ${author.username}'s profile, ${glyphLabel}` : `Open ${author.username}'s profile`}
+              accessibilityLabel={glyphLabel ? t("book.openProfileStatus", { username: author.username, status: glyphLabel }) : t("book.openProfile", { username: author.username })}
               onPress={() => openProfile(author.username)}
               style={({ pressed }) => [styles.nameRow, styles.shrink, { backgroundColor: pressed ? colors.surfacePressed : colors.surface }]}
             >
@@ -50,9 +51,9 @@ export function DiscoverRow({ item, linkAuthor, stats, onPreviewBooks, onOpen }:
           )}
         </View>
       }
-      badges={status.votedBadge ? [status, { label: "Voted", tone: "info" }] : [status]}
+      badges={status.votedBadge ? [status, contentStatusBadge("voted", locale)] : [status]}
       stats={stats ?? contentStats(content, locale)}
-      seeBooks={content.kind === "tournament" && onPreviewBooks ? { text: `See ${itemNoun(content.subject, 2, locale)}`, label: `See all ${content.bookCount} ${itemNoun(content.subject, content.bookCount, locale)} in ${content.name}`, onPress: () => onPreviewBooks({ id: content.id, name: content.name, character: content.subject?.kind === "characters" }) } : undefined}
+      seeBooks={content.kind === "tournament" && onPreviewBooks ? { text: t("community.seeNoun", { noun: itemNoun(content.subject, 2, locale) }), label: t("community.seeAllIn", { count: content.bookCount, noun: itemNoun(content.subject, content.bookCount, locale), name: content.name }), onPress: () => onPreviewBooks({ id: content.id, name: content.name, character: content.subject?.kind === "characters" }) } : undefined}
     />
   );
 }
@@ -76,8 +77,10 @@ export type GameRowProps = {
   onDelete?: () => void;
 };
 
-export function GameRow({ kind, name, meta, badges, caption, stats = [], covers, ladder, preview, actionLabel = "Open game", seeBooks, accessibilityRole = "button", onPress, onDelete }: GameRowProps) {
+export function GameRow({ kind, name, meta, badges, caption, stats = [], covers, ladder, preview, actionLabel, seeBooks, accessibilityRole = "button", onPress, onDelete }: GameRowProps) {
   const locale = useLocale();
+  const t = useT();
+  const action = actionLabel ?? t("community.openGame");
   const { colors } = useTheme();
   const { fontScale } = useWindowDimensions();
   const color = kind === "quiz" ? colors.reference : kind === "tierlist" ? colors.success : colors.accent;
@@ -87,11 +90,11 @@ export function GameRow({ kind, name, meta, badges, caption, stats = [], covers,
     <View style={[styles.ticket, { backgroundColor: colors.surface }]}>
       <Pressable
         accessibilityRole={accessibilityRole}
-        accessibilityLabel={`${kind === "tierlist" ? "Tier list" : kind === "tournament" ? "Tournament" : "Quiz"}: ${name}`}
+        accessibilityLabel={t("community.labelWithName", { label: kind === "tierlist" ? t("book.gameTierlist") : kind === "tournament" ? t("book.gameTournament") : t("community.kindQuiz"), name })}
         onPress={onPress}
         onLongPress={onDelete}
-        accessibilityHint={onDelete ? "Long-press to delete" : preview?.type !== "cover_title" ? preview?.prompt : undefined}
-        accessibilityActions={onDelete ? [{ name: "delete", label: "Delete" }] : undefined}
+        accessibilityHint={onDelete ? t("community.longPressDelete") : preview?.type !== "cover_title" ? preview?.prompt : undefined}
+        accessibilityActions={onDelete ? [{ name: "delete", label: t("library.delete") }] : undefined}
         onAccessibilityAction={onDelete ? (event) => { if (event.nativeEvent.actionName === "delete") onDelete(); } : undefined}
       >
         {({ pressed }) => (
@@ -133,11 +136,11 @@ export function GameRow({ kind, name, meta, badges, caption, stats = [], covers,
       <View style={[styles.footer, { borderColor: colors.border }]}>
         <View style={[styles.notch, styles.leftNotch, { backgroundColor: colors.background }]} />
         <View style={[styles.notch, styles.rightNotch, { backgroundColor: colors.background }]} />
-        <Pressable accessibilityRole={accessibilityRole} accessibilityLabel={`${actionLabel}: ${name}`} onPress={onPress} style={({ pressed }) => [styles.primaryAction, { backgroundColor: pressed ? colors.accentFill : soft }]}>
-          {({ pressed }) => <><Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.shrink, { color: pressed ? colors.text : color }]}>{actionLabel}</Text><Icon name="chevronRight" size={16} color={pressed ? colors.text : color} /></>}
+        <Pressable accessibilityRole={accessibilityRole} accessibilityLabel={t("community.labelWithName", { label: action, name })} onPress={onPress} style={({ pressed }) => [styles.primaryAction, { backgroundColor: pressed ? colors.accentFill : soft }]}>
+          {({ pressed }) => <><Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.shrink, { color: pressed ? colors.text : color }]}>{action}</Text><Icon name="chevronRight" size={16} color={pressed ? colors.text : color} /></>}
         </Pressable>
         {seeBooks ? <Pressable accessibilityRole="button" accessibilityLabel={seeBooks.label} onPress={seeBooks.onPress} style={({ pressed }) => [styles.secondaryAction, { borderColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : colors.surface }]}><Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.textDim }]}>{seeBooks.text}</Text></Pressable> : null}
-        {onDelete ? <ActionSheet title={name} groups={[[{ label: "Delete", icon: "delete", destructive: true, onPress: onDelete }]]}>{(open) => <IconButton accessibilityLabel={`More actions for ${name}`} name="more" onPress={open} />}</ActionSheet> : null}
+        {onDelete ? <ActionSheet title={name} groups={[[{ label: t("library.delete"), icon: "delete", destructive: true, onPress: onDelete }]]}>{(open) => <IconButton accessibilityLabel={t("community.moreActionsFor", { name })} name="more" onPress={open} />}</ActionSheet> : null}
       </View>
     </View>
   );

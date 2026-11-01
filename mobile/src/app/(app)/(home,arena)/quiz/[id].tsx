@@ -4,13 +4,15 @@ import { View } from "react-native";
 import { ErrorState, Skeleton } from "@/ui";
 import { fetchQuizzes, type Quiz } from "@/features/quizzes/api";
 import { QuizEditorScreen } from "@/features/quizzes/QuizEditorScreen";
+import { useT } from "@/i18n";
 
 export default function QuizEditorRoute() {
+  const t = useT();
   const { id, view } = useLocalSearchParams<{ id: string; view?: string }>();
   const client = useQueryClient();
   const query = useQuery({ queryKey: ["quizzes"], queryFn: fetchQuizzes, retry: false });
   const quiz = query.data?.find((item) => item.id === id);
   if (query.isPending) return <View style={{ flex: 1, padding: 24 }}><Skeleton height={180} /></View>;
-  if (query.isError || !quiz) return <ErrorState title="Quiz unavailable" actionLabel="Back" onAction={() => router.back()} />;
+  if (query.isError || !quiz) return <ErrorState title={t("shell.quizUnavailable")} actionLabel={t("shell.back")} onAction={() => router.back()} />;
   return <QuizEditorScreen quiz={quiz} initialView={view === "results" ? "results" : undefined} onUpdated={(updated) => client.setQueryData<Quiz[]>(["quizzes"], (items = []) => items.map((item) => item.id === updated.id ? updated : item))} />;
 }

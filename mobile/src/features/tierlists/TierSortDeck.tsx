@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { booksByWork, isCharacterBook, itemNoun, type TierDefinition, type TierlistData } from "@scripta/shared";
+import { booksByWork, isCharacterBook, type TierDefinition, type TierlistData } from "@scripta/shared";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
@@ -7,8 +7,9 @@ import { Pressable, StyleSheet, View, type HostInstance } from "react-native";
 import { Text } from "../../ui/Text";
 import { commitHaptic, liftHaptic } from "../../ui/haptics";
 import { EmptyState, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
-import { labelOf, TierCover, type TierBook } from "./TierBoard";
-import { useLocale } from "../../i18n";
+import { TierCover } from "./TierBoard";
+import { labelOf, type TierBook } from "./tierBook";
+import { useLocale, useT } from "../../i18n";
 
 const TARGET_SIZE = 56;
 
@@ -18,12 +19,13 @@ function TierTarget({ tier, index, targeted, onPress }: {
   targeted: SharedValue<number>;
   onPress: () => void;
 }) {
+  const t = useT();
   const style = useAnimatedStyle(() => ({
     transform: [{ scale: withSpring(targeted.get() === index ? 1.18 : 1, { duration: 400, dampingRatio: 1, reduceMotion: ReduceMotion.System }) }],
   }));
   return <Animated.View style={[styles.target, { backgroundColor: tier.color }, style]}>
-    <Pressable accessibilityRole="button" accessibilityLabel={`Rank in ${tier.label || "Untitled"}`} onPress={onPress} style={styles.targetHit}>
-      <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.targetLabel]}>{tier.label || "Untitled"}</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel={t("tierlists.rankIn", { label: tier.label || t("library.untitled") })} onPress={onPress} style={styles.targetHit}>
+      <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.targetLabel]}>{tier.label || t("library.untitled")}</Text>
     </Pressable>
   </Animated.View>;
 }
@@ -34,6 +36,8 @@ function DragBook({ book, x, y, lifted }: {
   y: SharedValue<number>;
   lifted: SharedValue<boolean>;
 }) {
+  const locale = useLocale();
+  const t = useT();
   const style = useAnimatedStyle(() => ({
     transform: [
       { translateX: x.get() },
@@ -41,13 +45,13 @@ function DragBook({ book, x, y, lifted }: {
       { scale: withSpring(lifted.get() ? 1.08 : 1, { duration: 400, dampingRatio: 1, reduceMotion: ReduceMotion.System }) },
     ],
   }));
-  return <Animated.View accessibilityLabel={`${labelOf(book)}. Swipe up from the lower half to drag into a tier; or tap a tier.`} style={style}>
+  return <Animated.View accessibilityLabel={t("tierlists.dragHint", { label: labelOf(book, locale) })} style={style}>
     <TierCover book={book} style={styles.cover} />
   </Animated.View>;
 }
 
 export function TierSortDeck({ data, books, onAssign, selectedWorkId }: { data: TierlistData; books: TierBook[]; onAssign: (workId: string, tierId: string) => void; selectedWorkId?: string | null }) {
-  const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const ringRef = useRef<HostInstance>(null);
   const zones = useSharedValue<Array<{ x: number; y: number }>>([]);
@@ -116,11 +120,12 @@ export function TierSortDeck({ data, books, onAssign, selectedWorkId }: { data: 
       targeted.set(-1);
     });
 
-  if (!data.tiers.length) return <EmptyState title="No tiers yet" body={`Add a tier from the menu, then rank your ${books.some(isCharacterBook) ? "characters" : "books"}.`} />;
-  if (!book) return <EmptyState title="Nothing left to rank" body={`Every ${books.some(isCharacterBook) ? "character" : "book"} in this list already sits in a tier.`} />;
+  const characters = books.some(isCharacterBook);
+  if (!data.tiers.length) return <EmptyState title={t("tierlists.noTiersTitle")} body={t(characters ? "tierlists.noTiersBodyCharacters" : "tierlists.noTiersBodyBooks")} />;
+  if (!book) return <EmptyState title={t("tierlists.nothingLeftTitle")} body={t(characters ? "tierlists.nothingLeftBodyCharacter" : "tierlists.nothingLeftBodyBook")} />;
 
   return <View style={styles.deck}>
-    <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{selectedWorkId ? "Choose a new tier · drag or tap a circle" : `${pending.length} ${itemNoun(books.some(isCharacterBook), pending.length, locale)} left · swipe up from below`}</Text>
+    <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{selectedWorkId ? t("tierlists.chooseNewTier") : t(characters ? "tierlists.leftCharacters" : "tierlists.leftBooks", { count: pending.length })}</Text>
     <GestureDetector gesture={gesture}><View ref={ringRef} style={styles.ring} onLayout={(event) => setRing(event.nativeEvent.layout)}>
       <DragBook key={current} book={book} x={x} y={y} lifted={lifted} />
       {data.tiers.map((tier, index) => <View key={tier.id} style={[styles.targetWrap, { transform: [{ translateX: radius * Math.sin(index * 2 * Math.PI / data.tiers.length) }, { translateY: -radius * Math.cos(index * 2 * Math.PI / data.tiers.length) }] }]}>

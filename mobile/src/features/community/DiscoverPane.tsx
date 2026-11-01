@@ -8,10 +8,12 @@ import { DISCOVER_FILTERS, type DiscoverFilter } from "./communityHome";
 import { AddBookSheet } from "./AddBookSheet";
 import { useDebouncedValue } from "../library/lib/debounce";
 import { DiscoverRow } from "./DiscoverRow";
+import { useT } from "../../i18n";
 
 const FILTER_ICONS: Record<DiscoverFilter, IconName> = { all: "filter", tierlist: "tierlist", tournament: "bracket", quiz: "champion" };
 
 export function DiscoverPane({ linkAuthors = true, fab }: { linkAuthors?: boolean; fab?: ReactNode }) {
+  const t = useT();
   const [filter, setFilter] = useState<DiscoverFilter>("all");
   const [search, setSearch] = useState("");
   const needle = useDebouncedValue(search.trim(), 300);
@@ -31,18 +33,18 @@ export function DiscoverPane({ linkAuthors = true, fab }: { linkAuthors?: boolea
 
   return (
     <View style={styles.grow}>
-      {discover.isRefetchError && !discover.isRefetching ? <Toast visible message="Couldn't refresh Discover." tone="error" /> : null}
+      {discover.isRefetchError && !discover.isRefetching ? <Toast visible message={t("community.refreshDiscoverFailed")} tone="error" /> : null}
       <SearchDock
         value={search}
         onChangeText={setSearch}
-        accessibilityLabel="Search tier lists, tournaments and quizzes by name or book"
-        placeholder="Search"
+        accessibilityLabel={t("community.searchGamesLabel")}
+        placeholder={t("community.searchPlaceholder")}
         fab={fab}
         cycle={{
           icon: FILTER_ICONS[filter],
           active: filter !== "all",
-          accessibilityLabel: `Showing ${current.label.toLowerCase()}`,
-          accessibilityHint: "Switches to the next type",
+          accessibilityLabel: t("shell.showingType", { type: t(current.labelKey).toLowerCase() }),
+          accessibilityHint: t("shell.switchesToNextType"),
           onPress: () => setFilter(next.value),
         }}
       >
@@ -52,7 +54,7 @@ export function DiscoverPane({ linkAuthors = true, fab }: { linkAuthors?: boolea
           </View>
         ) : discover.isError && !discover.data ? (
           <View style={styles.page}>
-            <ErrorState body="Couldn't load tier lists, tournaments and quizzes." actionLabel="Retry" onAction={() => void discover.refetch()} />
+            <ErrorState body={t("community.discoverLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void discover.refetch()} />
           </View>
         ) : (
           <FlatList
@@ -65,9 +67,9 @@ export function DiscoverPane({ linkAuthors = true, fab }: { linkAuthors?: boolea
             ListEmptyComponent={
               <View style={styles.page}>
                 {needle ? (
-                  <EmptyState title={`No games match “${needle}”.`} body="Try another name or book." />
+                  <EmptyState title={t("community.noGamesMatch", { query: needle })} body={t("community.tryAnotherName")} />
                 ) : (
-                  <EmptyState title="Nothing published yet" body="Check back later for new tier lists, tournaments and quizzes." />
+                  <EmptyState title={t("community.nothingPublishedTitle")} body={t("community.nothingPublishedDiscoverBody")} />
                 )}
               </View>
             }
@@ -79,7 +81,7 @@ export function DiscoverPane({ linkAuthors = true, fab }: { linkAuthors?: boolea
               discover.isFetchingNextPage ? (
                 <View style={styles.page}><Skeleton height={80} /></View>
               ) : discover.isFetchNextPageError ? (
-                <View style={styles.page}><ErrorState body="Couldn't load more." actionLabel="Retry" onAction={() => void discover.fetchNextPage()} /></View>
+                <View style={styles.page}><ErrorState body={t("book.loadMoreFailed")} actionLabel={t("shell.retry")} onAction={() => void discover.fetchNextPage()} /></View>
               ) : undefined
             }
             renderItem={({ item }) => <DiscoverRow item={item} onPreviewBooks={setPreview} linkAuthor={linkAuthors} />}
@@ -88,7 +90,7 @@ export function DiscoverPane({ linkAuthors = true, fab }: { linkAuthors?: boolea
       </SearchDock>
       <ArenaBooksSheet
         id={preview?.id ?? null}
-        name={preview?.name ?? "Tournament"}
+        name={preview?.name ?? t("book.gameTournament")}
         character={preview?.character}
         onAddBook={(book) => {
           setPreview(null);

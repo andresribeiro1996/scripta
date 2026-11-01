@@ -4,17 +4,19 @@ import type { PerCardStyle } from "@scripta/shared";
 import { PerCardStyleForm } from "@/features/library/components/PerCardStyleForm";
 import { useBook } from "@/features/library/hooks/useBook";
 import { useLibraryActions } from "@/features/library/hooks/useLibraryActions";
+import { useT } from "@/i18n";
 import { ErrorState, Screen, SheetHeader, Skeleton } from "@/ui";
 import { spacing, useTheme } from "@/ui/theme";
 
 export default function BookStyleRoute() {
+  const t = useT();
   const { colors } = useTheme();
   const { key } = useLocalSearchParams<{ key: string }>();
   const { book, seedStyle, inheritedFrom, loading } = useBook(key);
   const [error, setError] = useState<string | null>(null);
   const { saveBookStyle } = useLibraryActions(setError);
   const name = String(book?.Title ?? "");
-  const title = "Card style";
+  const title = t("shell.cardStyle");
 
   return (
     <Screen top={false} style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
@@ -23,7 +25,7 @@ export default function BookStyleRoute() {
       {loading ? (
         <Skeleton height={180} />
       ) : !book ? (
-        <ErrorState title="Book not found" actionLabel="Close" onAction={() => router.back()} />
+        <ErrorState title={t("shell.bookNotFound")} actionLabel={t("shell.close")} onAction={() => router.back()} />
       ) : (
         <PerCardStyleForm
           key={key}

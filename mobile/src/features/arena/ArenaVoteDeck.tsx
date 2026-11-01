@@ -4,11 +4,12 @@ import { Text } from "../../ui/Text";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { interpolate, ReduceMotion, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
-import { countdownLabel, type Duel, type DuelSide } from "@scripta/shared";
+import type { Duel, DuelSide } from "@scripta/shared";
 import { commitHaptic } from "../../ui/haptics";
 import { dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";
-import { useLocale } from "../../i18n";
+import { matchHeading } from "./arenaView";
+import { useLocale, useT } from "../../i18n";
 
 const SWIPE_THRESHOLD = 100;
 const FLY_OUT_DISTANCE = 500;
@@ -30,6 +31,7 @@ function VoteHalf({
   edge: "left" | "right";
   onVote: (workId: string) => void;
 }) {
+  const t = useT();
   const { colors } = useTheme();
   const y = useSharedValue(0);
   const committed = useSharedValue(false);
@@ -89,8 +91,8 @@ function VoteHalf({
       <Animated.View
         accessible
         accessibilityRole="button"
-        accessibilityLabel={character ? side.title : `${side.title} by ${side.author}`}
-        accessibilityHint={`Picks this ${character ? "character" : "book"} as the winner`}
+        accessibilityLabel={character ? side.title : t("arena.titleByAuthor", { title: side.title, author: side.author })}
+        accessibilityHint={t(character ? "arena.pickCharacterHint" : "arena.pickBookHint")}
         accessibilityState={{ disabled: disabled || winId === null }}
         onAccessibilityTap={() => { if (winId) onVote(winId); }}
         style={[styles.half, rounding, cardStyle]}
@@ -98,15 +100,15 @@ function VoteHalf({
         <BookCover cover={side.cover} title={side.title} fill />
         <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: colors.success }, winTint]} />
         <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: colors.danger }, loseTint]} />
-        <Animated.View pointerEvents="none" style={[styles.badge, styles.badgeTop, { backgroundColor: colors.success }, winBadge]}><Text style={styles.badgeText}>WINS</Text></Animated.View>
-        <Animated.View pointerEvents="none" style={[styles.badge, styles.badgeBottom, { backgroundColor: colors.danger }, loseBadge]}><Text style={[styles.badgeText, { color: colors.onDanger }]}>LOSES</Text></Animated.View>
+        <Animated.View pointerEvents="none" style={[styles.badge, styles.badgeTop, { backgroundColor: colors.success }, winBadge]}><Text style={styles.badgeText}>{t("arena.winsBadge")}</Text></Animated.View>
+        <Animated.View pointerEvents="none" style={[styles.badge, styles.badgeBottom, { backgroundColor: colors.danger }, loseBadge]}><Text style={[styles.badgeText, { color: colors.onDanger }]}>{t("arena.losesBadge")}</Text></Animated.View>
         <View pointerEvents="none" style={[styles.scrim, { backgroundColor: colors.scrim }]} />
         <View pointerEvents="none" style={styles.textOverlay}>
           <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, { color: "#ffffff" }]}>{side.title}</Text>
           {character ? null : <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: "rgba(255,255,255,0.8)" }]}>{side.author}</Text>}
         </View>
-        <Text {...dynamicType} pointerEvents="none" style={[typography.caption, styles.hint, styles.hintTop]}>↑ pick</Text>
-        <Text {...dynamicType} pointerEvents="none" style={[typography.caption, styles.hint, styles.hintBottom]}>↓ pass</Text>
+        <Text {...dynamicType} pointerEvents="none" style={[typography.caption, styles.hint, styles.hintTop]}>{t("arena.pickHint")}</Text>
+        <Text {...dynamicType} pointerEvents="none" style={[typography.caption, styles.hint, styles.hintBottom]}>{t("arena.passHint")}</Text>
       </Animated.View>
     </GestureDetector>
   );
@@ -117,19 +119,20 @@ function VoteHalf({
  *  back at rest. */
 export function ArenaVoteDeck({ duel, character = false, disabled, onVote }: { duel: Duel; character?: boolean; disabled: boolean; onVote: (workId: string) => void }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const [attempt, setAttempt] = useState(0);
   const vote = (workId: string) => { setAttempt((n) => n + 1); onVote(workId); };
 
   return (
     <View key={`${duel.id}:${attempt}`} style={styles.wrap}>
-      <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.center, { color: colors.text }]}>Round {duel.roundNumber} · Match {duel.duelIndex + 1} · {countdownLabel(duel.closesAt, locale)}</Text>
+      <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.center, { color: colors.text }]}>{matchHeading(duel, locale)}</Text>
       <View style={styles.row}>
         <VoteHalf character={character} side={duel.bookA} winId={duel.bookA.workId} loseId={duel.bookB.workId} disabled={disabled} edge="left" onVote={vote} />
         <VoteHalf character={character} side={duel.bookB} winId={duel.bookB.workId} loseId={duel.bookA.workId} disabled={disabled} edge="right" onVote={vote} />
         <View pointerEvents="none" style={[styles.vs, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={[styles.vsText, { color: colors.text }]}>VS</Text></View>
       </View>
-      <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{`Swipe a ${character ? "character" : "cover"} up to pick it, down to pass — or tap it to pick. Votes can't be changed.`}</Text>
+      <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{t(character ? "arena.swipeHintCharacter" : "arena.swipeHintBook")}</Text>
     </View>
   );
 }

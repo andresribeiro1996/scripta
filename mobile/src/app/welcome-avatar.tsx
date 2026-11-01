@@ -9,8 +9,10 @@ import { useAuth } from "../core/auth";
 import { API_URL } from "../core/config";
 import { Button } from "../ui";
 import { radii, spacing, typography, useTheme } from "../ui/theme";
+import { useT } from "../i18n";
 
 export default function WelcomeAvatarRoute() {
+  const t = useT();
   const { colors } = useTheme();
   const { ready, user, uploadAvatar } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -21,7 +23,7 @@ export default function WelcomeAvatarRoute() {
   async function choosePhoto() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      setError("Photo library access is off. Enable it in device Settings to add a picture.");
+      setError(t("shell.photoAccessOffAdd"));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsEditing: true, aspect: [1, 1], quality: 0.9 });
@@ -32,20 +34,20 @@ export default function WelcomeAvatarRoute() {
     try {
       await uploadAvatar({ uri: asset.uri, name: asset.fileName ?? `avatar-${Date.now()}.jpg`, mimeType: asset.mimeType ?? "image/jpeg" });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Couldn't upload that picture.");
+      setError(reason instanceof TypeError ? t("shell.connectFailedShort") : reason instanceof Error ? reason.message : t("shell.uploadFailed"));
     } finally {
       setBusy(false);
     }
   }
 
   return <View style={[styles.screen, { backgroundColor: colors.background }]}>
-    <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>Make it yours</Text>
-    <Text style={[typography.body, { color: colors.textDim, alignSelf: "stretch", textAlign: "center" }]}>{user.avatarId ? "Looking good. Continue, or choose a different photo." : "Add a profile picture, or skip this for now."}</Text>
+    <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>{t("shell.makeItYours")}</Text>
+    <Text style={[typography.body, { color: colors.textDim, alignSelf: "stretch", textAlign: "center" }]}>{user.avatarId ? t("shell.avatarHas") : t("shell.avatarNone")}</Text>
     {user.avatarId ? <Image source={{ uri: `${API_URL}/auth/avatar/${user.avatarId}/file` }} style={styles.avatar} /> : <View style={[styles.avatar, styles.initial, { backgroundColor: colors.accentSoft }]}><Text style={[styles.initialText, { color: colors.accent }]}>{(user.username ?? user.email)[0]?.toUpperCase()}</Text></View>}
     {error ? <Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{error}</Text> : null}
     {user.avatarId
-      ? <View style={styles.actions}><Button label="Continue" disabled={busy} onPress={() => router.replace(finishAuthNavigation() as never, { withAnchor: true })} /><Button label="Choose a different photo" variant="secondary" loading={busy} onPress={() => void choosePhoto()} /></View>
-      : <View style={styles.actions}><Button label="Choose a photo" loading={busy} onPress={() => void choosePhoto()} /><Button label="Skip for now" variant="secondary" disabled={busy} onPress={() => router.replace(finishAuthNavigation() as never, { withAnchor: true })} /></View>}
+      ? <View style={styles.actions}><Button label={t("shell.continue")} disabled={busy} onPress={() => router.replace(finishAuthNavigation() as never, { withAnchor: true })} /><Button label={t("shell.chooseDifferentPhoto")} variant="secondary" loading={busy} onPress={() => void choosePhoto()} /></View>
+      : <View style={styles.actions}><Button label={t("shell.choosePhoto")} loading={busy} onPress={() => void choosePhoto()} /><Button label={t("shell.skipForNow")} variant="secondary" disabled={busy} onPress={() => router.replace(finishAuthNavigation() as never, { withAnchor: true })} /></View>}
   </View>;
 }
 

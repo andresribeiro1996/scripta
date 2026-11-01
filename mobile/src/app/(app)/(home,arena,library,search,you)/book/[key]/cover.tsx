@@ -6,9 +6,11 @@ import { useBook } from "@/features/library/hooks/useBook";
 import { useLibraryActions } from "@/features/library/hooks/useLibraryActions";
 import { fetchWork } from "@/features/works/api";
 import { otherEditionCovers } from "@/features/works/bookPage";
+import { useT } from "@/i18n";
 import { ErrorState, Screen, SheetHeader, Skeleton } from "@/ui";
 
 export default function BookCoverRoute() {
+  const t = useT();
   const { key } = useLocalSearchParams<{ key: string }>();
   const { book, loading, workId } = useBook(key);
   const workQuery = useQuery({ queryKey: ["works", workId], queryFn: () => fetchWork(workId!), enabled: Boolean(workId), retry: false });
@@ -16,7 +18,7 @@ export default function BookCoverRoute() {
   const current = typeof book?._coverUrl === "string" ? book._coverUrl : (editions.find((edition) => edition.mine)?.coverUrl ?? null);
   const { saveBookCover, saveBookCoverUrl, removeBookCover } = useLibraryActions();
   const title = String(book?.Title ?? "");
-  const sheetTitle = title ? `Cover for "${title}"` : "Cover";
+  const sheetTitle = title ? t("shell.coverFor", { title }) : t("shell.cover");
 
   return (
     <Screen top={false}>
@@ -25,7 +27,7 @@ export default function BookCoverRoute() {
       {loading ? (
         <Skeleton height={180} />
       ) : !book ? (
-        <ErrorState title="Book not found" actionLabel="Close" onAction={() => router.back()} />
+        <ErrorState title={t("shell.bookNotFound")} actionLabel={t("shell.close")} onAction={() => router.back()} />
       ) : (
         <CoverPicker
           title={title}

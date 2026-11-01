@@ -3,11 +3,13 @@ import { StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { Button, ErrorState, Skeleton } from "../../ui/components";
 import { spacing, typography, useTheme } from "../../ui/theme";
+import { useT } from "../../i18n";
 import { uploadImportPreview } from "./api";
 import type { ImportFilePicker, ImportPreview } from "./types";
 
 export function ImportPreviewPanel({ pickFile }: { pickFile: ImportFilePicker }) {
   const { colors } = useTheme();
+  const t = useT();
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +22,7 @@ export function ImportPreviewPanel({ pickFile }: { pickFile: ImportFilePicker })
       if (!file) return;
       setPreview(await uploadImportPreview(file));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Couldn't preview that import.");
+      setError(cause instanceof Error ? cause.message : t("addBook.importFailed"));
     } finally {
       setLoading(false);
     }
@@ -28,17 +30,17 @@ export function ImportPreviewPanel({ pickFile }: { pickFile: ImportFilePicker })
 
   return (
     <View style={styles.container}>
-      <Button label="Choose library file" loading={loading} onPress={() => void chooseFile()} />
+      <Button label={t("addBook.importChooseFile")} loading={loading} onPress={() => void chooseFile()} />
       {loading ? <><Skeleton height={18} /><Skeleton height={18} width="70%" /></> : null}
-      {error ? <ErrorState title="Couldn't preview import" body={error} actionLabel="Try again" onAction={() => void chooseFile()} /> : null}
+      {error ? <ErrorState title={t("addBook.importFailedTitle")} body={error} actionLabel={t("shell.tryAgain")} onAction={() => void chooseFile()} /> : null}
       {preview ? (
         <View style={[styles.preview, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-          <Text style={[typography.title, { color: colors.text }]}>Ready to import</Text>
-          <Text style={[typography.body, { color: colors.textDim }]}>{preview.data.books.length} books found</Text>
+          <Text style={[typography.title, { color: colors.text }]}>{t("library.readyToImport")}</Text>
+          <Text style={[typography.body, { color: colors.textDim }]}>{t("addBook.importBooksFound", { count: preview.data.books.length })}</Text>
           {preview.warnings.map((warning) => <Text key={warning} style={[typography.caption, { color: colors.danger }]}>{warning}</Text>)}
           {preview.data.books.slice(0, 3).map((book, index) => (
             <Text key={`${String(book.ContentID ?? book.Title ?? "book")}-${index}`} numberOfLines={1} style={[typography.body, { color: colors.text }]}>
-              {String(book.Title ?? "Untitled")}
+              {String(book.Title ?? t("library.untitled"))}
             </Text>
           ))}
         </View>

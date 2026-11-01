@@ -28,35 +28,23 @@ import { useToast } from "../../../ui/ToastHost";
 import { useLibrary } from "../hooks/useLibrary";
 import { attemptUpdate } from "../lib/attemptUpdate";
 import { CoverImage } from "./CoverImage";
-import { getLocale } from "../../../i18n";
+import { getLocale, useT, type MessageKey } from "../../../i18n";
 
 export type TypeFilter = GroupType | "all";
 
-export const TYPE_FILTER_OPTIONS: readonly { value: TypeFilter; label: string; icon: IconName }[] = [
-  { value: "all", label: "All", icon: "filter" },
-  { value: "series", label: "Series", icon: "library" },
-  { value: "collection", label: "Collections", icon: "folder" },
+export const TYPE_FILTER_OPTIONS: readonly { value: TypeFilter; labelKey: MessageKey; icon: IconName }[] = [
+  { value: "all", labelKey: "library.typeAll", icon: "filter" },
+  { value: "series", labelKey: "library.typeSeries", icon: "library" },
+  { value: "collection", labelKey: "library.collections", icon: "folder" },
 ];
 
-const COPY: Record<TypeFilter, { noun: string; emptyTitle: string; emptyBody: string }> = {
-  all: {
-    noun: "collection",
-    emptyTitle: "No collections yet.",
-    emptyBody: "Series are picked up automatically from your books' Series field on import — or create your own collection with the New button.",
-  },
-  series: {
-    noun: "series",
-    emptyTitle: "No series yet.",
-    emptyBody: "Series are picked up automatically from your books' Series field on import — or add one with the New button.",
-  },
-  collection: {
-    noun: "collection",
-    emptyTitle: "No collections yet.",
-    emptyBody: "Use the New button to start organizing your books your own way.",
-  },
+const COPY: Record<TypeFilter, { nameKey: MessageKey; emptyTitleKey: MessageKey; emptyBodyKey: MessageKey }> = {
+  all: { nameKey: "library.nameThisCollection", emptyTitleKey: "library.noCollectionsYet", emptyBodyKey: "library.emptyAllBody" },
+  series: { nameKey: "library.nameThisSeries", emptyTitleKey: "library.noSeriesYet", emptyBodyKey: "library.emptySeriesBody" },
+  collection: { nameKey: "library.nameThisCollection", emptyTitleKey: "library.noCollectionsYet", emptyBodyKey: "library.emptyCollectionBody" },
 };
 
-const GROUP_TYPE_LABEL: Record<GroupType, string> = { series: "Series", collection: "Collection" };
+const GROUP_TYPE_LABEL: Record<GroupType, MessageKey> = { series: "library.groupTypeSeries", collection: "shell.collection" };
 
 export type GroupsViewHandle = { startCreating: () => void };
 
@@ -67,6 +55,7 @@ type GroupsViewProps = Partial<SearchDockScrollProps> & {
 };
 
 export const GroupsView = forwardRef<GroupsViewHandle, GroupsViewProps>(function GroupsView({ search, typeFilter, bottomInset, ...scrollProps }, ref) {
+  const t = useT();
   const { data: library, updateLibrary } = useLibrary();
   // "All" has no single creatable type; a manually-added group there is a
   // collection like any other — series are meant to come from import.
@@ -104,7 +93,7 @@ export const GroupsView = forwardRef<GroupsViewHandle, GroupsViewProps>(function
     const group = makeGroup(draftType, name);
     await attemptUpdate(
       () => updateLibrary((data) => ({ ...data, groups: [...(data.groups ?? []), group] })),
-      (error) => show(saveFailureMessage(error, "Couldn't save — check your connection.", getLocale()), "error"),
+      (error) => show(saveFailureMessage(error, t("library.saveFailedConnection"), getLocale()), "error"),
       () => router.push(`/collection/${group.id}` as never),
     );
   }
@@ -115,7 +104,7 @@ export const GroupsView = forwardRef<GroupsViewHandle, GroupsViewProps>(function
         <View style={[styles.draftRow, { borderColor: colors.accent }]}>
           <Input
             autoFocus
-            label={`Name this ${copy.noun}`}
+            label={t(copy.nameKey)}
             value={draftName}
             maxLength={200}
             onChangeText={setDraftName}
@@ -125,8 +114,8 @@ export const GroupsView = forwardRef<GroupsViewHandle, GroupsViewProps>(function
         </View>
       )}
 
-      {!allGroups.length && !drafting && <EmptyState title={copy.emptyTitle} body={copy.emptyBody} />}
-      {allGroups.length > 0 && groups.length === 0 && <Text style={[typography.body, { color: colors.textDim }]}>Nothing matches "{search.trim()}".</Text>}
+      {!allGroups.length && !drafting && <EmptyState title={t(copy.emptyTitleKey)} body={t(copy.emptyBodyKey)} />}
+      {allGroups.length > 0 && groups.length === 0 && <Text style={[typography.body, { color: colors.textDim }]}>{t("library.nothingMatches", { query: search.trim() })}</Text>}
 
       {groups.map((group) => {
         const members = orderedGroupBooks(group, books);
@@ -134,7 +123,7 @@ export const GroupsView = forwardRef<GroupsViewHandle, GroupsViewProps>(function
         return (
           <Pressable
             key={group.id}
-            accessibilityLabel={`Open ${group.name}, ${GROUP_TYPE_LABEL[group.type].toLowerCase()}, ${members.length} book${members.length === 1 ? "" : "s"}`}
+            accessibilityLabel={t("library.openGroup", { name: group.name, type: t(GROUP_TYPE_LABEL[group.type]).toLowerCase(), count: members.length })}
             accessibilityRole="button"
             onPress={() => router.push(`/collection/${group.id}` as never)}
             style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}
@@ -145,7 +134,7 @@ export const GroupsView = forwardRef<GroupsViewHandle, GroupsViewProps>(function
               </Text>
               <View style={styles.meta}>
                 <Text style={[typography.caption, { color: colors.textDim }]}>
-                  {members.length} book{members.length === 1 ? "" : "s"}
+                  {t("library.bookCount", { count: members.length })}
                 </Text>
                 <Icon name="chevronRight" size={14} color={colors.textDim} />
               </View>

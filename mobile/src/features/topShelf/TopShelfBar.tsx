@@ -2,14 +2,8 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { Icon, Menu, Segmented, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import type { TopShelfPeriod } from "@scripta/shared";
-import { genreMenu } from "./topShelfModel";
-
-const PERIODS = [
-  { value: "month", label: "This month" },
-  { value: "all", label: "All time" },
-] as const;
-
-const ALL_GENRES = "All genres";
+import { useLocale, useT } from "../../i18n";
+import { genreMenu, genreName } from "./topShelfModel";
 
 export function TopShelfBar({
   period,
@@ -27,7 +21,13 @@ export function TopShelfBar({
   genreDisabled: boolean;
 }) {
   const { colors } = useTheme();
-  const label = genre ?? ALL_GENRES;
+  const t = useT();
+  const locale = useLocale();
+  const periods = [
+    { value: "month", label: t("sharing.periodMonth") },
+    { value: "all", label: t("sharing.periodAll") },
+  ] as const;
+  const label = genre ? genreName(genre, locale) : t("sharing.allGenres");
   const active = genre !== null && !genreDisabled;
   const pill = (
     <View style={[styles.pill, { borderColor: colors.border, backgroundColor: active ? colors.accentSoft : colors.surface, opacity: genreDisabled ? 0.5 : 1 }]}>
@@ -36,20 +36,20 @@ export function TopShelfBar({
     </View>
   );
   const items = [
-    { label: ALL_GENRES, selected: genre === null, onPress: () => onGenre(null) },
-    ...genreMenu(genres, genre).map((name) => ({ label: name, selected: name === genre, onPress: () => onGenre(name) })),
+    { label: t("sharing.allGenres"), selected: genre === null, onPress: () => onGenre(null) },
+    ...genreMenu(genres, genre).map((name) => ({ label: genreName(name, locale), selected: name === genre, onPress: () => onGenre(name) })),
   ];
 
   return (
     <View style={styles.row}>
       <View style={styles.segmented}>
-        <Segmented options={PERIODS} value={period} onChange={onPeriod} accessibilityLabel="Period" />
+        <Segmented options={periods} value={period} onChange={onPeriod} accessibilityLabel={t("sharing.period")} />
       </View>
       <View style={styles.genre}>
         {genreDisabled ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="Genre" accessibilityState={{ disabled: true }} disabled>{pill}</Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={t("sharing.genre")} accessibilityState={{ disabled: true }} disabled>{pill}</Pressable>
         ) : (
-          <Menu key={label.length} title="Genre" items={items}>{pill}</Menu>
+          <Menu key={label.length} title={t("sharing.genre")} items={items}>{pill}</Menu>
         )}
       </View>
     </View>

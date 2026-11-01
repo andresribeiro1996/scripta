@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { playerLabel, resultCovers, scoreRows, type PublicQuizQuestion, type ScoreRow } from "@scripta/shared";
+import { decimalText } from "@scripta/shared/i18n";
 import { useQuery } from "@tanstack/react-query";
 import { router, Stack } from "expo-router";
 import { isPermanentError } from "../../core/apiClient";
@@ -15,11 +16,12 @@ import { publicContentUrl } from "../sharing/links";
 import { coverUrlForApi } from "../library/lib/coverUrl";
 import { fetchPlay, fetchPlayBoard, fetchPublicResults, submitPlay, type PlayBoard, type PlayResponse } from "./api";
 import { buildSubmission, isComplete, nextIndex, playStage, playStorageKey } from "./quizPlay";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 const uriFor = (url: string): string => coverUrlForApi(url, API_URL);
 
 export function QuizPlayScreen({ code }: { code: string }) {
+  const t = useT();
   const { colors } = useTheme();
   const { ready, user } = useAuth();
   const [storedId, setStoredId] = useState<string | null | undefined>(undefined);
@@ -58,13 +60,13 @@ export function QuizPlayScreen({ code }: { code: string }) {
         // Anything else (network, 5xx) must surface with a retry — staying
         // "unresolved" would pin the screen on the skeleton forever.
         setOwnPlayMissing(false);
-        setRecoverError(reason instanceof Error ? reason.message : "Couldn't check your previous plays.");
+        setRecoverError(reason instanceof Error ? reason.message : t("quizzes.recoverFailed"));
       }
     });
   }
 
   const result = submitted ?? ownPlay;
-  const leaveDialog = useUnsavedChangesGuard(Object.keys(answers).length > 0 && !submitted, { title: "Leave this quiz?", body: "Your answers so far won't be saved.", confirmLabel: "Leave", cancelLabel: "Keep playing" });
+  const leaveDialog = useUnsavedChangesGuard(Object.keys(answers).length > 0 && !submitted, { title: t("quizzes.leaveTitle"), body: t("quizzes.leaveBody"), confirmLabel: t("quizzes.leave"), cancelLabel: t("quizzes.keepPlaying") });
   const stage = playStage({
     boardReady: board.isSuccess,
     boardMissing: board.isError,
@@ -81,9 +83,9 @@ export function QuizPlayScreen({ code }: { code: string }) {
       const response = await submitPlay(code, playerName.trim() ? { ...body, playerName: playerName.trim() } : body);
       setSubmitted(response);
       try { await AsyncStorage.setItem(playStorageKey(code), response.playId); }
-      catch { setError("Scored, but this device couldn't save your result link."); }
+      catch { setError(t("quizzes.resultLinkNotSaved")); }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Couldn't submit your answers.");
+      setError(reason instanceof Error ? reason.message : t("quizzes.submitFailed"));
     } finally {
       setBusy(false);
     }
@@ -91,13 +93,13 @@ export function QuizPlayScreen({ code }: { code: string }) {
 
   return <Screen bottom top={false} style={styles.screen}>
     {leaveDialog}
-    <Stack.Screen options={{ headerShown: true, title: board.data?.name ?? "Quiz" }} />
+    <Stack.Screen options={{ headerShown: true, title: board.data?.name ?? t("quizzes.quizTitle") }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     {stage === "loading" || board.isPending ? <Screen bottom style={styles.screen}><Skeleton height={180} /></Screen>
-    : stage === "unavailable" ? <ErrorState title="No quiz at that link" body="Check the code and try again." actionLabel={isPermanentError(board.error) ? "Go to Atmyshelf" : "Retry"} onAction={isPermanentError(board.error) ? () => router.replace("/") : () => void board.refetch()} />
-    : recoverError ? <ErrorState title="Couldn't check your previous plays" body={recoverError} actionLabel="Retry" onAction={() => { setRecoverError(null); loadOwnPlay(); }} />
+    : stage === "unavailable" ? <ErrorState title={t("quizzes.noQuizAtLink")} body={t("quizzes.checkCode")} actionLabel={isPermanentError(board.error) ? t("shell.notFoundAction") : t("shell.retry")} onAction={isPermanentError(board.error) ? () => router.replace("/") : () => void board.refetch()} />
+    : recoverError ? <ErrorState title={t("quizzes.recoverFailedTitle")} body={recoverError} actionLabel={t("shell.retry")} onAction={() => { setRecoverError(null); loadOwnPlay(); }} />
     : stage === "leaderboard" ? <View style={styles.closed}>
-      <Text {...dynamicType} style={[typography.body, styles.center, { color: colors.textDim }]}>This quiz is closed.</Text>
+      <Text {...dynamicType} style={[typography.body, styles.center, { color: colors.textDim }]}>{t("quizzes.quizClosed")}</Text>
       <Leaderboard code={code} />
     </View>
     : stage === "played" && board.data ? <EndScreen code={code} board={board.data} result={result!} tab={tab} setTab={setTab} onError={setError} />
@@ -109,16 +111,16 @@ export function QuizPlayScreen({ code }: { code: string }) {
       const onLast = index === questions.length - 1;
       return <FormScroll contentContainerStyle={styles.page} scrollToEnd={onLast && complete}>
         <View style={[styles.track, { backgroundColor: colors.border }]}><View style={[styles.fill, { backgroundColor: colors.accent, width: `${Math.round((answered / questions.length) * 100)}%` }]} /></View>
-        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Question {index + 1} of {questions.length}</Text>
+        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.questionOf", { number: index + 1, total: questions.length })}</Text>
         <Prompt question={question} />
         {question.type === "title_cover" ? (
           <View style={styles.grid}>
             {question.options.map((option, optionIndex) => (
-              <Pressable key={option} accessibilityRole="button" accessibilityLabel={`Option ${optionIndex + 1}`} disabled={busy} onPress={() => {
+              <Pressable key={option} accessibilityRole="button" accessibilityLabel={t("quizzes.option", { number: optionIndex + 1 })} disabled={busy} onPress={() => {
                 setAnswers((value) => ({ ...value, [question.id]: optionIndex }));
                 setIndex((value) => nextIndex(questions, value));
               }} style={[styles.tile, { borderColor: answers[question.id] === optionIndex ? colors.accent : colors.border, backgroundColor: colors.border }]}>
-                <Image source={{ uri: uriFor(option) }} contentFit="contain" style={styles.tileImage} alt={`Option ${optionIndex + 1}`} />
+                <Image source={{ uri: uriFor(option) }} contentFit="contain" style={styles.tileImage} alt={t("quizzes.option", { number: optionIndex + 1 })} />
               </Pressable>
             ))}
           </View>
@@ -135,8 +137,8 @@ export function QuizPlayScreen({ code }: { code: string }) {
           </View>
         )}
         {onLast && complete ? <View style={styles.complete}>
-          <Input label="Name for the leaderboard (optional)" value={playerName} onChangeText={setPlayerName} placeholder="Guest" maxLength={40} />
-          <Button label="See my score" loading={busy} onPress={() => void submit(questions)} />
+          <Input label={t("quizzes.leaderboardName")} value={playerName} onChangeText={setPlayerName} placeholder={t("quizzes.guest")} maxLength={40} />
+          <Button label={t("quizzes.seeScore")} loading={busy} onPress={() => void submit(questions)} />
         </View> : null}
       </FormScroll>;
     })() : null}
@@ -144,16 +146,17 @@ export function QuizPlayScreen({ code }: { code: string }) {
 }
 
 function Prompt({ question }: { question: PublicQuizQuestion }) {
+  const t = useT();
   const { colors } = useTheme();
   if (question.type === "cover_title") {
-    return <View style={[styles.promptTile, { backgroundColor: colors.border }]}><Image source={{ uri: uriFor(question.prompt) }} blurRadius={12} contentFit="cover" style={StyleSheet.absoluteFill} alt="Which book is this?" /></View>;
+    return <View style={[styles.promptTile, { backgroundColor: colors.border }]}><Image source={{ uri: uriFor(question.prompt) }} blurRadius={12} contentFit="cover" style={StyleSheet.absoluteFill} alt={t("quizzes.whichBook")} /></View>;
   }
   if (question.type === "title_cover") {
     return <Text {...dynamicType} style={[typography.heading, styles.promptText, { color: colors.text }]}>{question.prompt}</Text>;
   }
   if (question.type === "characters_title") {
     return <View style={styles.promptCharacters}>
-      <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Who's in this book?</Text>
+      <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.whoInBook")}</Text>
       <Text {...dynamicType} style={[typography.heading, styles.promptText, { color: colors.text }]}>{question.prompt}</Text>
     </View>;
   }
@@ -168,6 +171,7 @@ function EndScreen({ code, board, result, tab, setTab, onError }: {
   setTab: (tab: "answers" | "board") => void;
   onError: (message: string | null) => void;
 }) {
+  const t = useT();
   const { colors } = useTheme();
   const [expanded, setExpanded] = useState<string | null>(null);
   const rows = scoreRows(board.questions, result.correct, result.answers);
@@ -178,14 +182,14 @@ function EndScreen({ code, board, result, tab, setTab, onError }: {
     try {
       await Share.share({ message: await publicContentUrl(`/play/${code}`) });
     } catch (reason) {
-      onError(reason instanceof Error ? reason.message : "Couldn't create a public link.");
+      onError(reason instanceof Error ? reason.message : t("quizzes.publicLinkFailed"));
     }
   }
 
   return <View style={styles.end}>
     <View style={styles.hero}>
       <View style={styles.heroText}>
-        <Text {...dynamicType} display={false} maxFontSizeMultiplier={1.2} accessibilityLabel={`${result.score} of ${board.questionCount} correct`} style={[styles.score, { color: colors.text }]}>
+        <Text {...dynamicType} display={false} maxFontSizeMultiplier={1.2} accessibilityLabel={t("quizzes.scoreLabel", { score: result.score, total: board.questionCount })} style={[styles.score, { color: colors.text }]}>
           {result.score}<Text style={[styles.scoreOutOf, { color: colors.textDim }]}> / {board.questionCount}</Text>
         </Text>
       </View>
@@ -197,24 +201,25 @@ function EndScreen({ code, board, result, tab, setTab, onError }: {
         ))}
       </View> : null}
     </View>
-    <SwipeableTabs accessibilityLabel="Quiz results" options={[{ value: "answers", label: "Your answers" }, { value: "board", label: "Leaderboard" }]} value={tab} onChange={setTab} renderPage={(page) => page === "board" ? (
+    <SwipeableTabs accessibilityLabel={t("quizzes.quizResults")} options={[{ value: "answers", label: t("quizzes.yourAnswers") }, { value: "board", label: t("quizzes.leaderboard") }]} value={tab} onChange={setTab} renderPage={(page) => page === "board" ? (
       <Leaderboard code={code} />
     ) : (
       <ScrollView contentContainerStyle={styles.answers}>
         {rows.map((row, i) => <AnswerRow key={row.id} row={row} question={board.questions[i]!} expanded={expanded === row.id} onToggle={() => setExpanded((current) => current === row.id ? null : row.id)} />)}
       </ScrollView>
     )} />
-    <Button label="Challenge a friend" onPress={() => void challenge()} />
+    <Button label={t("quizzes.challengeFriend")} onPress={() => void challenge()} />
   </View>;
 }
 
 function AnswerRow({ row, question, expanded, onToggle }: { row: ScoreRow; question: PublicQuizQuestion; expanded: boolean; onToggle: () => void }) {
+  const t = useT();
   const { colors } = useTheme();
-  const title = row.answer?.title ?? (row.answer?.kind === "text" ? row.answer.value : `Question ${row.number}`);
+  const title = row.answer?.title ?? (row.answer?.kind === "text" ? row.answer.value : t("quizzes.questionNumber", { number: row.number }));
   const cover = row.answer?.kind === "cover" ? row.answer.value : question.type === "cover_title" ? question.prompt : null;
-  const verdict = row.correct ? "Correct" : "Incorrect";
+  const verdict = row.correct ? t("quizzes.correct") : t("quizzes.incorrect");
   return <View style={[styles.answerRow, { borderColor: colors.border }]}>
-    <Pressable accessibilityRole="button" accessibilityState={{ expanded }} accessibilityLabel={`${row.answer ? `Question ${row.number}: ` : ""}${title}, ${verdict.toLowerCase()}`} onPress={onToggle} style={styles.answerHead}>
+    <Pressable accessibilityRole="button" accessibilityState={{ expanded }} accessibilityLabel={row.answer ? t("quizzes.answerLabelNumbered", { number: row.number, title, verdict: verdict.toLowerCase() }) : t("quizzes.answerLabel", { title, verdict: verdict.toLowerCase() })} onPress={onToggle} style={styles.answerHead}>
       <View style={[styles.thumb, { backgroundColor: cover ? colors.border : colors.accentSoft }]}>
         {cover ? <Image source={{ uri: uriFor(cover) }} contentFit="contain" style={StyleSheet.absoluteFill} /> : <Icon name="book" size={18} color={colors.textDim} />}
       </View>
@@ -225,42 +230,44 @@ function AnswerRow({ row, question, expanded, onToggle }: { row: ScoreRow; quest
       <Icon name={expanded ? "chevronDown" : "chevronRight"} size={16} color={colors.textDim} />
     </Pressable>
     {expanded ? <View style={styles.answerBody}>
-      {row.answer ? <View style={styles.answerColumn}><AnswerValue value={row.answer} /></View> : <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Answer details aren’t available for this play.</Text>}
+      {row.answer ? <View style={styles.answerColumn}><AnswerValue value={row.answer} /></View> : <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("quizzes.answerUnavailable")}</Text>}
       {row.pick ? <View style={[styles.answerColumn, styles.pickColumn, { borderColor: colors.border }]}><AnswerValue value={row.pick} picked /></View> : null}
     </View> : null}
   </View>;
 }
 
 function AnswerValue({ value, picked = false }: { value: NonNullable<ScoreRow["answer"]>; picked?: boolean }) {
+  const t = useT();
   const { colors } = useTheme();
   const text = value.kind === "text" ? value.value : value.title;
   return <View style={styles.answerValue}>
-    <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{picked ? "Your pick" : "Correct answer"}</Text>
+    <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{picked ? t("quizzes.yourPick") : t("quizzes.correctAnswer")}</Text>
     {value.kind === "cover" ? <View style={[picked ? styles.pickCover : styles.answerCover, { backgroundColor: colors.border }]}>
-      <Image source={{ uri: uriFor(value.value) }} contentFit="contain" style={StyleSheet.absoluteFill} alt={text ?? "Cover"} />
+      <Image source={{ uri: uriFor(value.value) }} contentFit="contain" style={StyleSheet.absoluteFill} alt={text ?? t("quizzes.cover")} />
     </View> : null}
     {text ? <Text {...dynamicType} style={[typography.body, picked ? { color: colors.textDim } : [styles.strong, { color: colors.text }]]}>{text}</Text> : null}
   </View>;
 }
 
 function Leaderboard({ code }: { code: string }) {
+  const t = useT();
   const locale = useLocale();
   const { colors } = useTheme();
   const leaderboard = useQuery({ queryKey: ["quizzes", "results", code], queryFn: () => fetchPublicResults(code), retry: false });
   if (leaderboard.isPending) return <View style={styles.section}><Skeleton height={180} /></View>;
-  if (leaderboard.isError) return <ErrorState body="Couldn't load the leaderboard." actionLabel="Retry" onAction={() => void leaderboard.refetch()} />;
-  if (leaderboard.data.plays.length === 0) return <View style={styles.section}><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>No plays yet.</Text></View>;
+  if (leaderboard.isError) return <ErrorState body={t("quizzes.leaderboardFailed")} actionLabel={t("shell.retry")} onAction={() => void leaderboard.refetch()} />;
+  if (leaderboard.data.plays.length === 0) return <View style={styles.section}><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("quizzes.noPlays")}</Text></View>;
   return <ScrollView contentContainerStyle={styles.section}>
     {leaderboard.data.plays.map((play, i) => (
       <View key={`${play.playerName ?? "Guest"}-${i}`} style={[styles.leaderRow, { borderColor: colors.border }]}>
         <Text {...dynamicType} style={[typography.body, styles.rank, { color: colors.textDim }]}>{i + 1}</Text>
         <View style={styles.grow}>
           <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{playerLabel(play, locale).name}</Text>
-          {playerLabel(play, locale).guest ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Guest</Text> : null}
+          {playerLabel(play, locale).guest ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.guest")}</Text> : null}
         </View>
         <View style={styles.leaderScore}>
           <Text {...dynamicType} numberOfLines={1} style={[typography.body, styles.strong, { color: colors.text }]}>{play.score}/{leaderboard.data.questionCount}</Text>
-          <Text {...dynamicType} numberOfLines={1} style={[typography.caption, { color: colors.textDim }]}>{(play.durationMs / 1000).toFixed(1)}s</Text>
+          <Text {...dynamicType} numberOfLines={1} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.durationSeconds", { seconds: decimalText(play.durationMs / 1000, locale, 1) })}</Text>
         </View>
       </View>
     ))}

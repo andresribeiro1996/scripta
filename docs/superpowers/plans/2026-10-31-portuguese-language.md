@@ -842,6 +842,7 @@ Each task: apply the recipe, add the area's catalog pair under `mobile/src/i18n/
 - Modify: `mobile/src/i18n/messages/en/index.ts`
 - Modify: `mobile/src/i18n/messages/pt-PT/index.ts`
 - Modify: `mobile/src/features/library/`
+- Modify: `mobile/src/app/(app)/(library)/collections.tsx`
 - Test: `mobile/src/features/library/`
 
 Everything in `features/library/` except `components/AddBookForm.tsx` and `components/GenreChoices.tsx`, which are Task 22. Genres in `components/LibraryShareImage.tsx` use `genreLabel`.
@@ -857,6 +858,7 @@ Everything in `features/library/` except `components/AddBookForm.tsx` and `compo
 - Modify: `mobile/src/i18n/messages/pt-PT/index.ts`
 - Modify: `mobile/src/features/library/components/AddBookForm.tsx`
 - Modify: `mobile/src/features/library/components/GenreChoices.tsx`
+- Modify: `mobile/src/features/library/lib/addBookDraft.ts`
 - Modify: `mobile/src/features/import/`
 - Modify: `mobile/src/features/gallery/`
 - Modify: `mobile/src/app/gallery.tsx`
@@ -906,6 +908,7 @@ Genres in `features/works/BookScreen.tsx` use `genreLabel`.
 - Create: `mobile/src/i18n/messages/pt-PT/sharing.ts`
 - Modify: `mobile/src/i18n/messages/en/index.ts`
 - Modify: `mobile/src/i18n/messages/pt-PT/index.ts`
+- Modify: `mobile/src/i18n/index.ts`
 - Modify: `mobile/src/features/sharing/`
 - Modify: `mobile/src/features/socials/`
 - Modify: `mobile/src/features/public/`
@@ -970,6 +973,7 @@ Saved defaults are written in the creator's locale. `TierlistShareImage.tsx:36` 
 - Modify: `mobile/src/i18n/messages/en/index.ts`
 - Modify: `mobile/src/i18n/messages/pt-PT/index.ts`
 - Modify: `mobile/src/features/murals/`
+- Modify: `mobile/src/features/library/components/PerCardStyleFields.tsx`
 - Test: `mobile/src/features/murals/`
 
 Genres in `MuralCanvas.tsx` use `genreLabel`.

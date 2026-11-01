@@ -2,27 +2,30 @@ import { useState } from "react";
 import { Stack, router } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlatList, Pressable, StyleSheet, View } from "react-native";
-import { bracketSizes, canCreate, defaultTicked, plural, roundMinutesFromHours, type CharacterGameMode, type WorkCast } from "@scripta/shared";
+import { bracketSizes, canCreate, defaultTicked, roundMinutesFromHours, type CharacterGameMode, type WorkCast } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { Button, ErrorState, Input, Screen, Segmented, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
 import { createCharacterTournament } from "../arena/api";
 import { createCharacterTierlist, type Tierlist } from "../tierlists/api";
 import { fetchWorkCast } from "../works/api";
+import { useT, type MessageKey } from "../../i18n";
 
-const MODES = [{ value: "tierlist", label: "Tier list" }, { value: "tournament", label: "Tournament" }] as const;
+const MODES = [{ value: "tierlist", labelKey: "book.gameTierlist" }, { value: "tournament", labelKey: "book.gameTournament" }] as const satisfies readonly { value: CharacterGameMode; labelKey: MessageKey }[];
 
 export function CastPickerScreen({ workId }: { workId: string }) {
+  const t = useT();
   const cast = useQuery({ queryKey: ["works", workId, "cast"], queryFn: () => fetchWorkCast(workId), retry: false });
   return (
     <Screen top={false} style={styles.screen}>
-      <Stack.Screen options={{ headerShown: true, title: "Character game" }} />
-      {cast.isPending ? <Skeleton height={160} /> : cast.isError ? <ErrorState body="The cast couldn't be loaded." actionLabel="Retry" onAction={() => void cast.refetch()} /> : <CastPicker workId={workId} cast={cast.data} />}
+      <Stack.Screen options={{ headerShown: true, title: t("book.characterGame") }} />
+      {cast.isPending ? <Skeleton height={160} /> : cast.isError ? <ErrorState body={t("book.castLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void cast.refetch()} /> : <CastPicker workId={workId} cast={cast.data} />}
     </Screen>
   );
 }
 
 function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
+  const t = useT();
   const { colors } = useTheme();
   const queryClient = useQueryClient();
   const sizes = bracketSizes(cast.characters.length);
@@ -30,7 +33,7 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
   const [mode, setMode] = useState<CharacterGameMode>("tierlist");
   const [size, setSize] = useState(sizes[sizes.length - 1] ?? 0);
   const [ticked, setTicked] = useState(() => defaultTicked(cast.characters, "tierlist", size));
-  const [name, setName] = useState(`${cast.scope.label} characters`);
+  const [name, setName] = useState(t("book.castDefaultName", { label: cast.scope.label }));
   const [duration, setDuration] = useState("24");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,18 +54,18 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
     setError(null);
     try {
       const characters = { workId, characterIds: ticked };
-      const title = name.trim() || `${cast.scope.label} characters`;
+      const title = name.trim() || t("book.castDefaultName", { label: cast.scope.label });
       if (mode === "tierlist") {
         const created = await createCharacterTierlist(title, characters);
         queryClient.setQueryData<Tierlist[]>(["tierlists"], (items = []) => [created, ...items]);
         router.navigate(`/(app)/(arena)/tierlist/${created.id}?rank=1` as never);
       } else {
-        const created = await createCharacterTournament({ name: title, bracketSize: size, roundDurationMinutes: roundMinutesFromHours(duration), characters });
+        const created = await createCharacterTournament({ name: title, bracketSize: size, roundDurationMinutes: roundMinutesFromHours(duration.replace(",", ".")), characters });
         void queryClient.invalidateQueries({ queryKey: ["arena", "mine"] });
         router.replace(`/arena/${created.id}` as never);
       }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Couldn't create the game.");
+      setError(reason instanceof Error ? reason.message : t("book.gameCreateFailed"));
     } finally {
       setBusy(false);
     }
@@ -74,19 +77,19 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
         <BookCover cover={cast.scope.coverUrl} title={cast.scope.label} width={48} height={72} />
         <View style={styles.grow}>
           <Text numberOfLines={2} {...dynamicType} style={[typography.title, { color: colors.text }]}>{cast.scope.label}</Text>
-          {cast.scope.kind === "series" ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{plural(cast.scope.workCount, "book", "books")}</Text> : null}
+          {cast.scope.kind === "series" ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("library.bookCount", { count: cast.scope.workCount })}</Text> : null}
         </View>
       </View>
-      {modes.length > 1 ? <Segmented accessibilityLabel="Game type" options={modes} value={mode} onChange={chooseMode} /> : null}
+      {modes.length > 1 ? <Segmented accessibilityLabel={t("book.gameType")} options={modes.map(({ value, labelKey }) => ({ value, label: t(labelKey) }))} value={mode} onChange={chooseMode} /> : null}
       {mode === "tournament" ? (
         <>
-          <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>Bracket size</Text>
+          <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>{t("book.bracketSize")}</Text>
           <View style={styles.row}>{sizes.map((value) => <Button key={value} label={String(value)} variant={size === value ? "primary" : "secondary"} onPress={() => chooseSize(value)} />)}</View>
-          <Input label="Round duration (hours)" keyboardType="decimal-pad" value={duration} onChangeText={setDuration} returnKeyType="done" />
+          <Input label={t("book.roundDurationHours")} keyboardType="decimal-pad" value={duration} onChangeText={setDuration} returnKeyType="done" />
         </>
       ) : null}
-      <Input label="Name" value={name} onChangeText={setName} maxLength={200} returnKeyType="done" />
-      <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{mode === "tournament" ? `${ticked.length} of ${size} characters` : `${ticked.length} characters`}</Text>
+      <Input label={t("library.name")} value={name} onChangeText={setName} maxLength={200} returnKeyType="done" />
+      <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{mode === "tournament" ? t("book.castTicked", { count: ticked.length, size }) : t("book.castSelected", { count: ticked.length })}</Text>
     </View>
   );
 
@@ -110,7 +113,7 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
           );
         }}
       />
-      <Button label={mode === "tierlist" ? "Create tier list" : "Create tournament"} loading={busy} disabled={!canCreate(mode, ticked.length, size)} onPress={() => void create()} />
+      <Button label={mode === "tierlist" ? t("book.createTierlist") : t("book.createTournament")} loading={busy} disabled={!canCreate(mode, ticked.length, size)} onPress={() => void create()} />
     </View>
   );
 }

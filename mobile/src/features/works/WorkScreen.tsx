@@ -18,10 +18,11 @@ import { publicContentUrl } from "../sharing/links";
 import { fetchWork } from "./api";
 import { BookScreen, WashBackdrop, bookMenuItems } from "./BookScreen";
 import { workPath } from "./workPath";
-import { getLocale, useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export function WorkScreen({ id, edition = null }: { id: string; edition?: string | null }) {
   const locale = useLocale();
+  const t = useT();
   const [adding, setAdding] = useState(false);
   const [addingToRead, setAddingToRead] = useState(false);
   const addInFlight = useRef(false);
@@ -58,9 +59,9 @@ export function WorkScreen({ id, edition = null }: { id: string; edition?: strin
       <Screen bottom top={false} style={styles.centered}>
         {untitled}
         <ErrorState
-          title="Book unavailable"
-          body={query.error instanceof Error ? query.error.message : "Couldn't load this book."}
-          actionLabel={permanent ? "Back" : "Retry"}
+          title={t("book.unavailable")}
+          body={query.error instanceof Error ? query.error.message : t("book.loadFailed")}
+          actionLabel={permanent ? t("shell.back") : t("shell.retry")}
           onAction={permanent ? () => (router.canGoBack() ? router.back() : router.replace("/")) : () => void query.refetch()}
         />
       </Screen>
@@ -77,9 +78,9 @@ export function WorkScreen({ id, edition = null }: { id: string; edition?: strin
       <Screen bottom top={false} style={styles.centered}>
         {untitled}
         <ErrorState
-          title="Library unavailable"
-          body={libraryQuery.error instanceof Error ? libraryQuery.error.message : "Couldn't load your library."}
-          actionLabel="Retry"
+          title={t("book.libraryUnavailable")}
+          body={libraryQuery.error instanceof Error ? libraryQuery.error.message : t("shell.libraryLoadFailed")}
+          actionLabel={t("shell.retry")}
           onAction={() => void libraryQuery.refetch()}
         />
       </Screen>
@@ -95,7 +96,7 @@ export function WorkScreen({ id, edition = null }: { id: string; edition?: strin
     try {
       setShareUrl(await publicContentUrl(`/work/${encodeURIComponent(work.id)}`));
     } catch (reason) {
-      setShareError(reason instanceof Error ? reason.message : "Couldn't create the share link.");
+      setShareError(reason instanceof Error ? reason.message : t("book.shareLinkFailed"));
     }
   }
 
@@ -115,7 +116,7 @@ export function WorkScreen({ id, edition = null }: { id: string; edition?: strin
       await queryClient.refetchQueries({ queryKey: LIBRARY_QUERY_KEY }, { throwOnError: true });
       await query.refetch({ throwOnError: true });
     } catch (error) {
-      show(added ? "Added to your library, but the page didn't refresh." : saveFailureMessage(error, "Could not add the book.", getLocale()), "error");
+      show(added ? t("book.addedRefreshFailed") : saveFailureMessage(error, t("book.addBookFailed"), locale), "error");
     } finally {
       addInFlight.current = false;
       setAddingToRead(false);
@@ -131,8 +132,8 @@ export function WorkScreen({ id, edition = null }: { id: string; edition?: strin
           ...(tint ? { headerTransparent: true, headerStyle: { backgroundColor: "transparent" }, headerLargeTitleEnabled: false, headerShadowVisible: false } : plainHeader),
           headerRight: () => (
             <HeaderActions>
-              <IconButton name="share" accessibilityLabel="Share book" onPress={() => void share()} />
-              {menuItems.length > 0 ? <ActionSheet title={work.title} groups={[menuItems]}>{(open) => <IconButton accessibilityLabel="Book actions" name="more" onPress={open} />}</ActionSheet> : null}
+              <IconButton name="share" accessibilityLabel={t("book.shareBook")} onPress={() => void share()} />
+              {menuItems.length > 0 ? <ActionSheet title={work.title} groups={[menuItems]}>{(open) => <IconButton accessibilityLabel={t("shell.bookActions")} name="more" onPress={open} />}</ActionSheet> : null}
             </HeaderActions>
           ),
         }}
@@ -142,7 +143,7 @@ export function WorkScreen({ id, edition = null }: { id: string; edition?: strin
       <BookScreen page={page} book={book} model={model} signedIn={signedIn} onSelectEdition={setEditionId} scrollY={scrollY} headerInset={tint ? headerHeight : 0} />
       {model.primary === "add" ? (
         <View style={[styles.wantBar, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
-          <Button label="Want to read" variant="primary" loading={addingToRead} onPress={() => void wantToRead()} />
+          <Button label={t("book.wantToRead")} variant="primary" loading={addingToRead} onPress={() => void wantToRead()} />
         </View>
       ) : null}
       {shareError && tint ? <View pointerEvents="box-none" style={[styles.toastBelowHeader, { top: headerHeight }]}><Toast visible message={shareError} tone="error" /></View> : null}

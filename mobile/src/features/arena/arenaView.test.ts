@@ -20,9 +20,9 @@ const duel = (over: Partial<Duel> = {}): Duel => ({
 });
 
 test("both tabs stay put at every status — a finished tournament shows its winner on Match", () => {
-  assert.deepEqual(arenaViewTabs("seeding").map((option) => option.value), ["bracket", "match"]);
-  assert.deepEqual(arenaViewTabs("active").map((option) => option.value), ["bracket", "match"]);
-  assert.deepEqual(arenaViewTabs("completed").map((option) => option.value), ["bracket", "match"]);
+  assert.deepEqual(arenaViewTabs("seeding", "en").map((option) => option.value), ["bracket", "match"]);
+  assert.deepEqual(arenaViewTabs("active", "en").map((option) => option.value), ["bracket", "match"]);
+  assert.deepEqual(arenaViewTabs("completed", "en").map((option) => option.value), ["bracket", "match"]);
 });
 
 test("the match deck only queues duels still open to this voter", () => {
@@ -91,12 +91,12 @@ test("large bracket maps preserve cover sizes and leave room between matches", (
 });
 
 test("the match pane explains an empty deck by what the tournament is doing", () => {
-  assert.equal(matchEmptyCopy("seeding", false).title, "Not started yet");
-  assert.equal(matchEmptyCopy("completed", true).title, "No matches");
-  assert.equal(matchEmptyCopy("active", false).title, "No matches yet");
+  assert.equal(matchEmptyCopy("seeding", false, "en").title, "Not started yet");
+  assert.equal(matchEmptyCopy("completed", true, "en").title, "No matches");
+  assert.equal(matchEmptyCopy("active", false, "en").title, "No matches yet");
   // Active, matches drawn, nothing left to vote on: this voter is done until
   // the round closes — not the same as a tournament with no matches at all.
-  assert.equal(matchEmptyCopy("active", true).title, "All caught up");
+  assert.equal(matchEmptyCopy("active", true, "en").title, "All caught up");
 });
 
 test("the round headline places the round, its progress and its deadline", () => {
@@ -105,7 +105,7 @@ test("the round headline places the round, its progress and its deadline", () =>
   const open = duel({ id: "open", roundNumber: 1, duelIndex: 2, closesAt: "2026-09-26T18:00:00.000Z" });
   const byRound = bracketShape(8, [settled(0), settled(1), open]);
 
-  const head = roundHeadline(byRound, 0, now);
+  const head = roundHeadline(byRound, 0, "en", now);
   // Four matches deep in an 8-book draw is the quarter-final, whatever its
   // index says — the name comes from the back of the bracket.
   assert.equal(head.title, "Quarters · Round 1 of 3");
@@ -117,18 +117,18 @@ test("a deadline inside the last day counts down instead of naming a date", () =
   const open = duel({ id: "open", roundNumber: 1, duelIndex: 0, closesAt: "2026-09-21T17:30:00.000Z" });
   const byRound = bracketShape(2, [open]);
 
-  assert.equal(roundHeadline(byRound, 0, now).status, "0 of 1 settled · 5h 30m left");
+  assert.equal(roundHeadline(byRound, 0, "en", now).status, "0 of 1 settled · 5h 30m left");
 });
 
 test("a named round keeps its name alongside its position", () => {
   const final = duel({ id: "f", roundNumber: 2, duelIndex: 0 });
   const byRound = bracketShape(4, [duel({ id: "a", roundNumber: 1, duelIndex: 0 }), duel({ id: "b", roundNumber: 1, duelIndex: 1 }), final]);
-  assert.equal(roundHeadline(byRound, 1, Date.parse("2026-01-01T00:00:00.000Z")).title, "Final · Round 2 of 2");
+  assert.equal(roundHeadline(byRound, 1, "en", Date.parse("2026-01-01T00:00:00.000Z")).title, "Final · Round 2 of 2");
 });
 
 test("a settled match with nothing in it says so, and claims nothing about who settled it", () => {
-  assert.equal(matchNote(duel({ status: "settled", winnerWorkId: "a" })), "Settled · no votes");
-  assert.equal(matchNote(duel({ status: "settled", winnerWorkId: "a", bookA: { workId: "a", title: "A", author: "Author A", cover: null, votes: 3 } })), "Settled");
-  assert.equal(matchNote(duel({ status: "tied_pending_tiebreak" })), "Tiebreak needed");
-  assert.equal(matchNote(duel()), null);
+  assert.equal(matchNote(duel({ status: "settled", winnerWorkId: "a" }), "en"), "Settled · no votes");
+  assert.equal(matchNote(duel({ status: "settled", winnerWorkId: "a", bookA: { workId: "a", title: "A", author: "Author A", cover: null, votes: 3 } }), "en"), "Settled");
+  assert.equal(matchNote(duel({ status: "tied_pending_tiebreak" }), "en"), "Tiebreak needed");
+  assert.equal(matchNote(duel(), "en"), null);
 });

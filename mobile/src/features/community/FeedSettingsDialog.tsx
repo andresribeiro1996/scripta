@@ -4,12 +4,13 @@ import { Text } from "../../ui/Text";
 import { DEFAULT_FEED_SETTINGS, type FeedCategory, type FeedSettings } from "@scripta/shared/community";
 import { Button, Dialog, Toast, ToggleSwitch, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
 import { updateFeedSettings } from "./api";
+import { useT, type MessageKey } from "../../i18n";
 
-const FEED_SETTING_ROWS: Array<{ key: FeedCategory; label: string; caption: string }> = [
-  { key: "publications", label: "Publications", caption: "Murals, tier lists, quizzes and tournaments" },
-  { key: "reading", label: "Reading activity", caption: "Books you add or finish" },
-  { key: "votes", label: "Votes", caption: "Games you vote in, shown by name" },
-  { key: "follows", label: "Follows", caption: "Who you follow" },
+const FEED_SETTING_ROWS: Array<{ key: FeedCategory; labelKey: MessageKey; captionKey: MessageKey }> = [
+  { key: "publications", labelKey: "community.feedPublications", captionKey: "community.feedPublicationsCaption" },
+  { key: "reading", labelKey: "community.feedReading", captionKey: "community.feedReadingCaption" },
+  { key: "votes", labelKey: "community.feedVotes", captionKey: "community.feedVotesCaption" },
+  { key: "follows", labelKey: "community.feedFollows", captionKey: "community.feedFollowsCaption" },
 ];
 
 function SettingRow({ label, caption, value, onValueChange }: { label: string; caption: string; value: boolean; onValueChange: () => void }) {
@@ -26,6 +27,7 @@ function SettingRow({ label, caption, value, onValueChange }: { label: string; c
 }
 
 export function FeedSettingsDialog({ visible, settings, onClose }: { visible: boolean; settings: FeedSettings; onClose: () => void }) {
+  const t = useT();
   const { colors } = useTheme();
   const [local, setLocal] = useState<FeedSettings>(DEFAULT_FEED_SETTINGS);
   const [busy, setBusy] = useState(false);
@@ -45,27 +47,27 @@ export function FeedSettingsDialog({ visible, settings, onClose }: { visible: bo
       await updateFeedSettings(local);
       onClose();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not save settings.");
+      setError(reason instanceof Error ? reason.message : t("community.feedSettingsSaveFailed"));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <Dialog visible={visible} title="Feed settings" onClose={onClose}>
+    <Dialog visible={visible} title={t("community.feedSettings")} onClose={onClose}>
       <View style={styles.gap}>
-        <Text style={[typography.caption, { color: colors.textDim }]}>What other readers see in your profile activity.</Text>
-        {FEED_SETTING_ROWS.map(({ key, label, caption }) => (
+        <Text style={[typography.caption, { color: colors.textDim }]}>{t("community.feedSettingsIntro")}</Text>
+        {FEED_SETTING_ROWS.map(({ key, labelKey, captionKey }) => (
           <SettingRow
             key={key}
-            label={label}
-            caption={caption}
+            label={t(labelKey)}
+            caption={t(captionKey)}
             value={local[key]}
             onValueChange={() => setLocal((current) => ({ ...current, [key]: !current[key] }))}
           />
         ))}
         {error ? <Toast visible message={error} tone="error" /> : null}
-        <Button label="Save" loading={busy} onPress={() => void save()} />
+        <Button label={t("shell.save")} loading={busy} onPress={() => void save()} />
       </View>
     </Dialog>
   );
