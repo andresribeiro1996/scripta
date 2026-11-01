@@ -107,11 +107,11 @@ const history: DailyChapterHistory = {
   today: "2026-10-21",
 };
 
-const daily = () => {
+const daily = (perfect = 0) => {
   localStorage.setItem("daily-chapter:guest", guestId);
   return rendered(() => createElement(DailyChapterPage), (client) => {
     client.setQueryData(["daily-chapter", "today"], { date: "2026-10-21", board });
-    client.setQueryData(["daily-chapter", "history", "guest", guestId, "2026-10-21"], history);
+    client.setQueryData(["daily-chapter", "history", "guest", guestId, "2026-10-21"], { ...history, themes: [{ ...history.themes[0]!, perfect }] });
   });
 };
 
@@ -120,8 +120,9 @@ test("the Daily Chapter page translates its chrome, theme names and stats line",
   assert.match(html, /O Capítulo do Dia/);
   assert.match(html, /Mitos recontados · 21 out 2026/);
   assert.match(html, /Pergunta 1 de 5 · Diga o livro a partir das suas palavras/);
-  assert.match(html, /1\/6 edições desde 20 out 2026 · 4\/5 certas · 0 perfeitas/);
-  assert.match(html, /1 concluídos · sequência de 3 dias/);
+  assert.match(html, /1\/6 edições desde 20 out 2026 · 4\/5 certas · perfeitas: 0/);
+  assert.match(inPortuguese(() => daily(1)).replaceAll("<!-- -->", ""), /4\/5 certas · perfeitas: 1/);
+  assert.match(html, /Concluídos: 1 · sequência de 3 dias/);
   assert.match(html, /2 edições perfeitas seguidas/);
   assert.match(html, /Crie uma conta/);
   const english = daily().replaceAll("<!-- -->", "");
