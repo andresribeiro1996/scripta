@@ -60,7 +60,7 @@ export function matchEmptyCopy(status: TournamentView["status"], hasDuels: boole
 }
 
 const WEEKDAYS = ["arena.weekday0", "arena.weekday1", "arena.weekday2", "arena.weekday3", "arena.weekday4", "arena.weekday5", "arena.weekday6"] as const satisfies readonly MessageKey[];
-const MONTHS = ["arena.month0", "arena.month1", "arena.month2", "arena.month3", "arena.month4", "arena.month5", "arena.month6", "arena.month7", "arena.month8", "arena.month9", "arena.month10", "arena.month11"] as const satisfies readonly MessageKey[];
+const MONTHS = ["shortJan", "shortFeb", "shortMar", "shortApr", "shortMay", "shortJun", "shortJul", "shortAug", "shortSep", "shortOct", "shortNov", "shortDec"] as const;
 
 /** Where this round sits, how much of it is done, and when it closes — the
  *  three things the screen never said. Split in two because all of it on one
@@ -87,7 +87,7 @@ function closesLabel(closesAt: string, locale: Locale, now: number): string {
   const remainingMs = closes.getTime() - now;
   if (remainingMs > 86_400_000) {
     const t = translatorFor(locale);
-    return t("arena.closesOn", { weekday: t(WEEKDAYS[closes.getDay()]!), day: closes.getDate(), month: t(MONTHS[closes.getMonth()]!) });
+    return t("arena.closesOn", { weekday: t(WEEKDAYS[closes.getDay()]!), day: closes.getDate(), month: sharedT(locale)(`shared.months.${MONTHS[closes.getMonth()]!}`) });
   }
   return countdownLabel(closesAt, locale, now);
 }
