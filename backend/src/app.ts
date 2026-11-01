@@ -10,13 +10,14 @@
 
 import fastifyCors from "@fastify/cors";
 import type { CoverLookupParams } from "@scripta/shared";
-import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
+import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { randomUUID } from "node:crypto";
 import { STATUS_CODES } from "node:http";
 import { isAllowedOrigin } from "./config/corsOrigin.js";
 import { env } from "./config/env.js";
 import { devHttps } from "./config/devCerts.js";
 import { TRUSTED_PROXIES } from "./config/trustedProxies.js";
+import { localeOf, t } from "./i18n/index.js";
 import { assertObjectKey } from "./storage/objectStore.js";
 import { createObjectStore } from "./storage/createObjectStore.js";
 import { IMMUTABLE_CACHE_CONTROL } from "./storage/r2ObjectStore.js";
@@ -52,6 +53,21 @@ import { registerWaitlistModule } from "./modules/waitlist/index.js";
 import { registerWorksModule } from "./modules/works/index.js";
 
 const genReqId = () => randomUUID();
+
+export function handleError(error: FastifyError, request: FastifyRequest, reply: FastifyReply) {
+  if (error instanceof WorkResolutionError) {
+    request.log.error(error);
+    return reply.code(503).send({ error: error.message });
+  }
+  const locale = localeOf(request);
+  const statusCode = typeof error.statusCode === "number" && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 500;
+  if (statusCode === 500) {
+    request.log.error(error);
+    return reply.code(500).send({ error: t(locale, "common.internalError") });
+  }
+  const title = locale === "en" ? (STATUS_CODES[statusCode] ?? "Error") : t(locale, "common.requestFailed");
+  return reply.code(statusCode).send({ statusCode, error: title, message: error.message });
+}
 
 export function buildApp() {
   const bootStart = performance.now();
@@ -119,18 +135,7 @@ export function buildApp() {
   // keep the default {statusCode, error, message} shape clients already
   // parse; everything else becomes an opaque 500 with the detail logged
   // server-side only.
-  app.setErrorHandler((error: FastifyError, request, reply) => {
-    if (error instanceof WorkResolutionError) {
-      request.log.error(error);
-      return reply.code(503).send({ error: error.message });
-    }
-    const statusCode = typeof error.statusCode === "number" && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 500;
-    if (statusCode === 500) {
-      request.log.error(error);
-      return reply.code(500).send({ error: "Internal server error" });
-    }
-    return reply.code(statusCode).send({ statusCode, error: STATUS_CODES[statusCode] ?? "Error", message: error.message });
-  });
+  app.setErrorHandler(handleError);
 
   app.register(registerAuthModule, {
     authRoot: app,
