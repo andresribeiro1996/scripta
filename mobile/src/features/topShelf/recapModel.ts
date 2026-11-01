@@ -2,9 +2,7 @@ import { recapMonthName, type TopShelfBoard, type TopShelfRecapCard } from "@scr
 import { contentTarget } from "@scripta/shared/community";
 import { decimalText, type Locale } from "@scripta/shared/i18n";
 import { gameScoreLabel, valueLabel } from "./topShelfModel";
-import { translatorFor, type MobileMessages } from "../../i18n";
-
-type MessageKey = Extract<keyof MobileMessages, string>;
+import { translatorFor, type MessageKey } from "../../i18n";
 
 const RECORD_TITLES = {
   crowned: "sharing.recapCrownedTitle",

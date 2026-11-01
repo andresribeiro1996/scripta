@@ -1,8 +1,6 @@
 import { bookKey, canonicalIsbn, isCertainMatch, statusLabel, type BookSearchResult, type LibraryBook } from "@scripta/shared";
 import type { DiscoverItem, PersonResult } from "@scripta/shared/community";
-import { getLocale, type MobileMessages } from "../../i18n";
-
-type MessageKey = Extract<keyof MobileMessages, string>;
+import { getLocale, type MessageKey } from "../../i18n";
 
 export const SEARCH_SCOPES = [
   { value: "all", labelKey: "book.scopeAll" },

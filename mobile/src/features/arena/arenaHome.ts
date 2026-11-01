@@ -5,9 +5,7 @@ import type { Quiz } from "../quizzes/api";
 import type { Tierlist, VotedTierlist } from "../tierlists/api";
 import type { Tournament } from "./api";
 import type { Locale } from "@scripta/shared/i18n";
-import { translatorFor, type MobileMessages } from "../../i18n";
-
-type MessageKey = Extract<keyof MobileMessages, string>;
+import { translatorFor, type MessageKey } from "../../i18n";
 
 export const ARENA_TABS = [
   { value: "tournaments", labelKey: "book.tournaments" },

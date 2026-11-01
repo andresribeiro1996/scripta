@@ -8,9 +8,7 @@ import { Button, Sheet, captionHitSlop, dynamicType, radii, spacing, typography,
 import { workPath } from "../works/workPath";
 import { TierCover, TierHead, TierRowScroll } from "./TierBoard";
 import { authorOf, titleOf, type TierBook } from "./tierBook";
-import { useLocale, useT, type MobileMessages } from "../../i18n";
-
-type MessageKey = Extract<keyof MobileMessages, string>;
+import { useLocale, useT, type MessageKey } from "../../i18n";
 
 const descriptions: Record<AggregationMode, MessageKey> = {
   average: "tierlists.descriptionAverage",

@@ -4,9 +4,7 @@ import { Text } from "../../ui/Text";
 import { DEFAULT_FEED_SETTINGS, type FeedCategory, type FeedSettings } from "@scripta/shared/community";
 import { Button, Dialog, Toast, ToggleSwitch, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
 import { updateFeedSettings } from "./api";
-import { useT, type MobileMessages } from "../../i18n";
-
-type MessageKey = Extract<keyof MobileMessages, string>;
+import { useT, type MessageKey } from "../../i18n";
 
 const FEED_SETTING_ROWS: Array<{ key: FeedCategory; labelKey: MessageKey; captionKey: MessageKey }> = [
   { key: "publications", labelKey: "community.feedPublications", captionKey: "community.feedPublicationsCaption" },

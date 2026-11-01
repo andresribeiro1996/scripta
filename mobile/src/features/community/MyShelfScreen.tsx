@@ -20,9 +20,7 @@ import { FeedSettingsDialog } from "./FeedSettingsDialog";
 import { ShelfPreview } from "./ShelfPreview";
 import { fetchOwnProfile, publishProfile, setShelfMural, unpublishProfile } from "./api";
 import { MuralPicker } from "./ProfileScreen";
-import { useLocale, useT, type MobileMessages } from "../../i18n";
-
-type MessageKey = Extract<keyof MobileMessages, string>;
+import { useLocale, useT, type MessageKey } from "../../i18n";
 
 const MY_SHELF_TABS = [
   { value: "shelf", labelKey: "community.tabShelf" },

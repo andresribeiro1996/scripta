@@ -7,9 +7,7 @@ import { Text } from "../../ui/Text";
 import { useLibrary, useWorkBooks } from "../library";
 import { Button, ErrorState, Input, Screen, Segmented, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { createTierlist, type Tierlist } from "./api";
-import { useT, type MobileMessages } from "../../i18n";
-
-type MessageKey = Extract<keyof MobileMessages, string>;
+import { useT, type MessageKey } from "../../i18n";
 
 const VISIBILITY = [{ value: "private", label: "tierlists.private" }, { value: "public", label: "tierlists.public" }] as const satisfies ReadonlyArray<{ value: string; label: MessageKey }>;
 const DIRECTION = [{ value: "best", label: "tierlists.best" }, { value: "worst", label: "tierlists.worst" }] as const satisfies ReadonlyArray<{ value: string; label: MessageKey }>;

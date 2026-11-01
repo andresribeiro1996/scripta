@@ -7,13 +7,13 @@ import { Platform, StyleSheet, View } from "react-native";
 import { Button, Input } from "../../ui";
 import { Text } from "../../ui/Text";
 import { radii, spacing, typography, useTheme } from "../../ui/theme";
-import { useT, type MobileMessages } from "../../i18n";
+import { useT, type MessageKey } from "../../i18n";
 
 const CHANNELS = [
   { key: "r", labelKey: "murals.channelRed" },
   { key: "g", labelKey: "murals.channelGreen" },
   { key: "b", labelKey: "murals.channelBlue" },
-] as const satisfies readonly { key: string; labelKey: Extract<keyof MobileMessages, string> }[];
+] as const satisfies readonly { key: string; labelKey: MessageKey }[];
 
 export function ColorEditor({ color, onChange, onDone, onCancel }: {
   color: string;

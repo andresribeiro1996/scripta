@@ -1,8 +1,6 @@
 import { CARD_PRINTS, LAYOUTS, TRAITS, type CardPrint, type Layout, type Trait } from "@scripta/shared";
 import type { Locale } from "@scripta/shared/i18n";
-import { translatorFor, type MobileMessages } from "../../i18n";
-
-type MessageKey = Extract<keyof MobileMessages, string>;
+import { translatorFor, type MessageKey } from "../../i18n";
 
 const TRAIT_KEYS: Record<Trait, MessageKey> = { both: "readerCard.traitBoth", seal: "readerCard.traitSeal", line: "readerCard.traitLine", none: "readerCard.traitNone" };
 const PRINT_KEYS: Record<CardPrint, MessageKey> = { auto: "readerCard.printAuto", paper: "readerCard.printPaper", reversed: "readerCard.printReversed" };

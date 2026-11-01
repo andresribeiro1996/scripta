@@ -9,9 +9,7 @@ import { BookCover } from "../arena/BookCover";
 import { createCharacterTournament } from "../arena/api";
 import { createCharacterTierlist, type Tierlist } from "../tierlists/api";
 import { fetchWorkCast } from "../works/api";
-import { useT, type MobileMessages } from "../../i18n";
-
-type MessageKey = Extract<keyof MobileMessages, string>;
+import { useT, type MessageKey } from "../../i18n";
 
 const MODES = [{ value: "tierlist", labelKey: "book.gameTierlist" }, { value: "tournament", labelKey: "book.gameTournament" }] as const satisfies readonly { value: CharacterGameMode; labelKey: MessageKey }[];
 

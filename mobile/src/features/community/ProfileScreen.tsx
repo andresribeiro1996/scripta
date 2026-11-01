@@ -18,10 +18,8 @@ import { AuthorAvatar } from "./AuthorAvatar";
 import { fetchProfile, fetchProfileLibrary, followUser, unfollowUser, type CommunityProfileView } from "./api";
 import { contentDetail, contentKindLabel, contentTarget } from "./communityHome";
 import { ReaderGlyph } from "./ReaderGlyph";
-import { useLocale, useT, type MobileMessages } from "../../i18n";
+import { useLocale, useT, type MessageKey } from "../../i18n";
 import type { Locale } from "@scripta/shared/i18n";
-
-type MessageKey = Extract<keyof MobileMessages, string>;
 
 export function ProfileScreen({ username }: { username: string }) {
   const locale = useLocale();

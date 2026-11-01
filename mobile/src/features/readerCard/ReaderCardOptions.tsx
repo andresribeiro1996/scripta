@@ -8,12 +8,10 @@ import { Caption, Section, Tile } from "../library/components/StyleControls";
 import { ReaderCardImage } from "../murals/ReaderCardImage";
 import { DraftField } from "./DraftField";
 import type { SaveStyle } from "./ReaderCardChoices";
-import { translatorFor, useLocale, useT, type MobileMessages } from "../../i18n";
+import { translatorFor, useLocale, useT, type MessageKey } from "../../i18n";
 import { layoutOptions, printOptions, traitOptions } from "./segmentOptions";
 
 export type PanelId = "look" | "corners" | "finish" | "footerLeft" | "footerRight";
-
-type MessageKey = Extract<keyof MobileMessages, string>;
 
 const PANEL_TITLE_KEYS: Record<PanelId, MessageKey> = { look: "readerCard.mottoLook", corners: "readerCard.corners", finish: "readerCard.finish", footerLeft: "readerCard.bottomLeftText", footerRight: "readerCard.bottomRightText" };
 const TILE_COLUMNS = 4;

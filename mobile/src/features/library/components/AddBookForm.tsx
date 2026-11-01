@@ -38,9 +38,7 @@ import { FoundCovers } from "./FoundCovers";
 import { GenreChoices } from "./GenreChoices";
 import { IsbnScanner } from "./IsbnScanner";
 import { Chip } from "./StyleControls";
-import { t as translateNow, useLocale, useT, type MobileMessages } from "../../../i18n";
-
-type MessageKey = Extract<keyof MobileMessages, string>;
+import { t as translateNow, useLocale, useT, type MessageKey } from "../../../i18n";
 
 const FORMAT_CHIPS: Record<BookFormat, { labelKey: MessageKey; icon: IconName }> = {
   hardcopy: { labelKey: "addBook.formatHardcopy", icon: "book" },

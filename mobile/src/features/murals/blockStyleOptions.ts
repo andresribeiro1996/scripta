@@ -1,9 +1,8 @@
 import { DEFAULT_BORDER_SIDES, blockGradient, cardBorderStyleOptions, contrastRatio, effectiveBlockColors, normalizeHexColor, resolveBlockColor, themeColorRef, type BlockStyle, type BlockThemeColorKey, type BorderSides, type CardBorderStyle } from "@scripta/shared";
 import type { Locale } from "@scripta/shared/i18n";
 import type { ThemeColors } from "@scripta/shared/themes";
-import { translatorFor, type MobileMessages } from "../../i18n";
+import { translatorFor, type MessageKey } from "../../i18n";
 
-export type MessageKey = Extract<keyof MobileMessages, string>;
 export type Preset<T> = { key: string; label: string; value: T };
 export type PresetSpec<T> = { key: string; labelKey: MessageKey; value: T };
 

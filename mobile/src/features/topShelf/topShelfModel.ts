@@ -1,8 +1,6 @@
 import { genreLabel, isBookGenre, tierBand, type TopShelf, type TopShelfBoard, type TopShelfGame, type TopShelfPeriod, type TopShelfView } from "@scripta/shared";
 import type { Locale } from "@scripta/shared/i18n";
-import { translatorFor, type MobileMessages } from "../../i18n";
-
-type MessageKey = Extract<keyof MobileMessages, string>;
+import { translatorFor, type MessageKey } from "../../i18n";
 
 export const BOARD_ORDER: TopShelfBoard[] = ["crowned", "tiered", "highestTier", "quizzed", "risingStar"];
 

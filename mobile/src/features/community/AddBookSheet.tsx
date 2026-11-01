@@ -13,15 +13,9 @@ import { LIBRARY_QUERY_KEY, useLibrary } from "../library/hooks/useLibrary";
 import { ownedEntry } from "../search/searchModel";
 import { pathWithQuery } from "../auth/navigation";
 import { workPath } from "../works/workPath";
-import { useLocale, useT, type MobileMessages } from "../../i18n";
+import { useLocale, useT, type MessageKey } from "../../i18n";
 
-type MessageKey = Extract<keyof MobileMessages, string>;
-
-const STATUS_OPTIONS: ReadonlyArray<{ value: 0 | 1 | 2; labelKey: MessageKey }> = [
-  { value: 0, labelKey: "addBook.statusToRead" },
-  { value: 1, labelKey: "community.statusReading" },
-  { value: 2, labelKey: "shell.finished" },
-];
+const STATUS_VALUES = [0, 1, 2] as const;
 
 export function AddBookSheet({
   book,

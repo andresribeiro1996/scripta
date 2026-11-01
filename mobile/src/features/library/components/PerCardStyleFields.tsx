@@ -15,7 +15,7 @@ import {
 } from "../../murals/blockStyleOptions";
 import { Caption, Chip, ColorSwatchRow, PresetRow, SelectRow, StepperRow, Tile } from "./StyleControls";
 import { cardTextMayBeHardToRead } from "./scrim";
-import { useLocale, useT, type MobileMessages } from "../../../i18n";
+import { useLocale, useT, type MessageKey } from "../../../i18n";
 
 const TEXT_SIZES = [
   { key: "s", label: "S", value: 11 },
@@ -23,7 +23,7 @@ const TEXT_SIZES = [
   { key: "l", label: "L", value: 16 },
   { key: "xl", label: "XL", value: 20 },
 ];
-const OVERLAY_PRESETS: readonly { key: string; labelKey: Extract<keyof MobileMessages, string>; value: number }[] = [
+const OVERLAY_PRESETS: readonly { key: string; labelKey: MessageKey; value: number }[] = [
   { key: "light", labelKey: "library.overlayLight", value: 40 },
   { key: "medium", labelKey: "library.overlayMedium", value: 72 },
   { key: "strong", labelKey: "library.overlayStrong", value: 88 },

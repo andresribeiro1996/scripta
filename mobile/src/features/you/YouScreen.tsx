@@ -9,9 +9,7 @@ import { LanguagePicker } from "../settings/LanguagePicker";
 import { ThemePicker } from "../settings/ThemePicker";
 import { SocialsSection } from "../socials";
 import { ProfileHeader } from "./ProfileHeader";
-import { useT, type MobileMessages } from "../../i18n";
-
-type MessageKey = Extract<keyof MobileMessages, string>;
+import { useT, type MessageKey } from "../../i18n";
 
 type Card = { label: MessageKey; icon: IconName } & ({ href: string } | { sheet: "appearance" | "socials" });
 

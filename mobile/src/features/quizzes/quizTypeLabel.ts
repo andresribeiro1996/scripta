@@ -1,8 +1,8 @@
 import type { Locale } from "@scripta/shared/i18n";
 import type { QuizQuestionType } from "@scripta/shared";
-import { translatorFor, type MobileMessages } from "../../i18n";
+import { translatorFor, type MessageKey } from "../../i18n";
 
-const TYPE_LABEL_KEYS: Record<QuizQuestionType, Extract<keyof MobileMessages, `quizzes.type${string}`>> = {
+const TYPE_LABEL_KEYS: Record<QuizQuestionType, Extract<MessageKey, `quizzes.type${string}`>> = {
   cover_title: "quizzes.typeCoverTitle",
   title_cover: "quizzes.typeTitleCover",
   quote_title: "quizzes.typeQuoteTitle",

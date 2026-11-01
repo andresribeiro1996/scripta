@@ -1,9 +1,7 @@
 import { bracketShape, countdownLabel, duelWinner, needsVote, roundLabel, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
 import { sharedT, type Locale } from "@scripta/shared/i18n";
 import type { TournamentView } from "./api";
-import { translatorFor, type MobileMessages } from "../../i18n";
-
-type MessageKey = Extract<keyof MobileMessages, string>;
+import { translatorFor, type MessageKey } from "../../i18n";
 
 const ALL_ARENA_VIEW_TABS = [
   { value: "bracket", labelKey: "arena.tabBracket" },

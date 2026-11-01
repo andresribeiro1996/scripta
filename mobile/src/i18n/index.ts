@@ -5,6 +5,7 @@ import { ptPT } from "./messages/pt-PT";
 import { getLocale, subscribeLocale } from "./locale";
 
 export type { MobileMessages };
+export type MessageKey = Extract<keyof MobileMessages, string>;
 export { PORTUGUESE_ENABLED } from "./flag";
 export { getLocale, getLocalePreference, setDeviceLocaleTags, setLocalePreference, subscribeLocale } from "./locale";
 

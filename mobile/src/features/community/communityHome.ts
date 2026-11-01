@@ -1,8 +1,6 @@
 import type { Locale } from "@scripta/shared/i18n";
 import { activityRow, contentDetail, contentKindLabel, contentStats, contentStatus, contentTarget, feedHeading, feedTarget, gameActionLabel, TIER_LADDER, type ActivityItem } from "@scripta/shared/community";
-import type { MobileMessages } from "../../i18n";
-
-type MessageKey = Extract<keyof MobileMessages, string>;
+import type { MessageKey } from "../../i18n";
 
 export const FAN_SIZE = 3;
 

@@ -28,11 +28,9 @@ import { useToast } from "../../../ui/ToastHost";
 import { useLibrary } from "../hooks/useLibrary";
 import { attemptUpdate } from "../lib/attemptUpdate";
 import { CoverImage } from "./CoverImage";
-import { getLocale, useT, type MobileMessages } from "../../../i18n";
+import { getLocale, useT, type MessageKey } from "../../../i18n";
 
 export type TypeFilter = GroupType | "all";
-
-type MessageKey = Extract<keyof MobileMessages, string>;
 
 export const TYPE_FILTER_OPTIONS: readonly { value: TypeFilter; labelKey: MessageKey; icon: IconName }[] = [
   { value: "all", labelKey: "library.typeAll", icon: "filter" },
