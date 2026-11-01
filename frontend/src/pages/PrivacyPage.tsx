@@ -19,13 +19,14 @@ const contactLink = (
 
 export function PrivacyPage() {
   const t = useT();
+  const [updatedBefore, updatedAfter] = t("shell.privacyUpdated").split("{date}");
   return (
     <div className="flex min-h-svh flex-col bg-(--color-bg) font-sans text-(--color-text) [&_:focus-visible]:outline-(--color-text)!">
       <LandingNav />
       <main className={`${container} w-full flex-1 py-8 sm:py-12`}>
         <article className="mx-auto max-w-xl">
           <h1 className="font-sans text-4xl leading-tight font-light tracking-tight sm:text-5xl">{t("shell.privacyTitle")}</h1>
-          <p className="mt-3 text-xs text-(--color-text-dim)">{t("shell.privacyUpdated", { date: t("shell.privacyDate") })}</p>
+          <p className="mt-3 text-xs text-(--color-text-dim)">{updatedBefore}<time dateTime="2026-10-06">{t("shell.privacyDate")}</time>{updatedAfter}</p>
           <div className="mt-6 space-y-4 text-pretty text-base leading-relaxed text-(--color-text-dim)">
             <p>Join the launch list and we’ll use your email to confirm your place and tell you when Atmyshelf opens. You can ask us to remove it at any time.</p>
             <p>Your library stays private until you choose to share it.</p>

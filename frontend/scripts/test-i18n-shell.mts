@@ -23,7 +23,7 @@ const { SidebarNav } = await import("../src/components/page/SidebarNav.tsx");
 const { Sheet } = await import("../src/components/Sheet.tsx");
 const { NAV_AREAS, backTo, area } = await import("../src/lib/areas.ts");
 
-const inPortuguese = (render: () => string) => {
+const inPortuguese = <T extends unknown>(render: () => T): T => {
   setLocalePreference("pt-PT");
   try {
     return render();
@@ -54,7 +54,6 @@ test("area labels, tabs and back links follow the active language", () => {
     assert.deepEqual(area("library").tabs.map((tab) => tab.label), ["Livros", "Séries", "Coleções", "Galeria"]);
     assert.equal(backTo("tournament").label, "Jogos");
     assert.equal(area("admin").label, "Admin");
-    return "";
   });
 });
 

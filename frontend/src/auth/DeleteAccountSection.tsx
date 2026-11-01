@@ -21,7 +21,7 @@ export function DeleteAccountSection() {
   const [error, setError] = useState("");
   const hasPassword = account.data?.hasPassword ?? true;
   const name = session?.user.username ?? account.data?.email ?? "";
-  const [typeBefore, typeAfter] = t("shell.typeNameToConfirm", { name: "\0" }).split("\0");
+  const [typeBefore, typeAfter] = t("shell.typeNameToConfirm").split("{name}");
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
