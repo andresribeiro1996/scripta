@@ -4,6 +4,7 @@
 // (seeding is a one-time step).
 
 import { booksByWork } from "@scripta/shared";
+import { sharedT } from "@scripta/shared/i18n";
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
@@ -23,7 +24,8 @@ import { OptionSheet } from "../components/Sheet";
 import { backTo } from "../lib/areas";
 import { useArena } from "../hooks/useArena";
 import { useLibrary } from "../hooks/useLibrary";
-import { createSeededTournament, hasTournamentName, slotPayload, toSeedBook, UNTITLED_TOURNAMENT } from "../lib/arenaSeed";
+import { createSeededTournament, hasTournamentName, slotPayload, toSeedBook, untitledTournament } from "../lib/arenaSeed";
+import { useLocale, useT } from "../i18n";
 import { useWorkBooks } from "../hooks/useWorkBooks";
 
 /** Bracket sizes offered for a draft. Powers of two only — the service
@@ -34,6 +36,9 @@ const DEFAULT_BRACKET_SIZE = 16;
 const DEFAULT_ROUND_HOURS = 24;
 
 export function ArenaSeedPage() {
+  const locale = useLocale();
+  const t = useT();
+  const shared = sharedT(locale);
   const { id } = useParams<{ id: string }>();
   const { session } = useAuth();
   const navigate = useNavigate();
@@ -58,7 +63,7 @@ export function ArenaSeedPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
-  const [draftName, setDraftName] = useState(UNTITLED_TOURNAMENT);
+  const [draftName, setDraftName] = useState(untitledTournament);
   const [draftBracketSize, setDraftBracketSize] = useState(DEFAULT_BRACKET_SIZE);
   const [pickingSize, setPickingSize] = useState(false);
   // A ref, not state: two quick actions on a draft must not each see
@@ -75,13 +80,13 @@ export function ArenaSeedPage() {
     try {
       const { tournament: created, slotsError } = await createSeededTournament(
         { createTournament, setTournamentSlots },
-        { name: name.trim() || UNTITLED_TOURNAMENT, bracketSize: draftBracketSize, roundDurationMinutes: DEFAULT_ROUND_HOURS * 60 },
+        { name: name.trim() || untitledTournament(), bracketSize: draftBracketSize, roundDurationMinutes: DEFAULT_ROUND_HOURS * 60 },
         slots
       );
       // `replace` so Back skips the draft URL rather than opening a
       // second empty draft.
       navigate(`/dashboard/arena/${created.id}/seed`, { replace: true });
-      if (slotsError) throw new Error("The tournament was created, but your picks didn't save. Pick them again and save.");
+      if (slotsError) throw new Error(t("arena.picksNotSaved"));
       return created;
     } finally {
       creatingRef.current = false;
@@ -107,7 +112,7 @@ export function ArenaSeedPage() {
       try {
         await materialize(name);
       } catch (err) {
-        setActionError(err instanceof Error ? err.message : "Couldn't create that tournament.");
+        setActionError(err instanceof Error ? err.message : t("arena.couldntCreateTournament"));
       }
       return;
     }
@@ -116,7 +121,7 @@ export function ArenaSeedPage() {
       await renameTournament(tournament.id, name);
       await refetch();
     } catch {
-      setActionError("Couldn't save that name.");
+      setActionError(t("arena.couldntSaveName"));
     }
   }
 
@@ -137,8 +142,8 @@ export function ArenaSeedPage() {
 
   if (isLoading) {
     return (
-      <Page title="Seed tournament" back={backTo("tournament")}>
-        <p className="text-sm text-(--color-text-dim)">Loading…</p>
+      <Page title={t("arena.seedTournament")} back={backTo("tournament")}>
+        <p className="text-sm text-(--color-text-dim)">{t("library.loadingEllipsis")}</p>
       </Page>
     );
   }
@@ -153,7 +158,7 @@ export function ArenaSeedPage() {
 
   function requireName() {
     if (hasTournamentName(name)) return true;
-    setActionError("Name this tournament first.");
+    setActionError(t("arena.nameFirst"));
     setNameDraft("");
     setEditingName(true);
     return false;
@@ -162,9 +167,9 @@ export function ArenaSeedPage() {
   async function handleStart() {
     if (!requireName()) return;
     const confirmed = await confirm({
-      title: `Start "${name}"?`,
-      body: `The ${bracketSize}-book bracket is fixed once the tournament starts.`,
-      confirmLabel: "Start tournament",
+      title: t("arena.startConfirmTitle", { name }),
+      body: t("arena.startConfirmBody", { size: bracketSize }),
+      confirmLabel: t("arena.startTournament"),
       danger: false
     });
     if (!confirmed) return;
@@ -177,7 +182,7 @@ export function ArenaSeedPage() {
       await startTournament(target.id);
       navigate(`/arena/${target.id}`);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Couldn't start the tournament.");
+      setActionError(err instanceof Error ? err.message : t("arena.couldntStart"));
     } finally {
       setStarting(false);
     }
@@ -194,7 +199,7 @@ export function ArenaSeedPage() {
       await setTournamentSlots(target.id, slotPayload(slots));
       await refresh(target.id);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Couldn't save your progress.");
+      setActionError(err instanceof Error ? err.message : t("arena.couldntSaveProgress"));
     }
   }
 
@@ -209,7 +214,7 @@ export function ArenaSeedPage() {
       await randomFillTournament(target.id, pool);
       await refresh(target.id);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Couldn't random-fill the bracket.");
+      setActionError(err instanceof Error ? err.message : t("arena.couldntRandomFill"));
     } finally {
       setRandomFilling(false);
     }
@@ -218,7 +223,7 @@ export function ArenaSeedPage() {
   return (
     <Page
       back={backTo("tournament")}
-      subtitle={`${bracketSize}-book bracket`}
+      subtitle={shared("shared.helpers.bracketBooks", { size: bracketSize })}
       title={editingName ? (
         <input
           autoFocus
@@ -229,8 +234,8 @@ export function ArenaSeedPage() {
             if (e.key === "Enter") void handleRename();
             if (e.key === "Escape") setEditingName(false);
           }}
-          placeholder="Name this tournament…"
-          aria-label="Tournament name"
+          placeholder={t("arena.namePlaceholder")}
+          aria-label={t("arena.tournamentName")}
           className={TITLE_FIELD_CLASS}
         />
       ) : (
@@ -239,7 +244,7 @@ export function ArenaSeedPage() {
             setNameDraft(name);
             setEditingName(true);
           }}
-          title="Rename this tournament"
+          title={t("arena.renameTournament")}
           className="flex min-h-11 min-w-0 max-w-full items-center text-left transition-colors hover:text-(--color-accent)"
         >
           <span className="min-w-0 break-words">{name}</span>
@@ -247,14 +252,14 @@ export function ArenaSeedPage() {
       )}
       actions={<>
         <button onClick={() => void handleSaveProgress()} className={BUTTON_SECONDARY}>
-          Save progress
+          {t("arena.saveProgress")}
         </button>
         <button
           onClick={() => void handleStart()}
           disabled={!canStart || starting}
           className={BUTTON_PRIMARY}
         >
-          {starting ? "Starting…" : "Start tournament"}
+          {starting ? t("arena.starting") : t("arena.startTournament")}
         </button>
       </>}
     >
@@ -283,10 +288,10 @@ export function ArenaSeedPage() {
             // (filter, sort, folder, actions, rounds) is a bottom sheet.
             <button
               onClick={() => setPickingSize(true)}
-              aria-label={`Bracket size, ${draftBracketSize} books — fixed once the tournament starts`}
+              aria-label={t("arena.bracketSizeAria", { count: draftBracketSize })}
               className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border border-(--color-border) bg-(--color-surface) px-2.5 text-xs hover:bg-(--color-surface-hover)"
             >
-              {draftBracketSize} books
+              {shared("shared.helpers.books", { count: draftBracketSize })}
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-(--color-text-dim)">
                 <polyline points="6 9 12 15 18 9" />
               </svg>
@@ -294,14 +299,14 @@ export function ArenaSeedPage() {
           ) : undefined
         }
       />
-      {randomFilling && <p className="mt-2 text-sm text-(--color-text-dim)">Filling…</p>}
+      {randomFilling && <p className="mt-2 text-sm text-(--color-text-dim)">{t("arena.filling")}</p>}
 
       {pickingSize && (
         <OptionSheet
-          title="Bracket size"
+          title={t("arena.bracketSize")}
           // OptionSheet keys on strings; sizes are numbers, so they're
           // converted on the way in and back on the way out.
-          options={BRACKET_SIZES.map((size) => ({ value: String(size), label: `${size} books` }))}
+          options={BRACKET_SIZES.map((size) => ({ value: String(size), label: shared("shared.helpers.books", { count: size }) }))}
           value={String(draftBracketSize)}
           onSelect={(v) => setDraftBracketSize(Number(v))}
           onClose={() => setPickingSize(false)}

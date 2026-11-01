@@ -5,7 +5,7 @@ import type { ContentTone, PublishedContent } from "@scripta/shared/community";
 import { LibraryIcon, QuoteIcon } from "../NavIcons";
 import { ChevronRightIcon } from "../Toolbar";
 import { GameTicketArt } from "./GameTicketArt";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 const STATUS_TONES: Record<ContentTone, string> = {
   neutral: "border-(--color-border) bg-(--color-surface) text-(--color-text-dim)",
@@ -16,9 +16,9 @@ const STATUS_TONES: Record<ContentTone, string> = {
 };
 
 const KINDS = {
-  quiz: { prefix: "Quiz: ", color: "var(--color-reference)", soft: "bg-(--color-reference-soft)", action: "bg-(--color-reference-soft) text-(--color-reference)", hoverBorder: "hover:border-(--color-reference)" },
-  tierlist: { prefix: "Tier list: ", color: "var(--color-success)", soft: "bg-(--color-success-soft)", action: "bg-(--color-success-soft) text-(--color-success)", hoverBorder: "hover:border-(--color-success)" },
-  tournament: { prefix: "Tournament: ", color: "var(--color-accent)", soft: "bg-(--color-accent-soft)", action: "bg-(--color-accent-soft) text-(--color-accent)", hoverBorder: "hover:border-(--color-accent)" }
+  quiz: { prefix: "arena.prefixQuiz", color: "var(--color-reference)", soft: "bg-(--color-reference-soft)", action: "bg-(--color-reference-soft) text-(--color-reference)", hoverBorder: "hover:border-(--color-reference)" },
+  tierlist: { prefix: "arena.prefixTierlist", color: "var(--color-success)", soft: "bg-(--color-success-soft)", action: "bg-(--color-success-soft) text-(--color-success)", hoverBorder: "hover:border-(--color-success)" },
+  tournament: { prefix: "arena.prefixTournament", color: "var(--color-accent)", soft: "bg-(--color-accent-soft)", action: "bg-(--color-accent-soft) text-(--color-accent)", hoverBorder: "hover:border-(--color-accent)" }
 } as const;
 
 export function StatusBadge({ label, tone }: { label: string; tone: ContentTone }) {
@@ -35,7 +35,7 @@ export function GameTicket({
   covers,
   ladder,
   preview,
-  actionLabel = "Open game",
+  actionLabel,
   play,
   menu
 }: {
@@ -53,6 +53,8 @@ export function GameTicket({
   menu?: ReactNode;
 }) {
   const locale = useLocale();
+  const t = useT();
+  const actionText = actionLabel ?? t("arena.openGame");
   const { prefix, color, soft, action, hoverBorder } = KINDS[kind];
   const clue = kind === "quiz" && preview && preview.type !== "cover_title" ? preview : undefined;
   return (
@@ -64,7 +66,7 @@ export function GameTicket({
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 px-4 py-3">
           <h3 className="line-clamp-2 text-lg font-semibold sm:text-xl">
             <Link to={to} className="after:absolute after:inset-0">
-              <span className="sr-only">{prefix}</span>
+              <span className="sr-only">{t(prefix)}</span>
               {name}
             </Link>
           </h3>
@@ -96,16 +98,16 @@ export function GameTicket({
         <span aria-hidden="true" className="pointer-events-none absolute -top-2 -right-px h-4 w-2 rounded-l-full border border-r-0 border-solid border-inherit bg-(--color-bg)" />
         <Link
           to={to}
-          aria-label={`${actionLabel}: ${name}`}
+          aria-label={t("arena.ticketLink", { action: actionText, name })}
           className={`flex min-h-11 min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-4 text-base font-semibold ${action} hover:brightness-90 hover:text-(--color-text)`}
         >
-          <span className="min-w-0 truncate">{actionLabel}</span>
+          <span className="min-w-0 truncate">{actionText}</span>
           <ChevronRightIcon size={20} />
         </Link>
         {play && (
           <Link
             to={play.to}
-            aria-label={`${play.label}: ${name}`}
+            aria-label={t("arena.ticketLink", { action: play.label, name })}
             className="relative z-10 flex min-h-11 shrink-0 items-center rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-base font-semibold hover:bg-(--color-surface-hover)"
           >
             {play.label}

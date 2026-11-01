@@ -12,8 +12,8 @@ test("quiz cover options are named and sized so four fit on screen", () => {
 
 test("seed slots: a filled slot is named and can be cleared, and the grid is compact", () => {
   const grid = src("components/arena/SeedSlotGrid");
-  assert.match(grid, /aria-label=\{slot \? `Slot \$\{i \+ 1\}: \$\{slot\.title\}, change book` : undefined\}/);
-  assert.match(grid, /<button(?=(?:=>|[^>])*aria-label=\{`Remove \$\{slot\.title\} from slot \$\{i \+ 1\}`\})(?=(?:=>|[^>])*min-h-11)(?:=>|[^>])*>\s*Remove\s*<\/button>/);
+  assert.match(grid, /aria-label=\{slot \? t\("arena\.slotChange", \{ number: i \+ 1, title: slot\.title \}\) : undefined\}/);
+  assert.match(grid, /<button(?=(?:=>|[^>])*aria-label=\{t\("arena\.removeFromSlot", \{ title: slot\.title, number: i \+ 1 \}\)\})(?=(?:=>|[^>])*min-h-11)(?:=>|[^>])*>\s*\{t\("arena\.remove"\)\}\s*<\/button>/);
   assert.match(grid, /onChange\(slots\.map\(\(entry, index\) => \(index === i \? null : entry\)\)\)/);
   assert.match(grid, /grid grid-cols-4 gap-3 sm:grid-cols-8/);
 });

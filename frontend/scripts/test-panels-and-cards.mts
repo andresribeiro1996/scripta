@@ -20,7 +20,7 @@ function duelHtml(round: string) {
 }
 
 test("a duel card is headed with the bracket's own round name", () => {
-  assert.match(duelHtml("Semis"), />Semis<!-- --> · Duel <!-- -->1</);
+  assert.match(duelHtml("Semis"), />Semis · Duel 1</);
   assert.doesNotMatch(duelHtml("Semis"), /Round 1/);
   const tree = src("components/arena/BracketTree");
   assert.equal(tree.match(/renderDuel\(duel\.id, labelFor\(duel\.roundNumber\)\)/g)?.length, 2);

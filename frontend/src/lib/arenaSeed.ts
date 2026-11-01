@@ -11,14 +11,18 @@
 
 import { resolveCover } from "../api/covers";
 import type { SeedBook, Tournament } from "../api/arena";
-import { getLocale } from "../i18n";
+import { en } from "../i18n/messages/en";
+import { ptPT } from "../i18n/messages/pt-PT";
+import { getLocale, t } from "../i18n";
 import { seedCoverLookup, toSeedBook as createSeedBook, type createArenaApi } from "@scripta/shared";
 
-export const UNTITLED_TOURNAMENT = "Untitled tournament";
+export const UNTITLED_TOURNAMENT = en["arena.untitledTournament"];
+
+export const untitledTournament = () => t("arena.untitledTournament");
 
 export function hasTournamentName(name: string): boolean {
   const trimmed = name.trim();
-  return trimmed !== "" && trimmed !== UNTITLED_TOURNAMENT;
+  return trimmed !== "" && trimmed !== UNTITLED_TOURNAMENT && trimmed !== ptPT["arena.untitledTournament"];
 }
 
 export function slotPayload(slots: Array<SeedBook | null>): Array<{ slotIndex: number; book: SeedBook }> {

@@ -264,7 +264,7 @@ test("following refreshes the people lists and Home's circle, from all four plac
 
 test("the Games tournament search is the shared SearchField", () => {
   const list = src("pages/ArenaListPage");
-  assert.match(list, /<SearchField\b(?:=>|[^>])*label="Search tournaments by name"/);
+  assert.match(list, /<SearchField\b(?:=>|[^>])*label=\{t\("arena\.searchTournaments"\)\}/);
   assert.doesNotMatch(list, /<input\b(?:=>|[^>])*aria-label="Search tournaments/);
 });
 

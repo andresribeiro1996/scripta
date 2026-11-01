@@ -16,6 +16,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import type { SeedBook } from "../../api/arena";
 import { useLibrary } from "../../hooks/useLibrary";
 import { toSeedBook } from "../../lib/arenaSeed";
+import { useT } from "../../i18n";
 import { workIdOf, booksByWork } from "@scripta/shared";
 import { useWorkBooks } from "../../hooks/useWorkBooks";
 import { CoverImage } from "../BookCard";
@@ -45,6 +46,7 @@ export function SeedSlotGrid({
    *  unsaved draft, so the page owns whether it exists at all. */
   sizeControl?: ReactNode;
 }) {
+  const t = useT();
   const { data: library } = useLibrary();
   const workBooks = useWorkBooks(library);
   const books = useMemo(() => [...booksByWork(workBooks).values()], [workBooks]);
@@ -68,17 +70,17 @@ export function SeedSlotGrid({
           second line is better than a squeezed button. */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-(--color-text-dim)">
-          {filledCount} / {bracketSize} slots filled
+          {t("arena.slotsFilled", { filled: filledCount, size: bracketSize })}
         </p>
         <div className="flex items-center gap-2">
         {sizeControl}
         <button
           onClick={onRandomFill}
           disabled={books.length < bracketSize}
-          title={books.length < bracketSize ? `Your library needs at least ${bracketSize} books to random-fill.` : undefined}
+          title={books.length < bracketSize ? t("arena.randomFillNeeds", { size: bracketSize }) : undefined}
           className={BUTTON_SECONDARY}
         >
-          Random fill
+          {t("arena.randomFill")}
         </button>
         </div>
       </div>
@@ -88,7 +90,7 @@ export function SeedSlotGrid({
           <div key={i} className="flex flex-col items-stretch">
             <button
               onClick={() => setPickingSlot(i)}
-              aria-label={slot ? `Slot ${i + 1}: ${slot.title}, change book` : undefined}
+              aria-label={slot ? t("arena.slotChange", { number: i + 1, title: slot.title }) : undefined}
               className="flex aspect-2/3 flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-(--color-border) bg-(--color-surface) text-xs text-(--color-text-dim) hover:border-(--color-accent)"
             >
               {slot ? (
@@ -96,16 +98,16 @@ export function SeedSlotGrid({
                   <CoverImage book={{ Title: slot.title, Attribution: slot.author, _coverUrl: slot.cover ?? undefined }} />
                 </div>
               ) : (
-                <span>Slot {i + 1}</span>
+                <span>{t("arena.slot", { number: i + 1 })}</span>
               )}
             </button>
             {slot && (
               <button
                 onClick={() => onChange(slots.map((entry, index) => (index === i ? null : entry)))}
-                aria-label={`Remove ${slot.title} from slot ${i + 1}`}
+                aria-label={t("arena.removeFromSlot", { title: slot.title, number: i + 1 })}
                 className="min-h-11 text-xs font-semibold text-(--color-text-dim) hover:text-(--color-danger)"
               >
-                Remove
+                {t("arena.remove")}
               </button>
             )}
           </div>
@@ -113,7 +115,7 @@ export function SeedSlotGrid({
       </div>
 
       {pickingSlot !== null && (
-        <Sheet title={`Pick a book for slot ${pickingSlot + 1}`} onClose={() => setPickingSlot(null)}>
+        <Sheet title={t("arena.pickBookForSlot", { number: pickingSlot + 1 })} onClose={() => setPickingSlot(null)}>
           <div className="p-2">
             <BookSearchList
               books={books.filter((b) => !usedWorkIds.has(workIdOf(b) ?? null))}

@@ -1,4 +1,5 @@
 import type { Tournament } from "../../api/arena";
+import { useT } from "../../i18n";
 
 /** A tournament's stage, as a coloured pill.
  *
@@ -28,15 +29,16 @@ export function TournamentStatusBadge({
   round?: number;
   className?: string;
 }) {
+  const t = useT();
   const styles: Record<Tournament["status"], string> = {
     seeding: "border-(--color-border) bg-(--color-surface) text-(--color-text-dim)",
     active: "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)",
     completed: "border-(--color-success) bg-(--color-success-soft) text-(--color-success)"
   };
   const labels: Record<Tournament["status"], string> = {
-    seeding: "Seeding",
-    active: round ? `Round ${round}` : "Active",
-    completed: "Completed"
+    seeding: t("arena.statusSeeding"),
+    active: round ? t("arena.statusRound", { number: round }) : t("arena.statusActive"),
+    completed: t("arena.statusCompleted")
   };
   return (
     <span
