@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useState, type ReactElement } from "react";
-import { bookKey, calculateShelfTheme, effectiveCardStyle, plural, statusCounts, type Group, type LibraryBook, type LibraryStyleSettings, type PerCardStyle } from "@scripta/shared";
+import { bookKey, calculateShelfTheme, effectiveCardStyle, genreLabel, statusCounts, type Group, type LibraryBook, type LibraryStyleSettings, type PerCardStyle } from "@scripta/shared";
 import { useWindowDimensions, View } from "react-native";
 import { Text } from "../../../ui/Text";
 import { radii, spacing, typography, useTheme } from "../../../ui";
@@ -7,6 +7,7 @@ import { TierCover } from "../../tierlists/TierBoard";
 import { libraryGridColumns } from "../lib/gridColumns";
 import { newestFinished, readingNow, summaryCoverBooks, wallColumns, type LibraryShareLayout } from "../lib/libraryShareBooks";
 import { BookCard } from "./BookCard";
+import { useLocale, useT } from "../../../i18n";
 
 const WALL_GAP = 2;
 const FAN_ROTATIONS = ["-10deg", "-3deg", "4deg", "11deg"] as const;
@@ -51,6 +52,8 @@ export function LibraryShareImage({ layout, name, ordered, shelf, style, seriesG
   seriesGroups: Map<string, Group>;
   onReadyChange: (ready: boolean) => void;
 }): ReactElement {
+  const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const [width, setWidth] = useState(0);
@@ -100,7 +103,7 @@ export function LibraryShareImage({ layout, name, ordered, shelf, style, seriesG
 
   function shelfGrid() {
     if (!shelf) return null;
-    if (!shelf.books.length) return sectionLabel("This shelf is empty.");
+    if (!shelf.books.length) return sectionLabel(t("library.shelfIsEmpty"));
     if (width <= 0) return null;
     const contentWidth = width - 2 * style.contentPaddingX;
     const columns = libraryGridColumns(windowWidth, contentWidth, style);
@@ -114,7 +117,7 @@ export function LibraryShareImage({ layout, name, ordered, shelf, style, seriesG
   }
 
   function body() {
-    if (layout === "wall") return wall.length ? covers("wall", wall, wallColumns(wall.length), WALL_GAP) : sectionLabel("Your library is empty.");
+    if (layout === "wall") return wall.length ? covers("wall", wall, wallColumns(wall.length), WALL_GAP) : sectionLabel(t("library.libraryIsEmpty"));
     if (layout === "summary") {
       const genres = calculateShelfTheme(ordered, 3).genres;
       const counts = statusCounts(ordered);
@@ -126,31 +129,31 @@ export function LibraryShareImage({ layout, name, ordered, shelf, style, seriesG
           })}
         </View>
         <View style={{ flexDirection: "row", gap: spacing.sm }}>
-          {stat(counts.all, "books", colors.accentSoft)}
-          {stat(counts.finished, "finished", colors.surface)}
-          {stat(counts.reading, "reading", colors.surface)}
+          {stat(counts.all, t("library.statBooks"), colors.accentSoft)}
+          {stat(counts.finished, t("library.statFinished"), colors.surface)}
+          {stat(counts.reading, t("library.statReading"), colors.surface)}
         </View>
         {genres.length ? <View style={{ gap: spacing.sm }}>
-          {sectionLabel("Top genres")}
+          {sectionLabel(t("library.topGenres"))}
           {genres.map((genre, index) => <View key={genre} style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, borderRadius: radii.lg, backgroundColor: colors.surface }}>
             <Text style={[typography.title, { color: colors.accent, fontWeight: "700", fontVariant: ["tabular-nums"] }]}>{index + 1}</Text>
-            <Text style={[typography.body, { color: colors.text, fontWeight: "600" }]}>{genre}</Text>
+            <Text style={[typography.body, { color: colors.text, fontWeight: "600" }]}>{genreLabel(genre, locale)}</Text>
           </View>)}
         </View> : null}
       </>;
     }
     if (layout === "reading") {
-      if (!reading.length && !finished.length) return sectionLabel("Nothing being read or finished yet.");
+      if (!reading.length && !finished.length) return sectionLabel(t("library.nothingReading"));
       return <>
-        {reading.length ? <View style={{ gap: spacing.sm }}>{sectionLabel("Reading now")}{covers("reading", reading, 4, spacing.sm)}</View> : null}
-        {finished.length ? <View style={{ gap: spacing.sm }}>{sectionLabel("Recently finished")}{covers("finished", finished, 5, spacing.sm)}</View> : null}
+        {reading.length ? <View style={{ gap: spacing.sm }}>{sectionLabel(t("library.readingNow"))}{covers("reading", reading, 4, spacing.sm)}</View> : null}
+        {finished.length ? <View style={{ gap: spacing.sm }}>{sectionLabel(t("library.recentlyFinished"))}{covers("finished", finished, 5, spacing.sm)}</View> : null}
       </>;
     }
     return shelfGrid();
   }
 
-  const subtitle = layout === "wall" ? plural(ordered.length, "book", "books")
-    : layout === "shelf" && shelf ? [shelf.label, shelf.query.trim() ? `“${shelf.query.trim()}”` : "", plural(shelf.books.length, "book", "books")].filter(Boolean).join(" · ")
+  const subtitle = layout === "wall" ? t("library.bookCount", { count: ordered.length })
+    : layout === "shelf" && shelf ? [shelf.label, shelf.query.trim() ? `“${shelf.query.trim()}”` : "", t("library.bookCount", { count: shelf.books.length })].filter(Boolean).join(" · ")
     : null;
 
   return <View style={{ width: "100%", padding: spacing.md, gap: spacing.md, backgroundColor: colors.background }}>
@@ -160,7 +163,7 @@ export function LibraryShareImage({ layout, name, ordered, shelf, style, seriesG
     </View>
     <View style={{ gap: spacing.md }} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>{renderable ? body() : null}</View>
     <View style={{ borderTopWidth: 1, borderColor: colors.border, paddingTop: spacing.md }}>
-      <Text style={[typography.caption, { color: colors.textDim, textAlign: "right" }]}>Created with: <Text style={{ color: colors.text, fontWeight: "600" }}>Atmyshelf</Text></Text>
+      <Text style={[typography.caption, { color: colors.textDim, textAlign: "right" }]}>{t("library.createdWith")} <Text style={{ color: colors.text, fontWeight: "600" }}>Atmyshelf</Text></Text>
     </View>
   </View>;
 }

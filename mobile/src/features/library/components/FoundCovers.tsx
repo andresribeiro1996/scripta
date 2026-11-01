@@ -16,7 +16,7 @@ import {
 import { Text } from "../../../ui/Text";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../../ui/theme";
 import { fetchCoverCandidates, pickCover, type ResolveCoverParams } from "../api/covers";
-import { useLocale } from "../../../i18n";
+import { useLocale, useT } from "../../../i18n";
 
 export function FoundCovers({
   lookup: lookupProp,
@@ -28,6 +28,7 @@ export function FoundCovers({
   onPick: (cover: ResolvedCoverResponse) => void;
 }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const [quick, setQuick] = useState<FoundCoversLoad>(FOUND_COVERS_PENDING);
   const [apple, setApple] = useState<FoundCoversLoad>(FOUND_COVERS_PENDING);
@@ -83,7 +84,7 @@ export function FoundCovers({
   return (
     <View style={styles.section}>
       <Text accessibilityRole="header" style={[typography.body, { color: colors.text, fontWeight: "600" }]}>
-        Found covers
+        {t("library.foundCovers")}
       </Text>
       <View style={styles.grid}>
         {tiles.map(({ candidate, width, height }, index) => {
@@ -93,7 +94,7 @@ export function FoundCovers({
           return (
             <View key={candidate.url} style={styles.cell}>
               <Pressable
-                accessibilityLabel={`Use this ${label} cover, ${size ? `${size.width} by ${size.height}, ` : ""}${index + 1} of ${tiles.length}`}
+                accessibilityLabel={size ? t("library.useCoverSized", { source: label, width: size.width, height: size.height, position: index + 1, total: tiles.length }) : t("library.useCover", { source: label, position: index + 1, total: tiles.length })}
                 accessibilityRole="button"
                 accessibilityState={{ selected: current }}
                 disabled={picking}
@@ -126,12 +127,12 @@ export function FoundCovers({
         })}
         {checkingApple && (
           <View style={[styles.cell, styles.thumb, styles.checking, { borderColor: "transparent", backgroundColor: colors.border }]}>
-            <Text style={[typography.caption, { color: colors.textDim, textAlign: "center" }]}>Checking Apple Books…</Text>
+            <Text style={[typography.caption, { color: colors.textDim, textAlign: "center" }]}>{t("library.checkingApple")}</Text>
           </View>
         )}
       </View>
       {unavailable.map((name) => (
-        <Text key={name} style={[typography.caption, { color: colors.textDim }]}>{`${coverSourceLabel(name, locale)} didn't answer.`}</Text>
+        <Text key={name} style={[typography.caption, { color: colors.textDim }]}>{t("library.sourceNoAnswer", { source: coverSourceLabel(name, locale) })}</Text>
       ))}
       {failures.map((message) => (
         <Text key={message} style={[typography.caption, { color: colors.danger }]}>

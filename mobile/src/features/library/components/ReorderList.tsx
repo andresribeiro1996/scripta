@@ -3,6 +3,7 @@ import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../../ui/Text";
 import { bookKey, unitMoves, type Group } from "@scripta/shared";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../../ui/theme";
+import { useT } from "../../../i18n";
 
 export function ReorderList({
   orderedBooks,
@@ -15,6 +16,7 @@ export function ReorderList({
   onMove: (key: string, direction: "up" | "down") => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const { colors } = useTheme();
   const moves = useMemo(() => unitMoves(orderedBooks, groups), [orderedBooks, groups]);
 
@@ -35,14 +37,14 @@ export function ReorderList({
             <View style={[styles.row, { borderColor: colors.border }]}>
               <View style={styles.title}>
                 <Text style={[typography.body, { color: colors.text }]} numberOfLines={1}>
-                  {String(item.Title ?? "Untitled")}
+                  {String(item.Title ?? t("library.untitled"))}
                 </Text>
                 {firstInSeries ? (
-                  <Text style={[typography.caption, { color: colors.textDim }]}>Series stay at the top and move together.</Text>
+                  <Text style={[typography.caption, { color: colors.textDim }]}>{t("library.seriesStayTop")}</Text>
                 ) : null}
               </View>
               <Pressable
-                accessibilityLabel={`Move "${String(item.Title ?? "book")}" up`}
+                accessibilityLabel={t("library.moveUp", { title: String(item.Title ?? t("library.bookFallback")) })}
                 accessibilityRole="button"
                 disabled={!canMoveUp}
                 onPress={() => canMoveUp && onMove(key, "up")}
@@ -51,7 +53,7 @@ export function ReorderList({
                 <Text style={{ color: colors.text }}>↑</Text>
               </Pressable>
               <Pressable
-                accessibilityLabel={`Move "${String(item.Title ?? "book")}" down`}
+                accessibilityLabel={t("library.moveDown", { title: String(item.Title ?? t("library.bookFallback")) })}
                 accessibilityRole="button"
                 disabled={!canMoveDown}
                 onPress={() => canMoveDown && onMove(key, "down")}

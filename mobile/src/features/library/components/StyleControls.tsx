@@ -6,6 +6,7 @@ import { Icon, type IconName } from "../../../ui";
 import { Pressable, StyleSheet, Switch, View, type DimensionValue } from "react-native";
 import { Text } from "../../../ui/Text";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../../ui/theme";
+import { useT } from "../../../i18n";
 
 export function Section({ title, children }: { title: string; children: ReactNode }) {
   const { colors } = useTheme();
@@ -44,8 +45,9 @@ export function Tile({ label, selected, onPress, width = 64, tileWidth = 64, hei
 }
 
 export function PresetRow({ label, presets, value, onChange }: { label: string; presets: readonly Preset<number>[]; value: number; onChange: (value: number) => void }) {
+  const t = useT();
   const selected = matchPreset(presets, value);
-  return <View style={styles.row}><SelectRow label={label} value={selected} options={presets.map((preset) => ({ value: preset.key, label: preset.label }))} onChange={(key) => onChange(presets.find((preset) => preset.key === key)!.value)} />{selected === null ? <Caption>{`Custom · ${value}`}</Caption> : null}</View>;
+  return <View style={styles.row}><SelectRow label={label} value={selected} options={presets.map((preset) => ({ value: preset.key, label: preset.label }))} onChange={(key) => onChange(presets.find((preset) => preset.key === key)!.value)} />{selected === null ? <Caption>{t("library.customValue", { value })}</Caption> : null}</View>;
 }
 
 export function StepperRow({
@@ -61,6 +63,7 @@ export function StepperRow({
   range: { min: number; max: number; step: number };
   onChange: (value: number) => void;
 }) {
+  const t = useT();
   const { colors } = useTheme();
   const clamp = (v: number) => Math.min(range.max, Math.max(range.min, v));
   return (
@@ -68,7 +71,7 @@ export function StepperRow({
       <Text style={[typography.body, styles.rowLabel, { color: colors.text }]}>{label}</Text>
       <View style={styles.stepper}>
         <Pressable
-          accessibilityLabel={`Decrease ${label}`}
+          accessibilityLabel={t("library.decrease", { label })}
           accessibilityRole="button"
           disabled={value <= range.min}
           onPress={() => onChange(clamp(value - range.step))}
@@ -81,7 +84,7 @@ export function StepperRow({
           {unit}
         </Text>
         <Pressable
-          accessibilityLabel={`Increase ${label}`}
+          accessibilityLabel={t("library.increase", { label })}
           accessibilityRole="button"
           disabled={value >= range.max}
           onPress={() => onChange(clamp(value + range.step))}
@@ -154,6 +157,7 @@ export function ColorSwatchRow({ label, value, defaultColor, onChange }: {
   defaultColor: string;
   onChange: (color: string | null) => void;
 }) {
+  const t = useT();
   const { colors } = useTheme();
   const [editing, setEditing] = useState<string | null>(null);
   const custom = value !== null && !SWATCHES.includes(value.toLowerCase());
@@ -161,11 +165,11 @@ export function ColorSwatchRow({ label, value, defaultColor, onChange }: {
     <View style={styles.row}>
       <Text style={[typography.body, styles.rowLabel, { color: colors.text }]}>{label}</Text>
       <View style={styles.swatchRow}>
-        <Chip label="Auto" selected={value === null} onPress={() => { setEditing(null); onChange(null); }} />
+        <Chip label={t("library.auto")} selected={value === null} onPress={() => { setEditing(null); onChange(null); }} />
         {SWATCHES.map((swatch) => (
           <Pressable
             key={swatch}
-            accessibilityLabel={`Use ${swatch} for ${label.toLowerCase()}`}
+            accessibilityLabel={t("library.useColorFor", { color: swatch, label: label.toLowerCase() })}
             accessibilityRole="button"
             accessibilityState={{ selected: value?.toLowerCase() === swatch }}
             onPress={() => { setEditing(null); onChange(swatch); }}
@@ -173,7 +177,7 @@ export function ColorSwatchRow({ label, value, defaultColor, onChange }: {
           />
         ))}
         <Pressable
-          accessibilityLabel={`Custom ${label.toLowerCase()}${custom ? `, ${value}` : ""}`}
+          accessibilityLabel={custom ? t("library.customColorValue", { label: label.toLowerCase(), value: value! }) : t("library.customColor", { label: label.toLowerCase() })}
           accessibilityRole="button"
           accessibilityState={{ selected: custom }}
           onPress={() => { if (editing === null) setEditing(normalizeHexColor(value ?? defaultColor) ?? defaultColor); }}

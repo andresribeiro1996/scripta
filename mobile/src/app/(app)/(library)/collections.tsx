@@ -29,7 +29,7 @@ export default function CollectionsRoute() {
         cycle={{
           icon: typeFilterOption.icon,
           active: typeFilter !== "all",
-          accessibilityLabel: t("shell.showingType", { type: typeFilterOption.label.toLowerCase() }),
+          accessibilityLabel: t("shell.showingType", { type: t(typeFilterOption.labelKey).toLowerCase() }),
           accessibilityHint: t("shell.switchesToNextType"),
           onPress: () => setTypeFilter(nextTypeFilter.value),
         }}

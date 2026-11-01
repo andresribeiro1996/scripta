@@ -13,6 +13,7 @@ import { BookWrapGrid } from "./BookWrapGrid";
 import { useLibraryGridColumns } from "./LibraryGrid";
 import { PerCardStyleFields } from "./PerCardStyleFields";
 import { Caption, ColorSwatchRow, Section, StepperRow } from "./StyleControls";
+import { useT } from "../../../i18n";
 
 const PREVIEW_BOOKS: Array<Record<string, unknown>> = [
   { ContentID: "preview-1", Title: "The Secret Garden", Attribution: "Frances Hodgson Burnett", ReadStatus: 1, highlights: [] },
@@ -20,9 +21,10 @@ const PREVIEW_BOOKS: Array<Record<string, unknown>> = [
   { ContentID: "preview-3", Title: "The Odyssey", Attribution: "Homer", ReadStatus: 0, highlights: [] },
   { ContentID: "preview-4", Title: "Persuasion", Attribution: "Jane Austen", ReadStatus: 0, highlights: [] },
 ];
-const TABS = [{ value: "cards", label: "Cards" }, { value: "layout", label: "Layout" }, { value: "canvas", label: "Canvas" }] as const;
+type StyleTab = "cards" | "layout" | "canvas";
 
 export function CardStylePreview({ books, style, layout = false }: { books: Array<Record<string, unknown>>; style: LibraryStyleSettings; layout?: boolean }) {
+  const t = useT();
   const { colors } = useTheme();
   const { contentWidth } = useLibraryGridColumns(style);
   const [gridHeight, setGridHeight] = useState(160);
@@ -44,16 +46,16 @@ export function CardStylePreview({ books, style, layout = false }: { books: Arra
           <BookCard book={book} style={style} onPress={() => {}} />
         </View>
         <View style={{ flex: 1, gap: spacing.xs }}>
-          <Caption>Live preview</Caption>
-          <Text numberOfLines={3} style={[typography.body, { color: colors.text, fontWeight: "600" }]}>{String(book.Title ?? "Untitled")}</Text>
-          <Text numberOfLines={2} style={[typography.caption, { color: colors.textDim }]}>{String(book.Attribution ?? "Unknown author")}</Text>
+          <Caption>{t("library.livePreview")}</Caption>
+          <Text numberOfLines={3} style={[typography.body, { color: colors.text, fontWeight: "600" }]}>{String(book.Title ?? t("library.untitled"))}</Text>
+          <Text numberOfLines={2} style={[typography.caption, { color: colors.textDim }]}>{String(book.Attribution ?? t("library.unknownAuthor"))}</Text>
         </View>
       </View>
     );
   }
   return (
     <View style={{ gap: spacing.sm }}>
-      <Caption>{`${layout ? "Grid" : "Card"} preview${books.length ? "" : " · sample books"}`}</Caption>
+      <Caption>{t(layout ? (books.length ? "library.gridPreview" : "library.gridPreviewSample") : (books.length ? "library.cardPreview" : "library.cardPreviewSample"))}</Caption>
       {layout ? <View style={{ alignSelf: "center", width: gridWidth * scale, height: gridHeight * scale }}>
         <View onLayout={(event) => setGridHeight(event.nativeEvent.layout.height)} style={{ position: "absolute", width: gridWidth, backgroundColor: style.backgroundColor ?? colors.background, paddingHorizontal: style.contentPaddingX, paddingVertical: style.contentPaddingY, transform: [{ scale }], transformOrigin: "top left" }}>
           <BookWrapGrid books={shown} style={style} renderBook={(book) => <BookCard book={book} style={style} onPress={() => {}} />} />
@@ -70,8 +72,10 @@ export function LibraryStyleView({ savedStyle, previewBooks, onSave }: {
   previewBooks: Array<Record<string, unknown>>;
   onSave: (style: LibraryStyleSettings) => void;
 }) {
+  const t = useT();
   const { colors } = useTheme();
-  const [tab, setTab] = useState<(typeof TABS)[number]["value"]>("cards");
+  const tabs = [{ value: "cards", label: t("library.tabCards") }, { value: "layout", label: t("library.tabLayout") }, { value: "canvas", label: t("library.tabCanvas") }] as const;
+  const [tab, setTab] = useState<StyleTab>("cards");
   const [draft, setDraft] = useState<LibraryStyleSettings>(() => resolveLibraryStyle(savedStyle));
   const syncedRef = useRef(false);
   const debounced = useDebouncedCallback((next: LibraryStyleSettings) => onSave(next), 400);
@@ -94,26 +98,26 @@ export function LibraryStyleView({ savedStyle, previewBooks, onSave }: {
 
   return (
     <View style={styles.screen}>
-      <Text style={[typography.caption, { color: colors.textDim }]}>Applies to Library, Series and Collections. Book and series styles take priority.</Text>
-      <Segmented options={TABS} value={tab} onChange={setTab} accessibilityLabel="Library style settings" />
+      <Text style={[typography.caption, { color: colors.textDim }]}>{t("library.styleAppliesTo")}</Text>
+      <Segmented options={tabs} value={tab} onChange={setTab} accessibilityLabel={t("library.styleSettings")} />
       <CardStylePreview books={previewBooks} style={draft} layout={tab === "layout"} />
       <FormScroll key={tab} contentContainerStyle={styles.content}>
         {tab === "cards" ? <PerCardStyleFields draft={draft} canvasColor={draft.backgroundColor ?? colors.background} onApply={(patch) => applyDraft({ ...draft, ...patch })} onSaveNow={(patch) => saveNow({ ...draft, ...patch })} /> : null}
         {tab === "layout" ? <>
-          <Section title="Layout">
-            <StepperRow label="Card size" value={draft.cardMinWidth} range={CARD_MIN_WIDTH_RANGE} onChange={(cardMinWidth) => applyDraft({ ...draft, cardMinWidth })} />
-            <StepperRow label="Between cards" value={draft.cardGap} range={CARD_GAP_RANGE} onChange={(cardGap) => applyDraft({ ...draft, cardGap })} />
-            <StepperRow label="Between rows" value={draft.rowGap} range={CARD_GAP_RANGE} onChange={(rowGap) => applyDraft({ ...draft, rowGap })} />
+          <Section title={t("library.tabLayout")}>
+            <StepperRow label={t("library.cardSize")} value={draft.cardMinWidth} range={CARD_MIN_WIDTH_RANGE} onChange={(cardMinWidth) => applyDraft({ ...draft, cardMinWidth })} />
+            <StepperRow label={t("library.betweenCards")} value={draft.cardGap} range={CARD_GAP_RANGE} onChange={(cardGap) => applyDraft({ ...draft, cardGap })} />
+            <StepperRow label={t("library.betweenRows")} value={draft.rowGap} range={CARD_GAP_RANGE} onChange={(rowGap) => applyDraft({ ...draft, rowGap })} />
           </Section>
         </> : null}
-        {tab === "canvas" ? <Section title="Canvas">
-          <ColorSwatchRow label="Background" value={draft.backgroundColor} defaultColor={colors.background} onChange={(backgroundColor) => saveNow({ ...draft, backgroundColor })} />
-          <StepperRow label="Side padding" value={draft.contentPaddingX} range={CONTENT_PADDING_RANGE} onChange={(contentPaddingX) => applyDraft({ ...draft, contentPaddingX })} />
-          <StepperRow label="Top & bottom padding" value={draft.contentPaddingY} range={CONTENT_PADDING_RANGE} onChange={(contentPaddingY) => applyDraft({ ...draft, contentPaddingY })} />
-          <StepperRow label="Content width" value={draft.contentMaxWidth} range={CONTENT_MAX_WIDTH_RANGE} onChange={(contentMaxWidth) => applyDraft({ ...draft, contentMaxWidth })} />
-          <Caption>Content width applies on wider screens.</Caption>
+        {tab === "canvas" ? <Section title={t("library.tabCanvas")}>
+          <ColorSwatchRow label={t("library.background")} value={draft.backgroundColor} defaultColor={colors.background} onChange={(backgroundColor) => saveNow({ ...draft, backgroundColor })} />
+          <StepperRow label={t("library.sidePadding")} value={draft.contentPaddingX} range={CONTENT_PADDING_RANGE} onChange={(contentPaddingX) => applyDraft({ ...draft, contentPaddingX })} />
+          <StepperRow label={t("library.verticalPadding")} value={draft.contentPaddingY} range={CONTENT_PADDING_RANGE} onChange={(contentPaddingY) => applyDraft({ ...draft, contentPaddingY })} />
+          <StepperRow label={t("library.contentWidth")} value={draft.contentMaxWidth} range={CONTENT_MAX_WIDTH_RANGE} onChange={(contentMaxWidth) => applyDraft({ ...draft, contentMaxWidth })} />
+          <Caption>{t("library.contentWidthNote")}</Caption>
         </Section> : null}
-        <Button label="Reset library style" variant="secondary" onPress={() => saveNow(DEFAULT_LIBRARY_STYLE)} />
+        <Button label={t("library.resetStyle")} variant="secondary" onPress={() => saveNow(DEFAULT_LIBRARY_STYLE)} />
       </FormScroll>
     </View>
   );

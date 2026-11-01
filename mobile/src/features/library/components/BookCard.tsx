@@ -22,7 +22,7 @@ import { cardFontFamily, resolveBorderColor, resolveBorderStyle } from "../../..
 import { dynamicType, minimumTouchTarget, useTheme } from "../../../ui/theme";
 import { CoverImage } from "./CoverImage";
 import { scrimStops } from "./scrim";
-import { useLocale } from "../../../i18n";
+import { useLocale, useT } from "../../../i18n";
 
 function aspectRatioNumber(value: LibraryStyleSettings["cardAspectRatio"]): number {
   const [w, h] = value.split("/").map(Number);
@@ -49,11 +49,14 @@ export function BookCard({
   onLoadEnd?: () => void;
 }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const [hasCover, setHasCover] = useState(false);
   const [width, setWidth] = useState(0);
   const compact = width <= CARD_OVERLAY_COMPACT_WIDTH;
   const label = statusLabel(book.ReadStatus, locale);
+  const title = String(book.Title ?? t("library.untitled"));
+  const author = String(book.Attribution ?? t("library.unknownAuthor"));
   const highlights = Array.isArray(book.highlights) ? book.highlights.length : 0;
   const showOverlayText = (style.showTitleAuthor && width > CARD_OVERLAY_TEXT_MIN_WIDTH) || !hasCover;
   const overlayTextColor = style.cardTextColor ?? "#ffffff";
@@ -63,9 +66,7 @@ export function BookCard({
 
   return (
     <Pressable
-      accessibilityLabel={`${String(book.Title ?? "Untitled")}, ${String(book.Attribution ?? "Unknown author")}, ${label}${
-        highlights > 0 ? `, ${highlights} highlight${highlights === 1 ? "" : "s"}` : ""
-      }`}
+      accessibilityLabel={highlights > 0 ? t("library.bookCardLabelHighlights", { title, author, status: label, count: highlights }) : t("library.bookCardLabel", { title, author, status: label })}
       accessibilityRole="button"
       accessibilityState={selectable ? { selected } : undefined}
       onPress={selectable ? () => onToggleSelect?.(book) : onPress}
@@ -106,7 +107,7 @@ export function BookCard({
       {highlights > 0 && !compact && (
         <View style={styles.highlightBadge} pointerEvents="none">
           <Text style={styles.actionText}>
-            {highlights} highlight{highlights === 1 ? "" : "s"}
+            {t("library.highlightCount", { count: highlights })}
           </Text>
         </View>
       )}
@@ -141,7 +142,7 @@ export function BookCard({
               },
             ]}
           >
-            {String(book.Title ?? "Untitled")}
+            {title}
           </Text>
           {!compact && <Text
             {...dynamicType}
@@ -159,7 +160,7 @@ export function BookCard({
               },
             ]}
           >
-            {String(book.Attribution ?? "Unknown author")}
+            {author}
           </Text>}
           {!compact && <Text
             {...dynamicType}

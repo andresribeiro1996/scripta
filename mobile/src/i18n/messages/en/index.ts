@@ -1,7 +1,8 @@
 import type { Messages } from "@scripta/shared/i18n";
 import { errors } from "./errors";
+import { library } from "./library";
 import { settings } from "./settings";
 import { shell } from "./shell";
 
-export const en = { ...errors, ...settings, ...shell } satisfies Messages;
+export const en = { ...errors, ...library, ...settings, ...shell } satisfies Messages;
 export type MobileMessages = typeof en;

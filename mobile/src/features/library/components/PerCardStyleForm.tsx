@@ -5,6 +5,7 @@ import { extractPerCardStyle, resolvePerCardStyle, type LibraryStyleSettings, ty
 import { FormScroll, Segmented, Sheet } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { useDebouncedCallback } from "../lib/debounce";
+import { useT } from "../../../i18n";
 import { PerCardStyleFields } from "./PerCardStyleFields";
 import { CardStylePreview } from "./LibraryStyleView";
 
@@ -20,9 +21,10 @@ type PerCardStyleProps = {
 };
 
 export function PerCardStyleSheet({ visible, ...props }: PerCardStyleProps & { visible: boolean }) {
+  const t = useT();
   const { height } = useWindowDimensions();
   return (
-    <Sheet visible={visible} title="Card style" onClose={props.onClose}>
+    <Sheet visible={visible} title={t("shell.cardStyle")} onClose={props.onClose}>
       <View style={{ height: Math.round(height * 0.8), flexShrink: 1 }}><PerCardStyleForm {...props} /></View>
     </Sheet>
   );
@@ -37,6 +39,7 @@ export function PerCardStyleForm({
   previewBook,
   error,
 }: PerCardStyleProps) {
+  const t = useT();
   const { colors } = useTheme();
   const [customized, setCustomized] = useState(currentOverride !== undefined);
   const [draft, setDraft] = useState<PerCardStyle>(currentOverride ? resolvePerCardStyle(currentOverride) : extractPerCardStyle(seedStyle));
@@ -67,9 +70,9 @@ export function PerCardStyleForm({
       {error ? <Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{error}</Text> : null}
       <FormScroll contentContainerStyle={{ gap: spacing.lg, paddingBottom: spacing.xl }}>
         <View style={{ gap: spacing.sm }}>
-          <Segmented accessibilityLabel="Style source" value={customized ? "custom" : "inherited"} options={[{ value: "inherited", label: "Inherited" }, { value: "custom", label: "Custom" }]} onChange={(value) => toggleCustomized(value === "custom")} />
-          <Text style={[typography.caption, { color: colors.textDim }]}>{customized ? "Changes save automatically." : `Follows ${inheritedFrom}. Choose Custom to make it your own.`}</Text>
-          {previewBook?.Title !== name ? <Text style={[typography.caption, { color: colors.textDim }]}>{`Applies to “${name}”.`}</Text> : null}
+          <Segmented accessibilityLabel={t("library.styleSource")} value={customized ? "custom" : "inherited"} options={[{ value: "inherited", label: t("library.inherited") }, { value: "custom", label: t("library.custom") }]} onChange={(value) => toggleCustomized(value === "custom")} />
+          <Text style={[typography.caption, { color: colors.textDim }]}>{customized ? t("library.changesSaveAutomatically") : t("library.followsSource", { source: inheritedFrom })}</Text>
+          {previewBook?.Title !== name ? <Text style={[typography.caption, { color: colors.textDim }]}>{t("library.appliesTo", { name })}</Text> : null}
         </View>
         {customized ? <PerCardStyleFields draft={draft} canvasColor={seedStyle.backgroundColor ?? colors.background} onApply={applyPatch} onSaveNow={saveNowPatch} /> : null}
       </FormScroll>

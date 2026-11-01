@@ -9,10 +9,11 @@ import { mergeLibraryBooks } from "../api/client";
 import type { LibraryDocument } from "../api/types";
 import { LIBRARY_QUERY_KEY, useLibrary } from "../hooks/useLibrary";
 import { CoverImage } from "./CoverImage";
-import { getLocale, useLocale } from "../../../i18n";
+import { getLocale, useLocale, useT } from "../../../i18n";
 
 export function DuplicatesSheetBody({ groups, library }: { groups: string[][]; library: LibraryDocument }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const { updateLibrary, saver } = useLibrary();
   const queryClient = useQueryClient();
@@ -38,9 +39,9 @@ export function DuplicatesSheetBody({ groups, library }: { groups: string[][]; l
   const merge = (group: string[]) =>
     run(async () => {
       await saver.merge((expectedUpdatedAt, signal) => mergeLibraryBooks(group[0]!, group.slice(1), expectedUpdatedAt ?? library.updatedAt, signal));
-    }, "Couldn't merge these books.");
+    }, t("library.mergeFailed"));
 
-  const keepApart = (group: string[]) => run(() => updateLibrary((data) => markDistinct(data, group)), "Couldn't save that.");
+  const keepApart = (group: string[]) => run(() => updateLibrary((data) => markDistinct(data, group)), t("library.saveFailed"));
 
   return (
     <ModalBody>
@@ -57,15 +58,15 @@ export function DuplicatesSheetBody({ groups, library }: { groups: string[][]; l
                     <CoverImage book={book} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text numberOfLines={1} style={[typography.body, { color: colors.text }]}>{String(book.Title ?? "Untitled")}</Text>
+                    <Text numberOfLines={1} style={[typography.body, { color: colors.text }]}>{String(book.Title ?? t("library.untitled"))}</Text>
                     <Text numberOfLines={1} style={[typography.caption, { color: colors.textDim }]}>{String(book.Attribution ?? "")}</Text>
                     <Text style={[typography.caption, { color: colors.textDim }]}>{[book.ISBN ? `ISBN ${String(book.ISBN)}` : null, statusLabel(book.ReadStatus, locale)].filter(Boolean).join(" · ")}</Text>
                   </View>
                 </View>
               );
             })}
-            <Button label="Merge" disabled={busy} onPress={() => void merge(group)} />
-            <Button label="Not the same" variant="secondary" disabled={busy} onPress={() => void keepApart(group)} />
+            <Button label={t("library.merge")} disabled={busy} onPress={() => void merge(group)} />
+            <Button label={t("library.notTheSame")} variant="secondary" disabled={busy} onPress={() => void keepApart(group)} />
           </View>
         ))}
       </View>

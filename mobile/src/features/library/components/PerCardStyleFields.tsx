@@ -15,7 +15,7 @@ import {
 } from "../../murals/blockStyleOptions";
 import { Caption, Chip, ColorSwatchRow, PresetRow, SelectRow, StepperRow, Tile } from "./StyleControls";
 import { cardTextMayBeHardToRead } from "./scrim";
-import { useLocale } from "../../../i18n";
+import { useLocale, useT, type MobileMessages } from "../../../i18n";
 
 const TEXT_SIZES = [
   { key: "s", label: "S", value: 11 },
@@ -23,13 +23,18 @@ const TEXT_SIZES = [
   { key: "l", label: "L", value: 16 },
   { key: "xl", label: "XL", value: 20 },
 ];
-const OVERLAY_PRESETS = [
-  { key: "light", label: "Light", value: 40 },
-  { key: "medium", label: "Medium", value: 72 },
-  { key: "strong", label: "Strong", value: 88 },
-  { key: "dark", label: "Dark", value: 100 },
+const OVERLAY_PRESETS: readonly { key: string; labelKey: Extract<keyof MobileMessages, string>; value: number }[] = [
+  { key: "light", labelKey: "library.overlayLight", value: 40 },
+  { key: "medium", labelKey: "library.overlayMedium", value: 72 },
+  { key: "strong", labelKey: "library.overlayStrong", value: 88 },
+  { key: "dark", labelKey: "library.overlayDark", value: 100 },
 ];
-const BORDER_SIDES = ["top", "right", "bottom", "left"] as const;
+const BORDER_SIDES = [
+  { side: "top", labelKey: "library.sideTop" },
+  { side: "right", labelKey: "library.sideRight" },
+  { side: "bottom", labelKey: "library.sideBottom" },
+  { side: "left", labelKey: "library.sideLeft" },
+] as const;
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   const { colors } = useTheme();
@@ -48,11 +53,12 @@ export function PerCardStyleFields({ draft, canvasColor, onApply, onSaveNow }: {
   onSaveNow: (patch: Partial<PerCardStyle>) => void;
 }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const [fineTune, setFineTune] = useState(false);
   return (
     <View style={styles.body}>
-      <Section title="Looks">
+      <Section title={t("library.sectionLooks")}>
         <View style={styles.looks}>
           {FRAME_LOOKS.map((look) => (
             <Tile key={look.key} label={look.label} width="30%" selected={FRAME_LOOK_FIELDS.every((key) => key === "cardBorderSides" ? matchSides(draft[key]) === matchSides(look.style[key]) : draft[key] === look.style[key])} onPress={() => onSaveNow(look.style)}>
@@ -62,9 +68,9 @@ export function PerCardStyleFields({ draft, canvasColor, onApply, onSaveNow }: {
             </Tile>
           ))}
         </View>
-        <Caption>Cover and text choices stay as they are.</Caption>
+        <Caption>{t("library.looksNote")}</Caption>
       </Section>
-      <Section title="Cover">
+      <Section title={t("shell.cover")}>
         <View style={styles.looks}>
           {cardAspectRatioOptions(locale).map((option) => (
             <Tile key={option.value} label={option.label} width="30%" selected={draft.cardAspectRatio === option.value} onPress={() => onSaveNow({ cardAspectRatio: option.value })}>
@@ -72,56 +78,56 @@ export function PerCardStyleFields({ draft, canvasColor, onApply, onSaveNow }: {
             </Tile>
           ))}
         </View>
-        <SelectRow label="Title & author" value={draft.showTitleAuthor ? "show" : "hide"} options={[{ value: "show", label: "Show" }, { value: "hide", label: "Hide" }]} onChange={(value) => onSaveNow({ showTitleAuthor: value === "show" })} />
-        <Caption>Title and author stay visible when there’s no cover.</Caption>
-        {draft.showTitleAuthor ? <PresetRow label="Text backdrop" presets={OVERLAY_PRESETS} value={draft.overlayIntensity} onChange={(overlayIntensity) => onSaveNow({ overlayIntensity })} /> : null}
+        <SelectRow label={t("library.titleAuthor")} value={draft.showTitleAuthor ? "show" : "hide"} options={[{ value: "show", label: t("library.show") }, { value: "hide", label: t("library.hide") }]} onChange={(value) => onSaveNow({ showTitleAuthor: value === "show" })} />
+        <Caption>{t("library.titleAuthorNote")}</Caption>
+        {draft.showTitleAuthor ? <PresetRow label={t("library.textBackdrop")} presets={OVERLAY_PRESETS.map((preset) => ({ key: preset.key, label: t(preset.labelKey), value: preset.value }))} value={draft.overlayIntensity} onChange={(overlayIntensity) => onSaveNow({ overlayIntensity })} /> : null}
       </Section>
-      <Section title="Text">
+      <Section title={t("library.sectionText")}>
         <View style={styles.wrap}>
           {cardFontFamilyOptions(locale).map((option) => <Chip key={option.value} label={option.shortLabel} fontFamily={cardFontFamily(option.value)} selected={draft.cardFontFamily === option.value} onPress={() => onSaveNow({ cardFontFamily: option.value })} />)}
         </View>
-        <PresetRow label="Size" presets={TEXT_SIZES} value={draft.cardFontSize} onChange={(cardFontSize) => onSaveNow({ cardFontSize })} />
+        <PresetRow label={t("library.size")} presets={TEXT_SIZES} value={draft.cardFontSize} onChange={(cardFontSize) => onSaveNow({ cardFontSize })} />
         <View style={styles.wrap}>
-          <Chip label="Bold" selected={draft.cardBold} onPress={() => onSaveNow({ cardBold: !draft.cardBold })} />
-          <Chip label="Italic" selected={draft.cardItalic} onPress={() => onSaveNow({ cardItalic: !draft.cardItalic })} />
+          <Chip label={t("library.bold")} selected={draft.cardBold} onPress={() => onSaveNow({ cardBold: !draft.cardBold })} />
+          <Chip label={t("library.italic")} selected={draft.cardItalic} onPress={() => onSaveNow({ cardItalic: !draft.cardItalic })} />
         </View>
-        <ColorSwatchRow label="Text color" value={draft.cardTextColor} defaultColor="#ffffff" onChange={(cardTextColor) => onSaveNow({ cardTextColor })} />
-        {cardTextMayBeHardToRead(draft, canvasColor) ? <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: colors.danger }]}>Text may be hard to read over some covers. Try lighter text, a stronger backdrop, or less fade.</Text> : null}
+        <ColorSwatchRow label={t("library.textColor")} value={draft.cardTextColor} defaultColor="#ffffff" onChange={(cardTextColor) => onSaveNow({ cardTextColor })} />
+        {cardTextMayBeHardToRead(draft, canvasColor) ? <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: colors.danger }]}>{t("library.hardToRead")}</Text> : null}
       </Section>
-      <Section title="Frame">
+      <Section title={t("library.sectionFrame")}>
         <View style={styles.wrap}>
           {CORNER_PRESETS.map(({ key, label, value }) => <Tile key={key} label={label} selected={draft.cardRadius === value} onPress={() => onSaveNow({ cardRadius: value })}><View style={[styles.corner, { borderColor: colors.text, borderTopLeftRadius: value }]} /></Tile>)}
         </View>
-        {matchPreset(CORNER_PRESETS, draft.cardRadius) === null ? <Caption>{`Custom corners · ${draft.cardRadius}px`}</Caption> : null}
-        <PresetRow label="Width" presets={BORDER_WIDTH_PRESETS} value={draft.cardBorderWidth} onChange={(cardBorderWidth) => onSaveNow({ cardBorderWidth })} />
+        {matchPreset(CORNER_PRESETS, draft.cardRadius) === null ? <Caption>{t("library.customCorners", { radius: draft.cardRadius })}</Caption> : null}
+        <PresetRow label={t("library.width")} presets={BORDER_WIDTH_PRESETS} value={draft.cardBorderWidth} onChange={(cardBorderWidth) => onSaveNow({ cardBorderWidth })} />
         {draft.cardBorderWidth > 0 ? <>
-          <SelectRow label="Style" value={resolveBorderStyle(draft.cardBorderStyle)} options={BORDER_STYLE_CHOICES} onChange={(cardBorderStyle) => onSaveNow({ cardBorderStyle })} />
-          {resolveBorderStyle(draft.cardBorderStyle) !== draft.cardBorderStyle ? <Caption>{`${cardBorderStyleOptions(locale).find((option) => option.value === draft.cardBorderStyle)?.label} is saved for web; displays as ${resolveBorderStyle(draft.cardBorderStyle)} here.`}</Caption> : null}
-          <PresetRow label="Strength" presets={BORDER_STRENGTH_PRESETS} value={draft.cardBorderOpacity} onChange={(cardBorderOpacity) => onSaveNow({ cardBorderOpacity })} />
-          <Text style={[typography.body, styles.label, { color: colors.text }]}>Sides</Text>
+          <SelectRow label={t("library.style")} value={resolveBorderStyle(draft.cardBorderStyle)} options={BORDER_STYLE_CHOICES} onChange={(cardBorderStyle) => onSaveNow({ cardBorderStyle })} />
+          {resolveBorderStyle(draft.cardBorderStyle) !== draft.cardBorderStyle ? <Caption>{t("library.borderSavedForWeb", { style: cardBorderStyleOptions(locale).find((option) => option.value === draft.cardBorderStyle)?.label ?? draft.cardBorderStyle, shown: cardBorderStyleOptions(locale).find((option) => option.value === resolveBorderStyle(draft.cardBorderStyle))?.label.toLowerCase() ?? resolveBorderStyle(draft.cardBorderStyle) })}</Caption> : null}
+          <PresetRow label={t("library.strength")} presets={BORDER_STRENGTH_PRESETS} value={draft.cardBorderOpacity} onChange={(cardBorderOpacity) => onSaveNow({ cardBorderOpacity })} />
+          <Text style={[typography.body, styles.label, { color: colors.text }]}>{t("library.sides")}</Text>
           <View style={styles.wrap}>
             {BORDER_SIDE_PRESETS.map(({ key, label, value }) => {
               const edge = (on: boolean) => on ? colors.text : colors.border;
               return <Tile key={key} label={label} width={88} selected={matchSides(draft.cardBorderSides) === key} onPress={() => onSaveNow({ cardBorderSides: value })}><View style={[styles.sides, { borderTopColor: edge(value.top), borderRightColor: edge(value.right), borderBottomColor: edge(value.bottom), borderLeftColor: edge(value.left) }]} /></Tile>;
             })}
           </View>
-          <ColorSwatchRow label="Border color" value={draft.cardBorderColor} defaultColor={colors.border} onChange={(cardBorderColor) => onSaveNow({ cardBorderColor })} />
+          <ColorSwatchRow label={t("library.borderColor")} value={draft.cardBorderColor} defaultColor={colors.border} onChange={(cardBorderColor) => onSaveNow({ cardBorderColor })} />
         </> : null}
-        <SelectRow label="Shadow" value={draft.cardShadow ? "soft" : "none"} options={[{ value: "none", label: "None" }, { value: "soft", label: "Soft" }]} onChange={(value) => onSaveNow({ cardShadow: value === "soft" })} />
+        <SelectRow label={t("library.shadow")} value={draft.cardShadow ? "soft" : "none"} options={[{ value: "none", label: t("library.none") }, { value: "soft", label: t("library.soft") }]} onChange={(value) => onSaveNow({ cardShadow: value === "soft" })} />
       </Section>
-      <Section title="Fade & feedback">
-        <PresetRow label="Fade" presets={FADE_PRESETS} value={draft.cardOpacity} onChange={(cardOpacity) => onSaveNow({ cardOpacity })} />
-        <SelectRow label="Press feedback" value={draft.cardHoverEffect ? "on" : "off"} options={[{ value: "off", label: "None" }, { value: "on", label: "Subtle" }]} onChange={(value) => onSaveNow({ cardHoverEffect: value === "on" })} />
+      <Section title={t("library.sectionFadeFeedback")}>
+        <PresetRow label={t("library.fade")} presets={FADE_PRESETS} value={draft.cardOpacity} onChange={(cardOpacity) => onSaveNow({ cardOpacity })} />
+        <SelectRow label={t("library.pressFeedback")} value={draft.cardHoverEffect ? "on" : "off"} options={[{ value: "off", label: t("library.none") }, { value: "on", label: t("library.subtle") }]} onChange={(value) => onSaveNow({ cardHoverEffect: value === "on" })} />
       </Section>
-      <Button label={fineTune ? "Hide fine-tuning" : "Fine-tune"} variant="secondary" onPress={() => setFineTune(!fineTune)} />
-      {fineTune ? <Section title="Exact values">
-        <StepperRow label="Corners" value={draft.cardRadius} range={CARD_RADIUS_RANGE} onChange={(cardRadius) => onApply({ cardRadius })} />
-        <StepperRow label="Text size" value={draft.cardFontSize} range={CARD_FONT_SIZE_RANGE} onChange={(cardFontSize) => onApply({ cardFontSize })} />
-        <StepperRow label="Text backdrop" value={draft.overlayIntensity} range={OVERLAY_INTENSITY_RANGE} unit="%" onChange={(overlayIntensity) => onApply({ overlayIntensity })} />
-        <StepperRow label="Card opacity" value={draft.cardOpacity} range={CARD_OPACITY_RANGE} unit="%" onChange={(cardOpacity) => onApply({ cardOpacity })} />
-        <StepperRow label="Border width" value={draft.cardBorderWidth} range={CARD_BORDER_WIDTH_RANGE} onChange={(cardBorderWidth) => onApply({ cardBorderWidth })} />
-        <StepperRow label="Border strength" value={draft.cardBorderOpacity} range={CARD_BORDER_OPACITY_RANGE} unit="%" onChange={(cardBorderOpacity) => onApply({ cardBorderOpacity })} />
-        <View style={styles.wrap}>{BORDER_SIDES.map((side) => <Chip key={side} label={side[0].toUpperCase() + side.slice(1)} selected={draft.cardBorderSides[side]} onPress={() => onSaveNow({ cardBorderSides: { ...draft.cardBorderSides, [side]: !draft.cardBorderSides[side] } })} />)}</View>
+      <Button label={fineTune ? t("library.hideFineTuning") : t("library.fineTune")} variant="secondary" onPress={() => setFineTune(!fineTune)} />
+      {fineTune ? <Section title={t("library.sectionExactValues")}>
+        <StepperRow label={t("library.corners")} value={draft.cardRadius} range={CARD_RADIUS_RANGE} onChange={(cardRadius) => onApply({ cardRadius })} />
+        <StepperRow label={t("library.textSize")} value={draft.cardFontSize} range={CARD_FONT_SIZE_RANGE} onChange={(cardFontSize) => onApply({ cardFontSize })} />
+        <StepperRow label={t("library.textBackdrop")} value={draft.overlayIntensity} range={OVERLAY_INTENSITY_RANGE} unit="%" onChange={(overlayIntensity) => onApply({ overlayIntensity })} />
+        <StepperRow label={t("library.cardOpacity")} value={draft.cardOpacity} range={CARD_OPACITY_RANGE} unit="%" onChange={(cardOpacity) => onApply({ cardOpacity })} />
+        <StepperRow label={t("library.borderWidth")} value={draft.cardBorderWidth} range={CARD_BORDER_WIDTH_RANGE} onChange={(cardBorderWidth) => onApply({ cardBorderWidth })} />
+        <StepperRow label={t("library.borderStrength")} value={draft.cardBorderOpacity} range={CARD_BORDER_OPACITY_RANGE} unit="%" onChange={(cardBorderOpacity) => onApply({ cardBorderOpacity })} />
+        <View style={styles.wrap}>{BORDER_SIDES.map(({ side, labelKey }) => <Chip key={side} label={t(labelKey)} selected={draft.cardBorderSides[side]} onPress={() => onSaveNow({ cardBorderSides: { ...draft.cardBorderSides, [side]: !draft.cardBorderSides[side] } })} />)}</View>
       </Section> : null}
     </View>
   );

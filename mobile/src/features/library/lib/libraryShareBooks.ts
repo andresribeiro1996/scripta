@@ -9,11 +9,11 @@ import {
 
 export type LibraryShareLayout = "wall" | "summary" | "reading" | "shelf";
 
-export const LIBRARY_SHARE_LAYOUTS: ReadonlyArray<{ value: LibraryShareLayout; label: string }> = [
-  { value: "wall", label: "Wall" },
-  { value: "summary", label: "Summary" },
-  { value: "reading", label: "Reading" },
-  { value: "shelf", label: "Shelf" }
+export const LIBRARY_SHARE_LAYOUTS: ReadonlyArray<{ value: LibraryShareLayout; labelKey: "library.layoutWall" | "library.layoutSummary" | "library.layoutReading" | "library.layoutShelf" }> = [
+  { value: "wall", labelKey: "library.layoutWall" },
+  { value: "summary", labelKey: "library.layoutSummary" },
+  { value: "reading", labelKey: "library.layoutReading" },
+  { value: "shelf", labelKey: "library.layoutShelf" }
 ];
 
 export function newestFinished(books: LibraryBook[], limit: number): LibraryBook[] {

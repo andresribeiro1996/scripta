@@ -33,9 +33,10 @@ import { assertSaved, attemptUpdate } from "../lib/attemptUpdate";
 import { BookCard } from "./BookCard";
 import { BookWrapGrid } from "./BookWrapGrid";
 import { PerCardStyleSheet } from "./PerCardStyleForm";
-import { getLocale } from "../../../i18n";
+import { getLocale, useT } from "../../../i18n";
 
 export function GroupDetail({ groupId }: { groupId: string }) {
+  const t = useT();
   const { data: library, isPending, updateLibrary, submit } = useLibrary();
   const murals = useMurals();
   const { colors } = useTheme();
@@ -65,7 +66,7 @@ export function GroupDetail({ groupId }: { groupId: string }) {
 
   async function runUpdate(mutate: (data: LibraryData) => LibraryData, onSuccess?: () => void) {
     setNotice(null);
-    return attemptUpdate(() => updateLibrary(mutate), (error) => setNotice(saveFailureMessage(error, "Couldn't save — check your connection.", getLocale())), onSuccess);
+    return attemptUpdate(() => updateLibrary(mutate), (error) => setNotice(saveFailureMessage(error, t("library.saveFailedConnection"), getLocale())), onSuccess);
   }
 
   function handleCommitRename() {
@@ -86,7 +87,7 @@ export function GroupDetail({ groupId }: { groupId: string }) {
     setPickerError(null);
     void attemptUpdate(
       async () => assertSaved(await submit({ kind: "membership", groupId: group.id, bookKey: bookKey(book), member: !inGroup })),
-      (error) => setPickerError(saveFailureMessage(error, "Couldn't save — check your connection.", getLocale())),
+      (error) => setPickerError(saveFailureMessage(error, t("library.saveFailedConnection"), getLocale())),
     );
   }
 
@@ -95,7 +96,7 @@ export function GroupDetail({ groupId }: { groupId: string }) {
     setStyleError(null);
     void attemptUpdate(
       () => updateLibrary((data) => ({ ...data, groups: setGroupStyle(data.groups ?? [], group.id, groupStyle) })),
-      (error) => setStyleError(saveFailureMessage(error, "Couldn't save the style change.", getLocale())),
+      (error) => setStyleError(saveFailureMessage(error, t("shell.styleSaveFailed"), getLocale())),
     );
   }
 
@@ -120,7 +121,7 @@ export function GroupDetail({ groupId }: { groupId: string }) {
     void runUpdate(
       (data) => deleteBooks(data, keys),
       () => {
-        void murals.scrubBooks(keys).catch(() => setNotice("The books were deleted, but some mural references couldn't be updated."));
+        void murals.scrubBooks(keys).catch(() => setNotice(t("library.muralScrubFailed")));
         setSelectedKeys(new Set());
         setSelectionMode(false);
       },
@@ -130,12 +131,12 @@ export function GroupDetail({ groupId }: { groupId: string }) {
   const menuGroups: ActionItem[][] = group
     ? [
         [
-          ...(group.type === "series" ? [{ label: "Style", icon: "style" as const, onPress: () => setStyleOpen(true) }] : []),
-          { label: "Manage books", icon: "book", onPress: () => setPickerOpen(true) },
+          ...(group.type === "series" ? [{ label: t("library.style"), icon: "style" as const, onPress: () => setStyleOpen(true) }] : []),
+          { label: t("library.manageBooks"), icon: "book", onPress: () => setPickerOpen(true) },
           ...(members.length > 0
             ? [
                 {
-                  label: "Select",
+                  label: t("library.select"),
                   icon: "select" as const,
                   onPress: () => {
                     setSelectionMode(true);
@@ -145,7 +146,7 @@ export function GroupDetail({ groupId }: { groupId: string }) {
               ]
             : []),
         ],
-        [{ label: "Delete", icon: "delete", destructive: true, onPress: () => setConfirming("group") }],
+        [{ label: t("library.delete"), icon: "delete", destructive: true, onPress: () => setConfirming("group") }],
       ]
     : [];
 
@@ -156,22 +157,22 @@ export function GroupDetail({ groupId }: { groupId: string }) {
           action here has to live in the body — headerRight would be
           unreachable on that platform. Title stays for whatever chrome
           iOS does draw; it's otherwise inert. */}
-      <Stack.Screen options={{ title: group?.name ?? "Collection" }} />
+      <Stack.Screen options={{ title: group?.name ?? t("shell.collection") }} />
 
       {notice ? <Toast visible message={notice} tone="error" /> : null}
 
       {isPending ? (
         <Skeleton height={180} />
       ) : !group ? (
-        <ErrorState title="Collection not found" body="It may have been deleted." actionLabel="Close" onAction={() => router.back()} />
+        <ErrorState title={t("library.collectionNotFound")} body={t("library.collectionNotFoundBody")} actionLabel={t("shell.close")} onAction={() => router.back()} />
       ) : (
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
           {selectionMode ? (
             <View style={styles.topRow}>
-              <Text style={[typography.body, { color: colors.textDim }]}>{selectedKeys.size} selected</Text>
-              <Button label="Delete" variant="destructive" disabled={selectedKeys.size === 0} onPress={handleDeleteSelected} />
+              <Text style={[typography.body, { color: colors.textDim }]}>{t("library.selectedCount", { count: selectedKeys.size })}</Text>
+              <Button label={t("library.delete")} variant="destructive" disabled={selectedKeys.size === 0} onPress={handleDeleteSelected} />
               <Button
-                label="Cancel"
+                label={t("shell.cancel")}
                 variant="secondary"
                 onPress={() => {
                   setSelectionMode(false);
@@ -182,10 +183,10 @@ export function GroupDetail({ groupId }: { groupId: string }) {
           ) : (
             <View style={styles.topRow}>
               {editingName ? (
-                <Input autoFocus label="Name" value={nameDraft} maxLength={200} onChangeText={setNameDraft} onBlur={handleCommitRename} onSubmitEditing={handleCommitRename} />
+                <Input autoFocus label={t("library.name")} value={nameDraft} maxLength={200} onChangeText={setNameDraft} onBlur={handleCommitRename} onSubmitEditing={handleCommitRename} />
               ) : (
                 <Pressable
-                  accessibilityLabel={`Rename ${group.name}`}
+                  accessibilityLabel={t("shell.rename", { name: group.name })}
                   accessibilityRole="button"
                   onPress={() => {
                     setNameDraft(group.name);
@@ -194,22 +195,21 @@ export function GroupDetail({ groupId }: { groupId: string }) {
                   style={styles.nameFlex}
                 >
                   <Text style={[typography.title, { color: colors.text, fontWeight: "700" }]}>
-                    {group.name} {group.style ? "· custom style" : ""}
+                    {group.name} {group.style ? t("library.customStyle") : ""}
                   </Text>
                 </Pressable>
               )}
-              <ActionSheet title={group?.name ?? "Collection"} groups={menuGroups}>
-                {(open) => <IconButton accessibilityLabel="Collection actions" name="more" onPress={open} />}
+              <ActionSheet title={group?.name ?? t("shell.collection")} groups={menuGroups}>
+                {(open) => <IconButton accessibilityLabel={t("library.collectionActions")} name="more" onPress={open} />}
               </ActionSheet>
             </View>
           )}
           <Text style={[typography.caption, { color: colors.textDim }]}>
-            {members.length} book{members.length === 1 ? "" : "s"}
-            {selectionMode ? ` · ${selectedKeys.size} selected` : ""}
+            {selectionMode ? t("library.bookCountSelected", { count: members.length, selected: selectedKeys.size }) : t("library.bookCount", { count: members.length })}
           </Text>
 
           {members.length === 0 ? (
-            <EmptyState title="No books here yet." body='Use "Manage books" to add some.' />
+            <EmptyState title={t("library.noBooksHere")} body={t("library.noBooksHereBody")} />
           ) : (
             <BookWrapGrid
               books={members}
@@ -235,7 +235,7 @@ export function GroupDetail({ groupId }: { groupId: string }) {
         key={`${groupId}-${styleOpen}`}
         visible={styleOpen}
         name={group?.name ?? ""}
-        inheritedFrom={library?.data.name ? `library “${library.data.name}”` : "your library"}
+        inheritedFrom={library?.data.name ? t("library.inheritedLibrary", { name: library.data.name }) : t("library.inheritedYourLibrary")}
         currentOverride={group?.style}
         seedStyle={style}
         previewBook={members[0]}
@@ -249,9 +249,9 @@ export function GroupDetail({ groupId }: { groupId: string }) {
 
       <ConfirmDialog
         visible={confirming !== null}
-        title={confirming === "group" ? `Delete "${group?.name ?? ""}"?` : `Delete ${selectedKeys.size} book${selectedKeys.size === 1 ? "" : "s"}?`}
-        body={confirming === "group" ? "The books stay in your library — this only removes the grouping." : "This removes them from your library entirely, not just this group."}
-        confirmLabel="Delete"
+        title={confirming === "group" ? t("library.deleteGroupTitle", { name: group?.name ?? "" }) : t("library.deleteBooksTitle", { count: selectedKeys.size })}
+        body={confirming === "group" ? t("library.deleteGroupBody") : t("library.deleteBooksBody")}
+        confirmLabel={t("library.delete")}
         destructive
         onConfirm={confirming === "group" ? confirmDeleteGroup : confirmDeleteSelected}
         onCancel={() => setConfirming(null)}
@@ -273,10 +273,11 @@ function BookPickerSheet({
   onToggle: (book: Record<string, unknown>, inGroup: boolean) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const memberKeys = new Set(group.bookKeys);
 
   return (
-    <Sheet visible title={`Books in "${group.name}"`} onClose={onClose}>
+    <Sheet visible title={t("library.booksInGroup", { name: group.name })} onClose={onClose}>
       {error ? <Toast visible message={error} tone="error" /> : null}
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.xs, paddingBottom: spacing.xl }}>
         <BookPickerList books={allBooks} isSelected={(book) => memberKeys.has(bookKey(book))} onSelect={(book) => onToggle(book, memberKeys.has(bookKey(book)))} />

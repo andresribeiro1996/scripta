@@ -10,6 +10,7 @@ import { deleteGalleryImage, fetchGalleryImages, uploadGalleryImage, type Galler
 import type { ResolveCoverParams } from "../api/covers";
 import { BookCover } from "../../arena/BookCover";
 import { FoundCovers } from "./FoundCovers";
+import { useT } from "../../../i18n";
 
 export function CoverPicker({
   title,
@@ -34,6 +35,7 @@ export function CoverPicker({
   onRemoveCover: () => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const { colors } = useTheme();
   const [images, setImages] = useState<GalleryImage[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -50,7 +52,7 @@ export function CoverPicker({
         if (!cancelled) setImages(list);
       })
       .catch((err) => {
-        if (!cancelled) setLoadError(err instanceof Error ? err.message : "Couldn't load your gallery.");
+        if (!cancelled) setLoadError(err instanceof Error ? err.message : t("library.galleryLoadFailed"));
       });
     return () => {
       cancelled = true;
@@ -60,7 +62,7 @@ export function CoverPicker({
   async function handlePickAndUpload() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      setUploadError("Photo library access is off — enable it in Settings to upload a cover.");
+      setUploadError(t("library.photoAccessOffCover"));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.9 });
@@ -77,7 +79,7 @@ export function CoverPicker({
       onSelect(image);
       onClose();
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Couldn't upload that image.");
+      setUploadError(err instanceof Error ? err.message : t("library.uploadFailed"));
     } finally {
       setUploading(false);
     }
@@ -89,7 +91,7 @@ export function CoverPicker({
     setDeletingId(image.id);
     deleteGalleryImage(image.id)
       .then(() => setImages((prev) => prev?.filter((i) => i.id !== image.id) ?? prev))
-      .catch(() => setUploadError("Couldn't delete that image — try again."))
+      .catch(() => setUploadError(t("library.deleteImageFailed")))
       .finally(() => setDeletingId(null));
   }
 
@@ -98,12 +100,12 @@ export function CoverPicker({
   return (
     <>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xl }}>
-        <Button label={uploading ? "Uploading…" : "Upload from your photos…"} loading={uploading} onPress={() => void handlePickAndUpload()} />
+        <Button label={uploading ? t("library.uploading") : t("library.uploadFromPhotos")} loading={uploading} onPress={() => void handlePickAndUpload()} />
         {uploadError && <Text style={[typography.caption, { color: colors.danger }]}>{uploadError}</Text>}
 
         {hasCustomCover && (
           <Button
-            label="Remove custom cover — go back to the normal auto-detected one"
+            label={t("library.removeCustomCover")}
             variant="destructive"
             onPress={() => {
               onRemoveCover();
@@ -115,11 +117,11 @@ export function CoverPicker({
         {editionCovers.length > 0 && (
           <>
             <Text accessibilityRole="header" style={[typography.body, { color: colors.text, fontWeight: "600" }]}>
-              Other editions
+              {t("library.otherEditions")}
             </Text>
             <View style={styles.grid}>
               {editionCovers.map((url) => (
-                <Pressable accessibilityLabel="Use this edition's cover" accessibilityRole="button" key={url} onPress={() => onPickEdition(url)}>
+                <Pressable accessibilityLabel={t("library.useEditionCover")} accessibilityRole="button" key={url} onPress={() => onPickEdition(url)}>
                   <BookCover cover={url} title={title} width={72} height={108} />
                 </Pressable>
               ))}
@@ -131,15 +133,15 @@ export function CoverPicker({
           <>
             <FoundCovers key={coverQueryKey(lookup)} lookup={lookup} coverUrl={coverUrl} onPick={onPickFound} />
             <Text accessibilityRole="header" style={[typography.body, { color: colors.text, fontWeight: "600" }]}>
-              Your gallery
+              {t("library.yourGallery")}
             </Text>
           </>
         )}
 
-        {loadError && <ErrorState body={loadError} actionLabel="Retry" onAction={() => setLoadError(null)} />}
+        {loadError && <ErrorState body={loadError} actionLabel={t("shell.retry")} onAction={() => setLoadError(null)} />}
         {!loadError && images === null && <ActivityIndicator />}
         {images !== null && images.length === 0 && (
-          <Text style={[typography.body, { color: colors.textDim }]}>No images in your gallery yet — upload one above.</Text>
+          <Text style={[typography.body, { color: colors.textDim }]}>{t("library.galleryEmpty")}</Text>
         )}
         {images !== null && images.length > 0 && (
           // A plain wrapped grid, not a FlatList — a personal gallery is
@@ -148,7 +150,7 @@ export function CoverPicker({
           <View style={styles.grid}>
             {images.map((item) => (
               <Pressable
-                accessibilityLabel="Use this image as the cover"
+                accessibilityLabel={t("library.useImageAsCover")}
                 accessibilityRole="button"
                 key={item.id}
                 onPress={() => {
@@ -172,14 +174,14 @@ export function CoverPicker({
           </View>
         )}
         {images !== null && images.length > 0 && (
-          <Text style={[typography.caption, { color: colors.textDim }]}>Tap to use as cover. Long-press to delete from your gallery.</Text>
+          <Text style={[typography.caption, { color: colors.textDim }]}>{t("library.galleryHint")}</Text>
         )}
       </ScrollView>
       <ConfirmDialog
         visible={confirmingDelete !== null}
-        title="Delete this image from your gallery?"
-        body="Any book using it as a cover will fall back to its normal cover."
-        confirmLabel="Delete"
+        title={t("library.deleteImageTitle")}
+        body={t("library.deleteImageBody")}
+        confirmLabel={t("library.delete")}
         destructive
         onConfirm={() => confirmingDelete && deleteImage(confirmingDelete)}
         onCancel={() => setConfirmingDelete(null)}
