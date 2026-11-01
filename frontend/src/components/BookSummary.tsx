@@ -1,7 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
+import { decimalText } from "@scripta/shared";
 import { bookMetadataOptions, summarySourceName, validBookRating } from "../lib/bookMetadata";
+import { useLocale, useT } from "../i18n";
 
 export function BookSummary({ book }: { book: Record<string, unknown> }) {
+  const t = useT();
+  const locale = useLocale();
   const personalRating = validBookRating(book.Rating);
   const { data, isPending, isError, refetch } = useQuery(bookMetadataOptions(book));
   return (
@@ -14,9 +18,9 @@ export function BookSummary({ book }: { book: Record<string, unknown> }) {
                 <span aria-hidden="true" className="text-(--color-accent)">
                   ★{" "}
                 </span>
-                {personalRating}/5
+                {decimalText(personalRating, locale)}/5
               </p>
-              <p className="mt-0.5 text-xs text-(--color-text-dim)">Your rating</p>
+              <p className="mt-0.5 text-xs text-(--color-text-dim)">{t("library.yourRating")}</p>
             </div>
           )}
           {data?.rating !== null && data?.rating !== undefined && (
@@ -25,32 +29,32 @@ export function BookSummary({ book }: { book: Record<string, unknown> }) {
                 <span aria-hidden="true" className="text-(--color-accent)">
                   ★{" "}
                 </span>
-                {data.rating.toFixed(1)}/5
+                {decimalText(data.rating, locale, 1)}/5
               </p>
               <p className="mt-0.5 text-xs text-(--color-text-dim)">
-                Open Library{data.ratingCount > 0 ? ` · ${data.ratingCount.toLocaleString()} ratings` : ""}
+                {data.ratingCount > 0 ? t("library.ratingsFrom", { count: data.ratingCount, formatted: data.ratingCount.toLocaleString(locale === "pt-PT" ? "pt-PT" : undefined) }) : "Open Library"}
               </p>
             </div>
           )}
         </div>
       )}
       <div>
-        <h3 className="mb-2 text-sm font-semibold">About this book</h3>
+        <h3 className="mb-2 text-sm font-semibold">{t("library.aboutThisBook")}</h3>
         {isPending ? (
           <p role="status" className="text-sm text-(--color-text-dim)">
-            Loading summary and rating…
+            {t("library.summaryLoading")}
           </p>
         ) : isError ? (
           <div className="text-sm text-(--color-text-dim)">
-            <p>Book information couldn’t be loaded.</p>
+            <p>{t("library.bookInfoFailed")}</p>
             <button onClick={() => void refetch()} className="min-h-11 font-semibold text-(--color-accent)">
-              Try again
+              {t("shell.tryAgain")}
             </button>
           </div>
         ) : (
           <>
             <p className="text-sm leading-6 whitespace-pre-wrap break-words">
-              {data?.summary || "No summary available for this book yet."}
+              {data?.summary || t("library.noSummary")}
             </p>
             {data?.sourceUrl && (
               <a
@@ -59,7 +63,7 @@ export function BookSummary({ book }: { book: Record<string, unknown> }) {
                 rel="noreferrer"
                 className="mt-2 inline-flex min-h-11 items-center text-xs text-(--color-text-dim) hover:text-(--color-accent)"
               >
-                Source: {summarySourceName(data)} ↗
+                {t("library.summarySource", { name: summarySourceName(data) })}
               </a>
             )}
           </>

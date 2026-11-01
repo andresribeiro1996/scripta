@@ -36,7 +36,7 @@ test("Home: two columns from lg, awards card, games from homeGames, reading stri
   assert.match(home, /lg:grid-cols-\[minmax\(0,1fr\)_340px\]/);
   for (const part of ["<AwardsCard", "<DiscoverTicket", "<ReadingStrip", "<SuggestedReaders"]) assert.match(home, new RegExp(part), part);
   assert.match(home, /homeGames\(/);
-  assert.match(home, /Browse all/);
+  assert.match(home, /t\("book\.browseAll"\)/);
   assert.doesNotMatch(home, /useDashboard\(/);
   assert.doesNotMatch(home, /Rediscover|Up next|Currently reading/);
 });
@@ -47,7 +47,7 @@ test("the reading strip: five linked, named covers, progress when known, an empt
   assert.match(strip, /readingPercent\(/);
   assert.match(strip, /\.slice\(0, 5\)/);
   assert.match(strip, /<Link(?:=>|[^>])*aria-label=/);
-  assert.match(strip, /Nothing in progress/);
+  assert.match(strip, /t\("book\.nothingInProgress"\)/);
   assert.match(strip, /\/dashboard\/library\?status=reading/);
 });
 
@@ -60,7 +60,7 @@ test("the awards card uses the shared model, links a work, and can be dismissed"
   const card = read("components/home/AwardsCard");
   assert.match(card, /awardCardModel\(/);
   assert.match(card, /firstUndismissed\(/);
-  assert.match(card, /aria-label="Dismiss"/);
+  assert.match(card, /aria-label=\{t\("shell\.dismiss"\)\}/);
 });
 
 test("suggestions: at most three, the shared reason, Follow as a secondary button, See all to People", () => {
@@ -79,14 +79,14 @@ test("the awards card looks nothing up by title: only the cover URL, and the tit
 
 test("suggestions: a failed load shows Retry, Follow names the reader, and following refreshes the circle", () => {
   const s = read("components/home/SuggestedReaders");
-  assert.match(s, /Couldn't load suggestions\./);
+  assert.match(s, /t\("book\.suggestionsLoadFailed"\)/);
   assert.match(s, /refetch/);
-  assert.match(s, /Retry/);
-  assert.match(s, /<button(?:=>|[^>])*aria-label=\{`Follow \$\{reader\.user\.username\}`\}/);
+  assert.match(s, /t\("library\.retry"\)/);
+  assert.match(s, /<button(?:=>|[^>])*aria-label=\{t\("book\.followAria", \{ name: reader\.user\.username \}\)\}/);
   assert.match(s, /await invalidateAfterFollow\(queryClient\)/);
 });
 
 test("the reading strip's empty-state link is a 44px target", () => {
   const strip = read("components/home/ReadingStrip");
-  assert.match(strip, /<Link to="\/dashboard\/library"(?:=>|[^>])*min-h-11(?:=>|[^>])*>Pick something from your library/);
+  assert.match(strip, /<Link to="\/dashboard\/library"(?:=>|[^>])*min-h-11(?:=>|[^>])*>\{t\("book\.pickFromLibrary"\)\}/);
 });

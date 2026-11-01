@@ -1,50 +1,52 @@
+import { t } from "../i18n";
+
 export type AreaId = "home" | "library" | "murals" | "games" | "readerCard" | "community" | "settings" | "admin";
-export interface AreaTab { label: string; to: string }
-export interface Area { id: AreaId; label: string; to: string; tabs: readonly AreaTab[]; description?: string }
+export interface AreaTab { readonly label: string; to: string }
+export interface Area { id: AreaId; readonly label: string; to: string; tabs: readonly AreaTab[]; readonly description?: string }
 
 export const AREAS: readonly Area[] = [
-  { id: "home", label: "Home", to: "/dashboard", tabs: [] },
+  { id: "home", get label() { return t("shell.areaHome"); }, to: "/dashboard", tabs: [] },
   {
     id: "library",
-    label: "Library",
+    get label() { return t("shell.areaLibrary"); },
     to: "/dashboard/library",
     tabs: [
-      { label: "Books", to: "/dashboard/library" },
-      { label: "Series", to: "/dashboard/series" },
-      { label: "Collections", to: "/dashboard/collections" },
-      { label: "Gallery", to: "/dashboard/gallery" }
+      { get label() { return t("shell.tabBooks"); }, to: "/dashboard/library" },
+      { get label() { return t("shell.tabSeries"); }, to: "/dashboard/series" },
+      { get label() { return t("shell.tabCollections"); }, to: "/dashboard/collections" },
+      { get label() { return t("shell.tabGallery"); }, to: "/dashboard/gallery" }
     ]
   },
-  { id: "murals", label: "Murals", to: "/dashboard/murals", tabs: [], description: "Freeform dashboard pages" },
+  { id: "murals", get label() { return t("shell.areaMurals"); }, to: "/dashboard/murals", tabs: [], get description() { return t("shell.areaMuralsDescription"); } },
   {
     id: "games",
-    label: "Games",
+    get label() { return t("shell.areaGames"); },
     to: "/dashboard/arena?tab=tierlists",
     tabs: [
-      { label: "Tier lists", to: "/dashboard/arena?tab=tierlists" },
-      { label: "Quizzes", to: "/dashboard/arena?tab=quizzes" },
-      { label: "Tournaments", to: "/dashboard/arena" }
+      { get label() { return t("shell.tabTierLists"); }, to: "/dashboard/arena?tab=tierlists" },
+      { get label() { return t("shell.tabQuizzes"); }, to: "/dashboard/arena?tab=quizzes" },
+      { get label() { return t("shell.tabTournaments"); }, to: "/dashboard/arena" }
     ],
-    description: "Book-bracket tournaments"
+    get description() { return t("shell.areaGamesDescription"); }
   },
-  { id: "readerCard", label: "Reader card", to: "/dashboard/reader-card", tabs: [] },
+  { id: "readerCard", get label() { return t("shell.areaReaderCard"); }, to: "/dashboard/reader-card", tabs: [] },
   {
     id: "community",
-    label: "Community",
+    get label() { return t("shell.areaCommunity"); },
     to: "/community/discover",
     tabs: [
-      { label: "Discover", to: "/community/discover" },
-      { label: "People", to: "/community/people" }
+      { get label() { return t("shell.tabDiscover"); }, to: "/community/discover" },
+      { get label() { return t("shell.tabPeople"); }, to: "/community/people" }
     ]
   },
   {
     id: "settings",
-    label: "Settings",
+    get label() { return t("shell.areaSettings"); },
     to: "/dashboard/settings",
     tabs: [
-      { label: "Account", to: "/dashboard/settings" },
-      { label: "Appearance", to: "/dashboard/settings/appearance" },
-      { label: "Library style", to: "/dashboard/style" }
+      { get label() { return t("shell.tabAccount"); }, to: "/dashboard/settings" },
+      { get label() { return t("shell.tabAppearance"); }, to: "/dashboard/settings/appearance" },
+      { get label() { return t("shell.tabLibraryStyle"); }, to: "/dashboard/style" }
     ]
   },
   {
@@ -125,11 +127,11 @@ export type BackKind = "tierlist" | "quiz" | "tournament" | "mural" | "book" | "
 
 export function backTo(kind: BackKind): { to: string; label: string } {
   switch (kind) {
-    case "tierlist": return { to: "/dashboard/arena?tab=tierlists", label: "Games" };
-    case "quiz": return { to: "/dashboard/arena?tab=quizzes", label: "Games" };
-    case "tournament": return { to: "/dashboard/arena", label: "Games" };
-    case "mural": return { to: "/dashboard/murals", label: "Murals" };
-    case "book": return { to: "/dashboard/library", label: "Library" };
-    case "profile": return { to: "/community/discover", label: "Community" };
+    case "tierlist": return { to: "/dashboard/arena?tab=tierlists", label: t("shell.areaGames") };
+    case "quiz": return { to: "/dashboard/arena?tab=quizzes", label: t("shell.areaGames") };
+    case "tournament": return { to: "/dashboard/arena", label: t("shell.areaGames") };
+    case "mural": return { to: "/dashboard/murals", label: t("shell.areaMurals") };
+    case "book": return { to: "/dashboard/library", label: t("shell.areaLibrary") };
+    case "profile": return { to: "/community/discover", label: t("shell.areaCommunity") };
   }
 }

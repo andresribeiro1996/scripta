@@ -1,7 +1,7 @@
 import { useId } from "react";
 import type { Locale } from "@scripta/shared/i18n";
 import { themes, themeLabel, type ThemeColors, type ThemePreference } from "@scripta/shared/themes";
-import { useLocale } from "../i18n";
+import { t, useLocale } from "../i18n";
 
 function Swatch({ colors }: { colors: ThemeColors }) {
   return (
@@ -16,7 +16,7 @@ function Swatch({ colors }: { colors: ThemeColors }) {
 }
 
 function optionLabel(option: ThemePreference, locale: Locale): string {
-  return option === "system" ? "System" : themeLabel(option, locale);
+  return option === "system" ? t("settings.themeSystem") : themeLabel(option, locale);
 }
 
 function OptionSwatch({ option }: { option: ThemePreference }) {
@@ -36,7 +36,7 @@ export function ThemeOptionGrid<T extends ThemePreference>({ options, value, onC
   const name = useId();
   return (
     <fieldset>
-      <legend className="sr-only">Theme</legend>
+      <legend className="sr-only">{t("settings.theme")}</legend>
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
         {options.map((option) => (
           <label key={option} className="cursor-pointer">

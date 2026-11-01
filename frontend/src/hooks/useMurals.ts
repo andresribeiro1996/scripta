@@ -30,10 +30,11 @@ import {
   updateMuralApi
 } from "../api/murals";
 import { compactMuralBlocks, ensureBookBlockHeights, scrubBooksFromMurals, scrubImageFromMurals, type Mural, type MuralBlock } from "../lib/murals";
+import { t } from "../i18n";
 
 export class MuralConflictError extends Error {
   constructor() {
-    super("This mural was changed somewhere else, so the latest version is showing now. Your last change wasn't saved.");
+    super(t("addBook.muralConflict"));
   }
 }
 

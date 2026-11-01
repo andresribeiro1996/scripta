@@ -39,7 +39,7 @@ test("the row nav and side nav share one tab-link helper", () => {
 
 test("the Appearance tab uses the Account tab's group: a heading above its panel", () => {
   const src = readFileSync(new URL("../src/pages/SettingsAppearancePage.tsx", import.meta.url), "utf8");
-  assert.match(src, /<SettingGroup title="Appearance">\s*<div className=\{`\$\{PANEL\} p-5`\}>/);
+  assert.match(src, /<SettingGroup title=\{t\("shell\.tabAppearance"\)\}>\s*<div className=\{`\$\{PANEL\} p-5`\}>/);
   assert.doesNotMatch(src, /<h[1-6]/);
 });
 
@@ -224,11 +224,11 @@ test("rename fields inside a title keep the heading size and stay 44px", () => {
 
 test("the tier list editor's one header primary is Open for voting, and the panel no longer hosts it", () => {
   const s = src("pages/TierListEditorPage");
-  assert.equal(s.match(/>\s*Open for voting\s*</g)?.length, 1);
+  assert.equal(s.match(/\{t\("tierlists\.openForVoting"\)\}/g)?.length, 1);
   const actions = s.slice(s.indexOf("actions={"), s.indexOf("{subject ?"));
-  assert.match(actions, /<button onClick=\{\(\) => setOpenPanelOpen\(true\)\} className=\{BUTTON_PRIMARY\}>\s*Open for voting/);
+  assert.match(actions, /<button onClick=\{\(\) => setOpenPanelOpen\(true\)\} className=\{BUTTON_PRIMARY\}>\s*\{t\("tierlists\.openForVoting"\)\}/);
   assert.equal(actions.match(/BUTTON_PRIMARY/g)?.length, 1);
-  assert.match(actions, /className=\{BUTTON_SECONDARY\}\s*>\s*\{editing \? "Done" : "Edit"\}/);
+  assert.match(actions, /className=\{BUTTON_SECONDARY\}\s*>\s*\{editing \? t\("addBook\.done"\) : t\("tierlists\.edit"\)\}/);
 });
 
 test("the author avatar letter scales with its size", () => {
@@ -264,14 +264,14 @@ test("following refreshes the people lists and Home's circle, from all four plac
 
 test("the Games tournament search is the shared SearchField", () => {
   const list = src("pages/ArenaListPage");
-  assert.match(list, /<SearchField\b(?:=>|[^>])*label="Search tournaments by name"/);
+  assert.match(list, /<SearchField\b(?:=>|[^>])*label=\{t\("arena\.searchTournaments"\)\}/);
   assert.doesNotMatch(list, /<input\b(?:=>|[^>])*aria-label="Search tournaments/);
 });
 
 test("the quiz editor says why Publish is off next to the header, and play and results get the Games back link", () => {
   const editor = src("pages/QuizEditorPage");
-  assert.equal(editor.match(/A quiz needs at least 4 books\./g)?.length, 1);
-  assert.match(editor, /<Page\b(?:=>|[^>])*subtitle=\{[^}]*data\.books\.length < 4[^}]*A quiz needs at least 4 books\./);
+  assert.equal(editor.match(/quizzes\.needFourBooks/g)?.length, 1);
+  assert.match(editor, /<Page\b(?:=>|[^>])*subtitle=\{[^}]*data\.books\.length < 4[^}]*quizzes\.needFourBooks/);
   const play = src("pages/PlayQuizPage");
   assert.match(play, /session\?\.user\.username \? backTo\("quiz"\) : undefined/);
   const tags = play.match(/<Page\b(?:=>|[^>])*>/g) ?? [];
@@ -319,8 +319,8 @@ test("the four Admin tabs fit a 328px row: a tighter gap below sm and short labe
 
 test("Series and Collections use the Library's toolbar: SearchField and a More actions menu holding Select", () => {
   const s = src("pages/GroupsPage");
-  assert.match(s, /<SearchField\b(?:=>|[^>])*label=\{`Search \$\{copy\.title\.toLowerCase\(\)\} by name`\}/);
-  assert.match(s, /<OptionsMenu\b(?:=>|[^>])*items=\{\[\{ label: "Select…"[^\]]*\]\}(?:=>|[^>])*title="More actions"/);
+  assert.match(s, /<SearchField\b(?:=>|[^>])*label=\{t\(copy\.search\)\}/);
+  assert.match(s, /<OptionsMenu\b(?:=>|[^>])*items=\{\[\{ label: t\("library\.actionSelect"\)[^\]]*\]\}(?:=>|[^>])*title=\{t\("library\.moreActions"\)\}/);
   assert.doesNotMatch(s, /<button\b(?:=>|[^>])*>Select…<\/button>/);
   assert.doesNotMatch(s, /aria-label=\{`Search/);
 });
@@ -329,7 +329,7 @@ test("profile tabs are flush with the title, and your own profile has the Librar
   const swipe = src("components/SwipeTabs");
   assert.doesNotMatch(swipe, /\$\{tabClass\(i === index\)\} gap-1\.5 px-1/);
   const own = src("components/OwnShelfView");
-  assert.match(own, /\{ value: "library", label: "Library" \}/);
+  assert.match(own, /\{ value: "library", label: "library\.shelfTabLibrary" \}/);
   for (const f of ["components/OwnShelfView", "pages/CommunityProfilePage"]) {
     const s = src(f);
     assert.match(s, /<ProfileLibraryPanel\b/, f);

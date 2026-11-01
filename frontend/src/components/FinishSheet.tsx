@@ -22,7 +22,7 @@ import { DuelButton } from "./DuelButton";
 import { FeelingChips } from "./FeelingChips";
 import { Sheet } from "./Sheet";
 import { useToast } from "./Toaster";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
 type Shelf = { blocks: MuralBlock[]; landed: Landing[] };
 
@@ -47,6 +47,7 @@ export function FinishSheet({
   onClose: () => void;
 }) {
   const locale = useLocale();
+  const t = useT();
   const queryClient = useQueryClient();
   const own = useQuery({ queryKey: ["community", "own-profile"], queryFn: fetchOwnProfile });
   const toast = useToast();
@@ -72,8 +73,8 @@ export function FinishSheet({
   // fails after Done/Undo already closed it (a queued finish/promote settling
   // late) has no banner left to show it, so that case also gets a toast.
   function reportShelfError() {
-    if (mounted.current) setShelfError("Couldn't update your shelf.");
-    else toast({ message: "Couldn't update your shelf.", kind: "error" });
+    if (mounted.current) setShelfError(t("addBook.shelfUpdateFailed"));
+    else toast({ message: t("addBook.shelfUpdateFailed"), kind: "error" });
   }
 
   useEffect(() => {
@@ -141,7 +142,7 @@ export function FinishSheet({
     }
     const shelfOk = (await sessionRef.current?.restore()) ?? true;
     if (!shelfOk) {
-      setShelfError("Couldn't update your shelf.");
+      setShelfError(t("addBook.shelfUpdateFailed"));
       return;
     }
     onClose();
@@ -156,23 +157,23 @@ export function FinishSheet({
     landed.length === 0
       ? null
       : landed.includes("favourites")
-        ? "Added to Finished on your shelf, and to Favourites"
-        : "Added to Finished on your shelf";
+        ? t("addBook.addedToFinishedFavourites")
+        : t("addBook.addedToFinished");
 
   return (
     <div className="relative z-[60]">
-      <Sheet title="Finished" onClose={close}>
+      <Sheet title={t("addBook.finishedTitle")} onClose={close}>
         <div className="flex flex-col gap-5 p-3">
           {shelfError && <p className="rounded-lg bg-(--color-danger-soft) px-3 py-2 text-sm text-(--color-danger)">{shelfError}</p>}
 
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-semibold text-(--color-text-dim)">{`Finished · ${day}`}</p>
+            <p className="text-xs font-semibold text-(--color-text-dim)">{t("addBook.finishedOn", { day })}</p>
             <button
               type="button"
               onClick={close}
               className={BUTTON_PRIMARY}
             >
-              Done
+              {t("addBook.done")}
             </button>
           </div>
 
@@ -181,51 +182,51 @@ export function FinishSheet({
               <CoverImage book={book} />
             </div>
             <div className="min-w-0 flex flex-col justify-center">
-              <p className="font-bold">{String(book.Title ?? "Untitled")}</p>
-              <p className="mt-1 text-(--color-text-dim)">{String(book.Attribution ?? "Unknown author")}</p>
+              <p className="font-bold">{String(book.Title ?? t("library.untitled"))}</p>
+              <p className="mt-1 text-(--color-text-dim)">{String(book.Attribution ?? t("library.unknownAuthor"))}</p>
             </div>
           </div>
 
           <div className="flex flex-col gap-2">
-            <p className="text-sm font-semibold">How did it land?</p>
+            <p className="text-sm font-semibold">{t("addBook.howDidItLand")}</p>
             <FeelingChips
               value={typeof book.Rating === "number" ? book.Rating : null}
               onChange={(rating) => void handleRatingChange(rating)}
             />
-            {savedRating && <p className="text-xs text-(--color-text-dim)">Saved as your rating</p>}
+            {savedRating && <p className="text-xs text-(--color-text-dim)">{t("addBook.savedAsRating")}</p>}
           </div>
 
           <div className="flex flex-col gap-2">
-            <p className="text-sm font-semibold">A thought to keep.</p>
+            <p className="text-sm font-semibold">{t("addBook.thoughtToKeep")}</p>
             <textarea
               value={note}
               onChange={(e) => {
                 setNote(e.target.value);
                 noteRef.current = e.target.value;
               }}
-              placeholder="What stuck with you?"
+              placeholder={t("addBook.thoughtPlaceholder")}
               rows={4}
-              aria-label="A thought to keep"
+              aria-label={t("addBook.thoughtToKeepLabel")}
               className={`${FIELD_CLASS} w-full resize-none`}
             />
           </div>
 
           {opponentBook && !favouriteChoiceMade && (
             <div className="flex flex-col gap-2">
-              <p className="text-sm font-semibold">Against your favourite.</p>
+              <p className="text-sm font-semibold">{t("addBook.againstFavourite")}</p>
               <div className="flex gap-4">
                 <div className="flex flex-1 flex-col gap-2">
                   <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-(--color-border)">
                     <CoverImage book={book} />
                   </div>
-                  <DuelButton onClick={() => void chooseThisOne()}>This one</DuelButton>
+                  <DuelButton onClick={() => void chooseThisOne()}>{t("addBook.thisOne")}</DuelButton>
                 </div>
                 <div className="flex flex-1 flex-col gap-2">
                   <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-(--color-border)">
                     <CoverImage book={opponentBook} />
                   </div>
                   <DuelButton onClick={() => setFavouriteChoiceMade(true)}>
-                    <span className="line-clamp-2">{`Still ${String(opponentBook.Title ?? "this one")}`}</span>
+                    <span className="line-clamp-2">{t("addBook.stillTitle", { title: String(opponentBook.Title ?? t("addBook.thisOneLower")) })}</span>
                   </DuelButton>
                 </div>
               </div>
@@ -236,7 +237,7 @@ export function FinishSheet({
 
           {before && (
             <button type="button" onClick={() => void undo(before)} className={secondaryButtonClass}>
-              Not finished? Undo
+              {t("addBook.notFinishedUndo")}
             </button>
           )}
         </div>

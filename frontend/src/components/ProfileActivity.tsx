@@ -7,7 +7,7 @@ import { ArenaIcon, CommunityIcon, LibraryIcon, MuralsIcon } from "./NavIcons";
 import { SkeletonCardGrid } from "./Skeleton";
 import { BUTTON_SECONDARY } from "./page/buttonClasses";
 import { LIST_PANEL, LIST_ROW, LIST_ROW_LINK, SECTION_HEADING } from "./page/surfaceClasses";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
 const TONE = {
   accent: { text: "text-(--color-accent)", fill: "bg-(--color-accent-soft)" },
@@ -66,7 +66,7 @@ function ActivityEntry({ item, row }: { item: ActivityItem; row: ActivityRow }) 
             <Glyph item={item} size={13} />
           </span>
           <span className={`truncate text-xs font-bold ${tone.text}`}>{row.label}</span>
-          <time dateTime={item.createdAt} title={new Date(item.createdAt).toLocaleString()} className="ml-auto shrink-0 text-xs text-(--color-text-dim) tabular-nums">
+          <time dateTime={item.createdAt} title={new Date(item.createdAt).toLocaleString(locale === "pt-PT" ? "pt-PT" : undefined)} className="ml-auto shrink-0 text-xs text-(--color-text-dim) tabular-nums">
             {relativeTime(item.createdAt, locale)}
           </time>
         </span>
@@ -86,14 +86,15 @@ function ActivityEntry({ item, row }: { item: ActivityItem; row: ActivityRow }) 
 
 export function ProfileActivity({ activity }: { activity: ReturnType<typeof useCommunityActivity> }) {
   const locale = useLocale();
-  if (activity.isLoading) return <SkeletonCardGrid count={3} label="Loading activity" tileClassName="min-h-[72px]" />;
+  const t = useT();
+  if (activity.isLoading) return <SkeletonCardGrid count={3} label={t("community.loadingActivity")} tileClassName="min-h-[72px]" />;
   if (activity.error) {
     return (
       <EmptyState
-        title="Couldn't load activity."
+        title={t("book.activityLoadFailed")}
         action={
           <button onClick={() => void activity.refetch()} className={BUTTON_SECONDARY}>
-            Retry
+            {t("library.retry")}
           </button>
         }
       />
@@ -103,7 +104,7 @@ export function ProfileActivity({ activity }: { activity: ReturnType<typeof useC
     const row = activityRow(item, locale);
     return row ? [{ item, row }] : [];
   });
-  if (entries.length === 0) return <EmptyState title="No activity yet." body="Publishing and reading will show up here." />;
+  if (entries.length === 0) return <EmptyState title={t("community.noActivity")} body={t("community.noActivityBody")} />;
   const days = entries.reduce<Array<{ day: string; rows: typeof entries }>>((groups, entry) => {
     const day = activityDay(entry.item.createdAt, locale);
     const last = groups[groups.length - 1];
@@ -129,7 +130,7 @@ export function ProfileActivity({ activity }: { activity: ReturnType<typeof useC
           disabled={activity.isFetchingNextPage}
           className="mt-4 min-h-11 w-full rounded-lg border border-(--color-border) px-3 py-2 text-sm text-(--color-text-dim) hover:border-(--color-accent) disabled:opacity-50"
         >
-          {activity.isFetchingNextPage ? "Loading…" : "Load more"}
+          {activity.isFetchingNextPage ? t("library.loadingEllipsis") : t("library.loadMore")}
         </button>
       )}
     </div>

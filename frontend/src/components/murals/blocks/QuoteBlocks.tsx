@@ -1,4 +1,5 @@
 import { resolveQuote, resolveQuoteCollection, type MuralBlock } from "../../../lib/murals";
+import { useT } from "../../../i18n";
 import { BlockEyebrow, EmptyBlockState } from "./BookBlocks";
 
 /** One featured highlight, shown large — the "top quote from a book"
@@ -12,17 +13,18 @@ import { BlockEyebrow, EmptyBlockState } from "./BookBlocks";
  *  attribution stay their own muted color regardless, same as every
  *  secondary/meta line in these block views. */
 export function QuoteBlockView({ block, books }: { block: Extract<MuralBlock, { type: "quote" }>; books: Array<Record<string, unknown>> }) {
+  const t = useT();
   const resolved = resolveQuote(block, books);
   if (!resolved) {
-    return <EmptyBlockState message="Pick a quote for this spotlight." />;
+    return <EmptyBlockState message={t("muralEditor.pickQuote")} />;
   }
   const { book, highlight } = resolved;
   return (
     <div className="flex h-full flex-col justify-center gap-3 overflow-y-auto block-p-4">
-      <p className="text-[1.1em] leading-snug italic">"{String(highlight.Text ?? "")}"</p>
+      <p className="text-[1.1em] leading-snug italic">{t("muralEditor.quoted", { text: String(highlight.Text ?? "") })}</p>
       {highlight.Annotation ? <p className="text-[0.85em] text-(--color-text-dim)">{String(highlight.Annotation)}</p> : null}
       <p className="text-[0.85em] font-medium text-(--color-text-dim)">
-        — {String(book.Title ?? "Untitled")}, {String(book.Attribution ?? "Unknown author")}
+        — {String(book.Title ?? t("library.untitled"))}, {String(book.Attribution ?? t("library.unknownAuthor"))}
       </p>
     </div>
   );
@@ -37,18 +39,19 @@ export function QuoteCollectionBlockView({
   block: Extract<MuralBlock, { type: "quoteCollection" }>;
   books: Array<Record<string, unknown>>;
 }) {
+  const t = useT();
   const resolved = resolveQuoteCollection(block, books);
   return (
     <div className="flex h-full flex-col overflow-hidden block-p-2.5">
-      <BlockEyebrow>{block.title || "Untitled quotes"}</BlockEyebrow>
+      <BlockEyebrow>{block.title || t("muralEditor.untitledQuotes")}</BlockEyebrow>
       {resolved.length === 0 ? (
-        <EmptyBlockState message="No quotes picked yet." />
+        <EmptyBlockState message={t("muralEditor.noQuotesPicked")} />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto">
           {resolved.map(({ book, highlight }, i) => (
             <div key={String(highlight.BookmarkID ?? i)} className="border-l-2 border-[var(--block-accent,var(--color-accent))] pl-2.5">
-              <p className="text-[0.9em] leading-snug italic">"{String(highlight.Text ?? "")}"</p>
-              <p className="mt-0.5 text-[0.75em] text-(--color-text-dim)">— {String(book.Title ?? "Untitled")}</p>
+              <p className="text-[0.9em] leading-snug italic">{t("muralEditor.quoted", { text: String(highlight.Text ?? "") })}</p>
+              <p className="mt-0.5 text-[0.75em] text-(--color-text-dim)">— {String(book.Title ?? t("library.untitled"))}</p>
             </div>
           ))}
         </div>

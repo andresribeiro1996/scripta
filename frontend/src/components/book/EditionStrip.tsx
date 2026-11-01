@@ -3,7 +3,7 @@ import { editionLabel, type BookScreenModel, type WorkEdition } from "@scripta/s
 import { OptionsMenu } from "../OptionsMenu";
 import { ChevronDownIcon } from "../Toolbar";
 import { BookCover, editionCoverBook } from "./BookCover";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 type Props = {
   editions: WorkEdition[];
@@ -19,6 +19,7 @@ const centreOf = (slide: HTMLElement) => slide.offsetLeft + slide.offsetWidth / 
 
 export function EditionStrip({ editions, author, edition, mineBook, onSelect }: Props) {
   const locale = useLocale();
+  const t = useT();
   const strip = useRef<HTMLDivElement>(null);
   const { index, mineIndex } = edition;
   const latest = useRef({ index, editions, onSelect });
@@ -86,7 +87,7 @@ export function EditionStrip({ editions, author, edition, mineBook, onSelect }: 
         ref={strip}
         role="group"
         aria-roledescription="carousel"
-        aria-label="Editions"
+        aria-label={t("book.editions")}
         tabIndex={0}
         onKeyDown={onKeyDown}
         className="relative flex snap-x snap-mandatory gap-3 overflow-x-auto px-[calc(50%-6.25rem)] py-4 [scrollbar-width:none] lg:px-[calc(50%-8.75rem)] [&::-webkit-scrollbar]:hidden"
@@ -118,16 +119,16 @@ export function EditionStrip({ editions, author, edition, mineBook, onSelect }: 
       ) : null}
       <div aria-live="polite" className="flex justify-center">
         <OptionsMenu
-          title="Editions"
+          title={t("book.editions")}
           trigger={<>{edition.label}<ChevronDownIcon /></>}
           triggerClassName="inline-flex min-h-11 items-center gap-1 px-2 text-xs text-(--color-text-dim) hover:text-(--color-text)"
-          items={editions.map((e, i) => ({ label: `${e.title} · ${editionLabel(e, locale)}${e.mine ? " · Yours" : ""}`, checked: i === index, onClick: () => choose(i) }))}
+          items={editions.map((e, i) => ({ label: e.mine ? t("book.editionMenuMine", { label: `${e.title} · ${editionLabel(e, locale)}` }) : `${e.title} · ${editionLabel(e, locale)}`, checked: i === index, onClick: () => choose(i) }))}
         />
       </div>
       {mineIndex !== null && index !== mineIndex ? (
         <div className="flex justify-center">
           <button type="button" onClick={() => choose(mineIndex)} className="min-h-11 text-xs font-semibold text-(--color-accent)">
-            Back to your edition
+            {t("book.backToYourEdition")}
           </button>
         </div>
       ) : null}

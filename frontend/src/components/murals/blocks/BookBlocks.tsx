@@ -1,15 +1,15 @@
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { readingPercent, booksByWork, isCharacterBook, itemNoun } from "@scripta/shared";
+import { readingPercent, booksByWork, isCharacterBook } from "@scripta/shared";
 import type { ReactNode } from "react";
 import { CoverImage } from "../../BookCard";
 import { CharacterName } from "../../CharacterName";
 import type { ResolvedTierlist } from "../../../api/tierlists";
 import { bookKey } from "../../../lib/merge";
-import { blockBooks, resolveShelfBooks, type MuralBlock, type TierDefinition } from "../../../lib/murals";
+import { blockBooks, blockLabel, resolveShelfBooks, type MuralBlock, type TierDefinition } from "../../../lib/murals";
 import { OptionsMenu, type OptionsMenuItem } from "../../OptionsMenu";
 import { TierRowEmpty, TierRowShell, TierRowTiles } from "../../tierlist/TierRowShell";
 import { MoreIcon } from "../../NavIcons";
-import { useLocale } from "../../../i18n";
+import { useLocale, useT } from "../../../i18n";
 
 /** A small, read-only cover tile — reuses BookCard's own CoverImage (same
  *  Kobo/Open Library/gallery-assigned resolution chain) but with none of
@@ -51,8 +51,9 @@ export function MiniBookTile({
   showTitle?: boolean;
   showAuthor?: boolean;
 }) {
+  const t = useT();
   if (isCharacterBook(book)) {
-    const name = String(book.Title ?? "Untitled");
+    const name = String(book.Title ?? t("library.untitled"));
     return (
       <div className="flex h-full items-center justify-center overflow-hidden rounded-lg bg-(--color-accent-soft) p-1 text-center">
         <CharacterName name={name} className="text-[0.7em] leading-tight" />
@@ -63,12 +64,12 @@ export function MiniBookTile({
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-lg">
       <div className={`relative min-h-0 overflow-hidden bg-(--color-border) ${showFooter ? "flex-1" : "h-full"}`}>
-        <CoverImage book={book} fit="contain" alt={showTitle ? "" : String(book.Title ?? "Untitled")} />
+        <CoverImage book={book} fit="contain" alt={showTitle ? "" : String(book.Title ?? t("library.untitled"))} />
       </div>
       {showFooter && (
         <div className="shrink-0 px-1.5 py-1">
-          {showTitle && <div className="truncate text-[0.75em] font-medium leading-tight">{String(book.Title ?? "Untitled")}</div>}
-          {showAuthor && <div className="truncate text-[0.65em] text-(--color-text-dim)">{String(book.Attribution ?? "Unknown author")}</div>}
+          {showTitle && <div className="truncate text-[0.75em] font-medium leading-tight">{String(book.Title ?? t("library.untitled"))}</div>}
+          {showAuthor && <div className="truncate text-[0.65em] text-(--color-text-dim)">{String(book.Attribution ?? t("library.unknownAuthor"))}</div>}
         </div>
       )}
     </div>
@@ -76,10 +77,11 @@ export function MiniBookTile({
 }
 
 export function BlockEyebrow({ children, count }: { children: ReactNode; count?: number }) {
+  const t = useT();
   return (
     <div className="mb-1.5 flex shrink-0 items-baseline justify-between gap-2">
       <span className="min-w-0 truncate text-[0.7em] font-bold text-(--color-text-dim)">{children}</span>
-      {count !== undefined && <span className="shrink-0 text-[0.7em] text-(--color-text-dim)">{count === 1 ? "1 book" : `${count} books`}</span>}
+      {count !== undefined && <span className="shrink-0 text-[0.7em] text-(--color-text-dim)">{t("library.bookCount", { count })}</span>}
     </div>
   );
 }
@@ -87,9 +89,10 @@ export function BlockEyebrow({ children, count }: { children: ReactNode; count?:
 /** One book, given the most room a mural block can offer it — the "big
  *  cover + optional caption" spotlight case. */
 export function SpotlightBlockView({ block, books }: { block: Extract<MuralBlock, { type: "spotlight" }>; books: Array<Record<string, unknown>> }) {
+  const t = useT();
   const book = books.find((b) => bookKey(b) === block.bookKey);
   if (!book) {
-    return <EmptyBlockState message="Pick a book for this spotlight." />;
+    return <EmptyBlockState message={t("muralEditor.pickSpotlightBook")} />;
   }
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -97,8 +100,8 @@ export function SpotlightBlockView({ block, books }: { block: Extract<MuralBlock
         <CoverImage book={book} />
       </div>
       <div className="shrink-0 block-px-2.5 block-py-2">
-        <div className="truncate text-[1.1em] font-semibold">{String(book.Title ?? "Untitled")}</div>
-        <div className="truncate text-[0.85em] text-(--color-text-dim)">{String(book.Attribution ?? "Unknown author")}</div>
+        <div className="truncate text-[1.1em] font-semibold">{String(book.Title ?? t("library.untitled"))}</div>
+        <div className="truncate text-[0.85em] text-(--color-text-dim)">{String(book.Attribution ?? t("library.unknownAuthor"))}</div>
         {block.caption && <p className="mt-1 text-[0.85em]">{block.caption}</p>}
       </div>
     </div>
@@ -109,12 +112,13 @@ export function SpotlightBlockView({ block, books }: { block: Extract<MuralBlock
  *  Year" case. Horizontally scrollable rather than wrapping, so it stays
  *  a genuine "shelf" regardless of the block's width. */
 export function ShelfBlockView({ block, books }: { block: Extract<MuralBlock, { type: "shelf" }>; books: Array<Record<string, unknown>> }) {
+  const t = useT();
   const resolved = resolveShelfBooks(block, books);
   return (
     <div className="flex h-full flex-col overflow-hidden block-p-2.5">
-      <BlockEyebrow count={resolved.length}>{block.title || "Untitled shelf"}</BlockEyebrow>
+      <BlockEyebrow count={resolved.length}>{block.title || t("muralEditor.untitledShelf")}</BlockEyebrow>
       {resolved.length === 0 ? (
-        <EmptyBlockState message="No books picked yet." />
+        <EmptyBlockState message={t("muralEditor.noBooksPicked")} />
       ) : (
         <div className="flex min-h-0 flex-1 gap-2 overflow-x-auto">
           {resolved.map((book, i) => (
@@ -130,13 +134,15 @@ export function ShelfBlockView({ block, books }: { block: Extract<MuralBlock, { 
 
 /** Auto-computed, no picker at all — whatever blockBooks says is being read. */
 export function CurrentlyReadingBlockView({ block, books }: { block: Extract<MuralBlock, { type: "currentlyReading" }>; books: Array<Record<string, unknown>> }) {
+  const locale = useLocale();
+  const t = useT();
   const reading = blockBooks(block, books);
   const showProgress = reading.some((b) => readingPercent(b) !== null);
   return (
     <div className="flex h-full flex-col overflow-hidden block-p-2.5">
-      <BlockEyebrow count={reading.length}>Currently reading</BlockEyebrow>
+      <BlockEyebrow count={reading.length}>{blockLabel("currentlyReading", locale)}</BlockEyebrow>
       {reading.length === 0 ? (
-        <EmptyBlockState message="Nothing marked as reading right now." />
+        <EmptyBlockState message={t("muralEditor.nothingReading")} />
       ) : (
         <div className="flex min-h-0 flex-1 gap-2 overflow-x-auto">
           {reading.map((book, i) => {
@@ -201,7 +207,7 @@ export function CurrentlyReadingBlockView({ block, books }: { block: Extract<Mur
  *  renderer — all ranking/editing lives in TierListEditorPage, whose own
  *  draggable tiles (DraggableTierTile below) are shared from this file. */
 export function TierRow({ tier, books }: { tier: TierDefinition; books: Array<Record<string, unknown>> }) {
-  const locale = useLocale();
+  const t = useT();
   const byWork = booksByWork(books);
   // Walking `tier.workIds` directly (not filtering to resolved books
   // first) so each tile still knows its own real work id — a
@@ -212,7 +218,7 @@ export function TierRow({ tier, books }: { tier: TierDefinition; books: Array<Re
   return (
     <TierRowShell tier={tier}>
       {resolvedKeys.length === 0 ? (
-        <TierRowEmpty message={`No ${itemNoun(books.some(isCharacterBook), 2, locale)} on this tier.`} />
+        <TierRowEmpty message={t(books.some(isCharacterBook) ? "muralEditor.noCharactersOnTier" : "muralEditor.noBooksOnTier")} />
       ) : (
         <TierRowTiles>
           {resolvedKeys.map((key) => (
@@ -281,7 +287,7 @@ export function DraggableTierTile({
   workId: string;
   menuItems: OptionsMenuItem[];
 }) {
-  const locale = useLocale();
+  const t = useT();
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: workId });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: workId });
   const setRefs = (el: HTMLDivElement | null) => {
@@ -292,8 +298,7 @@ export function DraggableTierTile({
   // hover-only, and hover does not exist on touch — so on a phone the
   // one control that could rank a book without dragging was invisible.
   const coarse = typeof window !== "undefined" && Boolean(window.matchMedia?.("(pointer: coarse)").matches);
-  const title = String(book.Title ?? "Untitled");
-  const noun = itemNoun(isCharacterBook(book), 1, locale);
+  const title = String(book.Title ?? t("library.untitled"));
   return (
     <div
       ref={setRefs}
@@ -307,8 +312,8 @@ export function DraggableTierTile({
       // ("button, Drag to a tier, or use the ⋮ menu" x N); folding the
       // book's own title in gives each one a distinct accessible name.
       // `title` is kept too, purely for the mouse-hover tooltip.
-      aria-label={`${title} — drag to a tier, or use the ⋮ menu`}
-      title="Drag to a tier, or use the ⋮ menu"
+      aria-label={t("muralEditor.tileLabel", { title })}
+      title={t("muralEditor.tileHint")}
       className={`group/tile relative h-[6em] w-[4em] shrink-0 cursor-grab overflow-hidden rounded-lg active:cursor-grabbing ${
         isOver && !isDragging ? "ring-2 ring-(--color-accent)" : ""
       } ${
@@ -350,7 +355,7 @@ export function DraggableTierTile({
       >
         <OptionsMenu
           items={menuItems}
-          title={`Move this ${noun}`}
+          title={t(isCharacterBook(book) ? "muralEditor.moveThisCharacter" : "muralEditor.moveThisBook")}
           triggerClassName="flex h-11 w-11 items-center justify-center"
           trigger={<span className="flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-white backdrop-blur-xs"><MoreIcon size={16} /></span>}
         />
@@ -375,15 +380,16 @@ export function DraggableTierTile({
  *  (tier list deleted, or a block that never picked one) renders the
  *  unavailable state rather than an empty shell. */
 export function TierListBlockView({ tierlist, books }: { tierlist: ResolvedTierlist | undefined; books: Array<Record<string, unknown>> }) {
-  if (!tierlist) return <EmptyBlockState message="Tier list unavailable." />;
+  const t = useT();
+  if (!tierlist) return <EmptyBlockState message={t("muralEditor.tierlistUnavailableShort")} />;
   return (
     <div className="flex h-full flex-col overflow-hidden block-p-2.5">
       {/* Always rendered, with a fallback — same "always show SOME title
           line" convention ShelfBlockView's own `block.title || "Untitled
           shelf"` already follows. */}
-      <BlockEyebrow>{tierlist.name || "Untitled tier list"}</BlockEyebrow>
+      <BlockEyebrow>{tierlist.name || t("tierlists.untitled")}</BlockEyebrow>
       {tierlist.tiers.length === 0 ? (
-        <EmptyBlockState message="No tiers yet." />
+        <EmptyBlockState message={t("muralEditor.noTiersYet")} />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto">
           {tierlist.tiers.map((tier) => (

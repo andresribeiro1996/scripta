@@ -1,4 +1,4 @@
-import { booksByWork, isCharacterBook, itemNoun } from "@scripta/shared";
+import { booksByWork, isCharacterBook } from "@scripta/shared";
 import {
   closestCenter,
   DndContext,
@@ -22,7 +22,7 @@ import { createTier } from "../../lib/murals";
 import { BUTTON_SECONDARY, FIELD_CLASS } from "../page/buttonClasses";
 import { TierColorPicker } from "./TierColorPicker";
 import { TierRowEmpty, TierRowShell, TierRowTiles } from "./TierRowShell";
-import { useLocale } from "../../i18n";
+import { useT } from "../../i18n";
 
 export interface TierBoardProps {
   data: TierlistData;
@@ -93,7 +93,7 @@ function TierEditorRow({
    *  color, order, and existence — is gated here. */
   structureEditable: boolean;
 }) {
-  const locale = useLocale();
+  const t = useT();
   const byWork = booksByWork(books);
   const resolvedKeys = tier.workIds.filter((k) => byWork.has(k));
   return (
@@ -113,8 +113,8 @@ function TierEditorRow({
                 e.currentTarget.blur();
               }
             }}
-            placeholder="Label"
-            aria-label="Tier label"
+            placeholder={t("tierlists.labelPlaceholder")}
+            aria-label={t("tierlists.tierLabel")}
             className={`${FIELD_CLASS} min-w-0 flex-1 font-semibold`}
           />
           {/* Up/down stay as direct buttons — reordering tiers is the
@@ -125,8 +125,8 @@ function TierEditorRow({
           <button
             disabled={isFirst}
             onClick={onMoveUp}
-            aria-label="Move tier up"
-            title="Move tier up"
+            aria-label={t("tierlists.moveTierUp")}
+            title={t("tierlists.moveTierUp")}
             className={`${toolbarIconClass()} disabled:opacity-30`}
           >
             <ChevronUpIcon />
@@ -134,23 +134,23 @@ function TierEditorRow({
           <button
             disabled={isLast}
             onClick={onMoveDown}
-            aria-label="Move tier down"
-            title="Move tier down"
+            aria-label={t("tierlists.moveTierDown")}
+            title={t("tierlists.moveTierDown")}
             className={`${toolbarIconClass()} disabled:opacity-30`}
           >
             <ChevronDownIcon />
           </button>
           <OptionsMenu
-            title="Tier settings"
+            title={t("tierlists.tierSettings")}
             triggerClassName={toolbarIconClass()}
-            items={[{ label: "Delete tier", onClick: onDelete, danger: true }]}
+            items={[{ label: t("tierlists.deleteTier"), onClick: onDelete, danger: true }]}
           />
         </div>
       )}
       <DropZone id={tier.id}>
         <TierRowShell tier={tier} colorControl={structureEditable ? <TierColorPicker color={tier.color} onChange={onRecolor} /> : undefined}>
           {resolvedKeys.length === 0 ? (
-            <TierRowEmpty message={`Drag a ${itemNoun(books.some(isCharacterBook), 1, locale)} here from the pool.`} />
+            <TierRowEmpty message={t(books.some(isCharacterBook) ? "tierlists.dragHereCharacters" : "tierlists.dragHereBooks")} />
           ) : (
             <TierRowTiles>
               {resolvedKeys.map((key) => {
@@ -161,8 +161,8 @@ function TierEditorRow({
                     book={book}
                     workId={key}
                     menuItems={[
-                      ...otherTiers.map((t) => ({ label: `Move to ${t.label || "Untitled tier"}`, onClick: () => onMoveBook(key, { type: "tier", tierId: t.id }) })),
-                      { label: "Return to pool", onClick: () => onMoveBook(key, { type: "pool" }) }
+                      ...otherTiers.map((other) => ({ label: t("tierlists.moveTo", { tier: other.label || t("tierlists.untitledTier") }), onClick: () => onMoveBook(key, { type: "tier", tierId: other.id }) })),
+                      { label: t("tierlists.returnToPool"), onClick: () => onMoveBook(key, { type: "pool" }) }
                     ]}
                   />
                 );
@@ -183,7 +183,7 @@ function TierEditorRow({
  *  who rank the same fixed set of books into the same fixed tiers but
  *  can't touch the tier list's own shape (`structureEditable: false`). */
 export function TierBoard({ data, books, onChange, structureEditable, poolLabel, onAddBooks }: TierBoardProps) {
-  const locale = useLocale();
+  const t = useT();
   const [poolCollapsed, setPoolCollapsed] = useState(false);
   // The book currently being dragged, tracked purely to feed `DragOverlay`
   // below — dnd-kit doesn't render an overlay on its own, and without one
@@ -327,12 +327,12 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
   }
 
   function addTier() {
-    onChange({ ...data, tiers: [...data.tiers, createTier("New tier", "#8a8580")] });
+    onChange({ ...data, tiers: [...data.tiers, createTier(t("tierlists.newTier"), "#8a8580")] });
   }
 
   const byWork = booksByWork(books);
   const resolvedPool = data.pool.filter((k) => byWork.has(k));
-  const poolHeading = poolLabel ?? "Pool";
+  const poolHeading = poolLabel ?? t("tierlists.pool");
   const character = books.some(isCharacterBook);
 
   return (
@@ -348,7 +348,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
       onDragCancel={() => setActiveKey(null)}
     >
       <div className="flex flex-col gap-2 pb-[13rem]">
-        {data.tiers.length === 0 && <p className="text-sm text-(--color-text-dim)">No tiers yet — add one.</p>}
+        {data.tiers.length === 0 && <p className="text-sm text-(--color-text-dim)">{t("tierlists.noTiersAddOne")}</p>}
         {data.tiers.map((tier, i) => (
           <TierEditorRow
             key={tier.id}
@@ -372,7 +372,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
             onClick={addTier}
             className="min-h-11 self-start rounded-lg border border-dashed border-(--color-border) px-3 text-sm text-(--color-text-dim) hover:border-(--color-accent) hover:text-(--color-accent)"
           >
-            + Add tier
+            {t("tierlists.addTierButton")}
           </button>
         )}
       </div>
@@ -392,7 +392,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
             className="flex min-h-11 items-center gap-1.5 text-xs font-semibold text-(--color-text-dim) hover:text-(--color-text)"
           >
             {poolCollapsed ? <ChevronUpIcon /> : <ChevronDownIcon />}
-            {poolHeading} — {resolvedPool.length} {itemNoun(character, resolvedPool.length, locale)}
+            {t(character ? "tierlists.poolSummaryCharacters" : "tierlists.poolSummaryBooks", { heading: poolHeading, count: resolvedPool.length })}
           </button>
           {/* Adding to the pool grows the frozen set voters would be
               ranking, so it's gated the same as the tier controls above —
@@ -402,7 +402,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
               onClick={onAddBooks}
               className={`${BUTTON_SECONDARY} shrink-0`}
             >
-              Add books
+              {t("tierlists.addBooks")}
             </button>
           )}
         </div>
@@ -411,7 +411,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
             <div className="flex min-h-[7em] items-start gap-1.5 overflow-x-auto overscroll-contain px-3 pb-3">
               {resolvedPool.length === 0 ? (
                 <p className="py-4 text-xs text-(--color-text-dim)">
-                  Pool is empty — every {itemNoun(character, 1, locale)} is ranked. Drag one back here to unrank it.
+                  {t(character ? "tierlists.poolEmptyCharacters" : "tierlists.poolEmptyBooks")}
                 </p>
               ) : (
                 resolvedPool.map((key) => (
@@ -419,9 +419,9 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
                     key={key}
                     book={byWork.get(key)!}
                     workId={key}
-                    menuItems={data.tiers.map((t) => ({
-                      label: `Move to ${t.label || "Untitled tier"}`,
-                      onClick: () => moveBook(key, { type: "tier", tierId: t.id })
+                    menuItems={data.tiers.map((tier) => ({
+                      label: t("tierlists.moveTo", { tier: tier.label || t("tierlists.untitledTier") }),
+                      onClick: () => moveBook(key, { type: "tier", tierId: tier.id })
                     }))}
                   />
                 ))

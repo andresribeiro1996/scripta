@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { buildTree, folderPath } from "../../lib/muralFolders";
 import type { MuralFolder } from "../../lib/murals";
+import { useT } from "../../i18n";
 import { OptionsMenu } from "../OptionsMenu";
 import { FIELD_CLASS } from "../page/buttonClasses";
 
@@ -21,6 +22,7 @@ export function MuralFolderTree({
   onMoveFolder: (folder: MuralFolder) => void;
   onDeleteFolder: (folder: MuralFolder) => void;
 }) {
+  const t = useT();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
@@ -54,7 +56,7 @@ export function MuralFolderTree({
             : "text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
         }`}
       >
-        All murals
+        {t("murals.allMurals")}
       </button>
 
       {buildTree(folders)
@@ -67,7 +69,7 @@ export function MuralFolderTree({
               {nested ? (
                 <button
                   onClick={() => toggle(folder.id)}
-                  title={isCollapsed ? "Expand" : "Collapse"}
+                  title={isCollapsed ? t("muralEditor.expand") : t("muralEditor.collapse")}
                   className={`flex h-11 w-11 shrink-0 items-center justify-center rounded text-(--color-text-dim) hover:bg-(--color-surface-hover) ${
                     hasChildren ? "" : "invisible"
                   }`}
@@ -115,19 +117,19 @@ export function MuralFolderTree({
               )}
               <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                 <OptionsMenu
-                  title="Folder settings"
+                  title={t("muralEditor.folderSettings")}
                   triggerClassName="flex h-11 w-11 items-center justify-center rounded text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
                   items={[
-                    { label: "New subfolder", onClick: () => onCreateFolder(folder.id) },
+                    { label: t("muralEditor.newSubfolder"), onClick: () => onCreateFolder(folder.id) },
                     {
-                      label: "Rename",
+                      label: t("library.groupRename"),
                       onClick: () => {
                         setRenamingId(folder.id);
                         setRenameDraft(folder.name);
                       }
                     },
-                    { label: "Move to…", onClick: () => onMoveFolder(folder) },
-                    { label: "Delete", onClick: () => onDeleteFolder(folder), danger: true }
+                    { label: t("murals.moveTo"), onClick: () => onMoveFolder(folder) },
+                    { label: t("shell.delete"), onClick: () => onDeleteFolder(folder), danger: true }
                   ]}
                 />
               </div>
@@ -137,10 +139,10 @@ export function MuralFolderTree({
 
       <button
         onClick={() => onCreateFolder(selectedFolderId === null ? null : (folders.find((f) => f.id === selectedFolderId)?.parentId ?? null))}
-        title="Create a folder next to the current selection"
+        title={t("muralEditor.createFolderNext")}
         className={`${indent}mt-2 min-h-11 rounded border border-dashed border-(--color-border) px-1.5 text-left text-xs text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent)`}
       >
-        + New folder
+        {t("muralEditor.newFolderButton")}
       </button>
     </nav>
   );

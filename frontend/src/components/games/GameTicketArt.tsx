@@ -1,10 +1,12 @@
 import type { QuizPreview } from "@scripta/shared";
 import type { PublishedContent } from "@scripta/shared/community";
+import { useT } from "../../i18n";
 import { LibraryIcon, QuoteIcon } from "../NavIcons";
 
 type Kind = PublishedContent["kind"];
 
 export function GameTicketArt({ kind, covers, ladder, preview, color }: { kind: Kind; covers: string[]; ladder?: string[]; preview?: QuizPreview; color: string }) {
+  const t = useT();
   if (kind === "quiz") {
     return (
       <div aria-hidden="true" className="flex w-full flex-col items-center justify-center gap-2 px-2 py-4" style={{ color }}>
@@ -32,7 +34,7 @@ export function GameTicketArt({ kind, covers, ladder, preview, color }: { kind: 
     return (
       <div aria-hidden="true" className="flex flex-col items-center gap-1 py-3" style={{ color }}>
         <Cover src={covers[0] ?? null} rotate={-7} />
-        <span className="text-sm font-bold tracking-wider">VS</span>
+        <span className="text-sm font-bold tracking-wider">{t("arena.vs")}</span>
         <Cover src={covers[1] ?? null} rotate={7} />
       </div>
     );

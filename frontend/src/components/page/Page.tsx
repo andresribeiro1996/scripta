@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { useT } from "../../i18n";
 import { activeTabTo, type AreaTab } from "../../lib/areas";
 import { ChevronLeftIcon } from "../Toolbar";
 import { LIST_ROW, PANEL_HEADING, TAB_NAV, tabClass } from "./surfaceClasses";
@@ -36,6 +37,7 @@ export function Page({ title, subtitle, back, actions, tabs, sideTabs, reserveSu
   maxWidth?: number;
   children: ReactNode;
 }) {
+  const t = useT();
   const location = useLocation();
   const tabList = tabs?.length ? tabs : null;
   const reservedSlot = reserveSubtitle && tabList && !sideTabs;
@@ -60,7 +62,7 @@ export function Page({ title, subtitle, back, actions, tabs, sideTabs, reserveSu
               </div>
             ) : null}
             {tabList ? (
-              <nav aria-label="Sections" className={`mt-6 ${TAB_NAV}${sideTabs ? " lg:hidden" : ""}`}>
+              <nav aria-label={t("shell.sections")} className={`mt-6 ${TAB_NAV}${sideTabs ? " lg:hidden" : ""}`}>
                 {tabLinks(tabList, activeTo, tabClass)}
               </nav>
             ) : null}
@@ -68,7 +70,7 @@ export function Page({ title, subtitle, back, actions, tabs, sideTabs, reserveSu
         ) : null}
         {tabList && sideTabs ? (
           <div className="pt-6 lg:grid lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-12">
-            <nav aria-label="Sections" className="hidden lg:flex flex-col gap-0.5">
+            <nav aria-label={t("shell.sections")} className="hidden lg:flex flex-col gap-0.5">
               {tabLinks(tabList, activeTo, sideTabClass)}
             </nav>
             <div className="min-w-0 max-w-3xl">{children}</div>

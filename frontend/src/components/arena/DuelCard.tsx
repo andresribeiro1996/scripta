@@ -13,6 +13,7 @@ import { duelWinner } from "@scripta/shared";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import type { Duel, DuelSide } from "../../api/arena";
+import { useT } from "../../i18n";
 import { CoverImage } from "../BookCard";
 import { useCountdown } from "./useCountdown";
 
@@ -35,6 +36,7 @@ function DuelSideCard({
   onVote: () => void;
   onAddBook?: (side: DuelSide) => void;
 }) {
+  const t = useT();
   const pct = totalVotes > 0 ? Math.round((side.votes / totalVotes) * 100) : 0;
   const coverImageBook = useMemo(
     () => ({ Title: side.title, Attribution: side.author, _coverUrl: side.cover ?? undefined }),
@@ -78,20 +80,20 @@ function DuelSideCard({
             <div className="h-full bg-(--color-accent)" style={{ width: `${pct}%` }} />
           </div>
           <p className="mt-1 text-xs text-(--color-text-dim)">
-            {side.votes} vote{side.votes === 1 ? "" : "s"} ({pct}%)
+            {t("arena.votesShare", { count: side.votes, pct })}
           </p>
         </div>
       </button>
       {aboutable || addBook ? (
         <div className="flex items-center justify-between gap-2">
           {aboutable ? (
-            <Link to={`/work/${side.workId}`} aria-label="About this book" className={SIDE_ACTION}>
-              About
+            <Link to={`/work/${side.workId}`} aria-label={t("library.aboutThisBook")} className={SIDE_ACTION}>
+              {t("arena.about")}
             </Link>
           ) : null}
           {addBook ? (
-            <button type="button" aria-label={`Add ${side.title} to your library`} onClick={() => addBook(side)} className={`${SIDE_ACTION} ml-auto`}>
-              Add
+            <button type="button" aria-label={t("arena.addToLibrary", { title: side.title })} onClick={() => addBook(side)} className={`${SIDE_ACTION} ml-auto`}>
+              {t("library.groupAdd")}
             </button>
           ) : null}
         </div>
@@ -120,6 +122,7 @@ export function DuelCard({
    *  page's AddBookSheet — omitted by any host that doesn't want it. */
   onAddBook?: (side: DuelSide) => void;
 }) {
+  const t = useT();
   const countdown = useCountdown(duel.closesAt);
   const totalVotes = duel.bookA.votes + duel.bookB.votes;
   const winner = duelWinner(duel);
@@ -129,14 +132,14 @@ export function DuelCard({
     <div className="rounded-2xl border border-(--color-border) bg-(--color-surface) p-4">
       <div className="mb-3 flex items-center justify-between text-xs text-(--color-text-dim)">
         <span>
-          {round} · Duel {duel.duelIndex + 1}
+          {t("arena.duelLabel", { round, number: duel.duelIndex + 1 })}
         </span>
         <span>
           {duel.status === "active"
             ? (votingDisabledReason ?? countdown)
             : duel.status === "tied_pending_tiebreak"
-              ? "Tied — awaiting tie-break"
-              : "Settled"}
+              ? t("arena.tied")
+              : t("arena.settled")}
         </span>
       </div>
       <div className="flex gap-3">
@@ -149,7 +152,7 @@ export function DuelCard({
           onVote={() => duel.bookA.workId && onVote(duel.bookA.workId)}
           onAddBook={onAddBook}
         />
-        <div className="flex items-center px-1 text-sm font-bold text-(--color-text-dim)">VS</div>
+        <div className="flex items-center px-1 text-sm font-bold text-(--color-text-dim)">{t("arena.vs")}</div>
         <DuelSideCard
           side={duel.bookB}
           character={character}

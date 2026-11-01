@@ -18,16 +18,19 @@ import { QuizLeaderboard, QuizResults } from "../components/quiz/QuizResults";
 import { backTo } from "../lib/areas";
 import { quizPlayStage } from "../lib/quizPlayStage";
 import { storePlayId, useQuizPlay } from "../hooks/useQuizPlay";
+import { useT } from "../i18n";
 
 function InfoScreen({ message, back }: { message: string; back?: { to: string; label: string } }) {
+  const t = useT();
   return (
-    <Page width="narrow" back={back} title="Quiz">
+    <Page width="narrow" back={back} title={t("quizzes.title")}>
       <p className="text-sm text-(--color-text-dim)">{message}</p>
     </Page>
   );
 }
 
 function Options({ question, onPick, picked }: { question: PublicQuizQuestion; onPick: (index: number) => void; picked: number | null }) {
+  const t = useT();
   if (question.type === "title_cover") {
     return (
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -35,7 +38,7 @@ function Options({ question, onPick, picked }: { question: PublicQuizQuestion; o
           <button
             key={option}
             type="button"
-            aria-label={`Cover option ${index + 1} of ${question.options.length}`}
+            aria-label={t("quizzes.coverOption", { number: index + 1, total: question.options.length })}
             disabled={picked !== null}
             onClick={() => onPick(index)}
             className={`relative aspect-[2/3] overflow-hidden rounded-xl border-2 bg-(--color-border) transition-colors ${picked === index ? "border-(--color-accent)" : "border-(--color-border) hover:border-(--color-text-dim)"}`}
@@ -43,7 +46,7 @@ function Options({ question, onPick, picked }: { question: PublicQuizQuestion; o
             {/* contain, not cover: cropping is what hides the artwork a
                 player needs to recognize; the border-colored tile backs
                 the letterbox, per DESIGN.md's BookCard note. */}
-            <CoverImage book={{ Title: `Option ${index + 1}`, _coverUrl: option }} fit="contain" alt={`Option ${index + 1}`} />
+            <CoverImage book={{ Title: t("quizzes.option", { number: index + 1 }), _coverUrl: option }} fit="contain" alt={t("quizzes.option", { number: index + 1 })} />
           </button>
         ))}
       </div>
@@ -67,6 +70,7 @@ function Options({ question, onPick, picked }: { question: PublicQuizQuestion; o
 }
 
 export function PlayQuizPage() {
+  const t = useT();
   const { code } = useParams();
   const { session } = useAuth();
   const back = session?.user.username ? backTo("quiz") : undefined;
@@ -86,19 +90,19 @@ export function PlayQuizPage() {
     return () => window.clearInterval(timer);
   }, []);
 
-  if (board.isPending) return <InfoScreen message="Loading…" back={back} />;
-  if (board.isError) return <InfoScreen message={board.error instanceof Error ? board.error.message : "No quiz at that link."} back={back} />;
+  if (board.isPending) return <InfoScreen message={t("library.loadingEllipsis")} back={back} />;
+  if (board.isError) return <InfoScreen message={board.error instanceof Error ? board.error.message : t("quizzes.noQuizAtLink")} back={back} />;
   const playBoard = board.data;
 
   const result = submitted ?? (ownPlay.data ?? null);
   const questions = playBoard.questions;
   const stage = quizPlayStage({ playOpen: playBoard.playOpen, hasResult: result !== null, ownPlayPending: ownPlay.isLoading });
-  if (stage === "loading") return <InfoScreen message="Loading…" back={back} />;
+  if (stage === "loading") return <InfoScreen message={t("library.loadingEllipsis")} back={back} />;
   if (stage === "leaderboard") {
     return (
       <Page width="narrow" back={back} title={playBoard.name}>
         <div className="flex flex-col gap-6">
-          <p className="text-center text-(--color-text-dim)">This quiz is closed.</p>
+          <p className="text-center text-(--color-text-dim)">{t("quizzes.isClosed")}</p>
           <QuizLeaderboard code={code ?? ""} />
         </div>
       </Page>
@@ -110,7 +114,7 @@ export function PlayQuizPage() {
   }
 
   const question = questions[index];
-  if (!question) return <InfoScreen message="This quiz has no questions yet." back={back} />;
+  if (!question) return <InfoScreen message={t("quizzes.noQuestionsYet")} back={back} />;
 
   function pick(choiceIndex: number) {
     setPicked(choiceIndex);
@@ -134,7 +138,7 @@ export function PlayQuizPage() {
       storePlayId(code ?? "", response.playId);
       setSubmitted(response);
     } catch (reason) {
-      setSubmitError(reason instanceof Error ? reason.message : "Couldn't submit your answers.");
+      setSubmitError(reason instanceof Error ? reason.message : t("quizzes.submitFailed"));
     } finally {
       setBusy(false);
     }
@@ -155,12 +159,12 @@ export function PlayQuizPage() {
         {index === questions.length - 1 && answeredCount === questions.length && (
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1 text-sm font-semibold">
-              Name for the leaderboard (optional)
+              {t("quizzes.leaderboardName")}
               <input
                 value={playerName}
                 onChange={(event) => setPlayerName(event.target.value)}
                 maxLength={40}
-                placeholder="Guest"
+                placeholder={t("quizzes.guest")}
                 className={FIELD_CLASS}
               />
             </label>
@@ -171,7 +175,7 @@ export function PlayQuizPage() {
               onClick={() => void submit()}
               className={BUTTON_PRIMARY}
             >
-              {busy ? "Scoring…" : "See my score"}
+              {busy ? t("quizzes.scoring") : t("quizzes.seeMyScore")}
             </button>
           </div>
         )}

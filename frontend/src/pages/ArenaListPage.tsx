@@ -8,6 +8,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { itemNoun, quizPreview, tierlistBookCount } from "@scripta/shared";
+import { sharedT } from "@scripta/shared/i18n";
 import { TIER_LADDER, ownedTierlistStatus, contentDetail, contentTarget, formatDate } from "@scripta/shared/community";
 import type { Quiz } from "../api/quizzes";
 import type { Tierlist } from "../api/tierlists";
@@ -30,10 +31,12 @@ import { useVotedTierlists } from "../hooks/useVotedTierlists";
 import { useVotedTournaments } from "../hooks/useVotedTournaments";
 import { area } from "../lib/areas";
 import type { Tournament } from "../api/arena";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
 export function ArenaListPage() {
   const locale = useLocale();
+  const t = useT();
+  const shared = sharedT(locale);
   const { tournaments, isLoading, error: tournamentsError, refetch: refetchTournaments } = useMyTournaments();
   const showSkeleton = useDelayedShow(isLoading);
   const { tournaments: votedTournaments, isLoading: votedLoading, error: votedError, refetch: refetchVoted } = useVotedTournaments();
@@ -58,8 +61,8 @@ export function ArenaListPage() {
     const needle = search.trim().toLowerCase();
     const matches = (name: string) => !needle || name.toLowerCase().includes(needle);
     return {
-      created: tournaments.filter((t) => matches(t.name)),
-      voted: votedTournaments.filter((t) => matches(t.name))
+      created: tournaments.filter((tournament) => matches(tournament.name)),
+      voted: votedTournaments.filter((tournament) => matches(tournament.name))
     };
   }, [tournaments, votedTournaments, search]);
 
@@ -79,38 +82,40 @@ export function ArenaListPage() {
     try {
       await rename(tierlist.id, name);
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Couldn't save that name.");
+      setCreateError(err instanceof Error ? err.message : t("arena.couldntSaveName"));
     }
   }
 
   async function handleDeleteTierlist(tierlist: Tierlist) {
-    if (!(await confirm({ title: `Delete "${tierlist.name}"?`, body: "This can't be undone." }))) return;
+    if (!(await confirm({ title: t("arena.deleteTitle", { name: tierlist.name }), body: t("library.cannotUndo") }))) return;
     await remove(tierlist.id);
   }
 
   async function handleDeleteQuiz(quiz: Quiz) {
-    if (!(await confirm({ title: `Delete "${quiz.name}"?`, body: "This can't be undone." }))) return;
+    if (!(await confirm({ title: t("arena.deleteTitle", { name: quiz.name }), body: t("library.cannotUndo") }))) return;
     await removeQuiz(quiz.id);
   }
 
   const create =
     tab === "tierlists"
-      ? { label: "New tier list", onClick: () => navigate("/dashboard/arena/tierlist/new") }
+      ? { label: t("arena.newTierList"), onClick: () => navigate("/dashboard/arena/tierlist/new") }
       : tab === "quizzes"
-        ? { label: "New quiz", onClick: () => navigate("/dashboard/arena/quiz/new") }
-        : { label: "New tournament", onClick: handleCreate };
+        ? { label: t("arena.newQuiz"), onClick: () => navigate("/dashboard/arena/quiz/new") }
+        : { label: t("arena.newTournament"), onClick: handleCreate };
+
+  const [subtitleBefore, subtitleAfter] = t("arena.listSubtitle").split("{link}");
 
   return (
     <Page
       width="wide"
-      title="Games"
+      title={t("shell.areaGames")}
       subtitle={
         <>
-          Tier lists, quizzes and tournaments from your library —{" "}
+          {subtitleBefore}
           <a href="/arena" className="inline-flex min-h-11 items-center text-(--color-accent) underline">
-            browse public games
+            {t("arena.browsePublicGames")}
           </a>
-          .
+          {subtitleAfter}
         </>
       }
       tabs={area("games").tabs}
@@ -125,48 +130,48 @@ export function ArenaListPage() {
         <>
           {(tournaments.length > 0 || votedTournaments.length > 0) && (
             <ToolbarRow>
-              <SearchField value={search} onChange={setSearch} placeholder="Search" label="Search tournaments by name" />
+              <SearchField value={search} onChange={setSearch} placeholder={t("library.search")} label={t("arena.searchTournaments")} />
             </ToolbarRow>
           )}
 
-          {showSkeleton && <SkeletonCardGrid count={3} label="Loading tournaments" tileClassName="min-h-[260px]" gridClassName="game-ticket-grid" />}
+          {showSkeleton && <SkeletonCardGrid count={3} label={t("arena.loadingTournaments")} tileClassName="min-h-[260px]" gridClassName="game-ticket-grid" />}
 
           {!isLoading && !votedLoading && loadError && (
             <EmptyState
-              title="Couldn't load your tournaments."
+              title={t("arena.loadTournamentsFailed")}
               action={
                 <button onClick={() => void Promise.all([refetchTournaments(), refetchVoted()])} className={BUTTON_SECONDARY}>
-                  Retry
+                  {t("library.retry")}
                 </button>
               }
             />
           )}
 
           {!isLoading && !votedLoading && !loadError && tournaments.length === 0 && votedTournaments.length === 0 && (
-            <EmptyState icon={ArenaIcon} title="No tournaments yet." body="Pit your books against each other in a bracket." />
+            <EmptyState icon={ArenaIcon} title={t("arena.noTournaments")} body={t("arena.noTournamentsBody")} />
           )}
 
-          {votedTournaments.length > 0 && <h3 className="mb-3 text-sm font-semibold">Created by you</h3>}
+          {votedTournaments.length > 0 && <h3 className="mb-3 text-sm font-semibold">{t("arena.createdByYou")}</h3>}
 
           <div className="game-ticket-grid">
-            {bySearch.created.map((t) => (
-              <TournamentCard key={t.id} t={t} />
+            {bySearch.created.map((tournament) => (
+              <TournamentCard key={tournament.id} tournament={tournament} />
             ))}
           </div>
 
           {(bySearch.voted.length > 0 || (votedTournaments.length > 0 && !search.trim())) && (
             <>
-              <h3 className="mb-3 mt-6 text-sm font-semibold">Voting in</h3>
+              <h3 className="mb-3 mt-6 text-sm font-semibold">{t("arena.votingIn")}</h3>
               <div className="game-ticket-grid">
-                {bySearch.voted.map((t) => (
-                  <TournamentCard key={t.id} t={t} />
+                {bySearch.voted.map((tournament) => (
+                  <TournamentCard key={tournament.id} tournament={tournament} />
                 ))}
               </div>
             </>
           )}
 
           {(tournaments.length > 0 || votedTournaments.length > 0) && bySearch.created.length === 0 && bySearch.voted.length === 0 && (
-            <p className="mt-4 text-sm text-(--color-text-dim)">Nothing matches “{search.trim()}”.</p>
+            <p className="mt-4 text-sm text-(--color-text-dim)">{t("arena.nothingMatches", { search: search.trim() })}</p>
           )}
         </>
       )}
@@ -175,17 +180,17 @@ export function ArenaListPage() {
         <>
           {createError && <p className="mb-4 text-sm text-(--color-danger)">{createError}</p>}
 
-          {showTierlistSkeleton && <SkeletonCardGrid count={3} label="Loading tier lists" tileClassName="min-h-[260px]" gridClassName="game-ticket-grid" />}
+          {showTierlistSkeleton && <SkeletonCardGrid count={3} label={t("arena.loadingTierlists")} tileClassName="min-h-[260px]" gridClassName="game-ticket-grid" />}
 
           {!tierlistsLoading && tierlists.length === 0 && votedTierlists.length === 0 && (
             <EmptyState
               icon={ArenaIcon}
-              title="No tier lists yet."
-              body="A tier list ranks your books into S/A/B… rows — build one and drop it into a mural."
+              title={t("arena.noTierlists")}
+              body={t("arena.noTierlistsBody")}
             />
           )}
 
-          {votedTierlists.length > 0 && <h3 className="mb-3 text-sm font-semibold">Created by you</h3>}
+          {votedTierlists.length > 0 && <h3 className="mb-3 text-sm font-semibold">{t("arena.createdByYouTierlists")}</h3>}
 
           <div className="game-ticket-grid">
             {tierlists.map((tl) =>
@@ -200,10 +205,10 @@ export function ArenaListPage() {
                       if (e.key === "Enter") void handleRenameTierlist(tl);
                       if (e.key === "Escape") setRenamingTierlistId(null);
                     }}
-                    aria-label="Tier list name"
+                    aria-label={t("arena.tierlistName")}
                     className={`${FIELD_CLASS} w-full font-semibold`}
                   />
-                  <p className="mt-1 text-sm text-(--color-text-dim)">Updated {formatDate(tl.updatedAt, locale)}</p>
+                  <p className="mt-1 text-sm text-(--color-text-dim)">{t("arena.updated", { date: formatDate(tl.updatedAt, locale) })}</p>
                 </div>
               ) : (
                 <GameTicket
@@ -211,25 +216,25 @@ export function ArenaListPage() {
                   kind="tierlist"
                   name={tl.name}
                   to={`/dashboard/arena/tierlist/${tl.id}`}
-                  meta={`Updated ${formatDate(tl.updatedAt, locale)}`}
+                  meta={t("arena.updated", { date: formatDate(tl.updatedAt, locale) })}
                   badges={<StatusBadge {...ownedTierlistStatus(tl, locale)} />}
                   stats={[{ value: tierlistBookCount(tl.data), label: itemNoun(tl.subject, tierlistBookCount(tl.data), locale) }]}
                   covers={tl.subject?.scope.coverUrl ? [tl.subject.scope.coverUrl] : []}
                   ladder={tl.data.tiers.map((tier) => tier.color)}
-                  play={tl.voteCode === null ? undefined : { to: `/vote/${tl.voteCode}`, label: "Preview" }}
+                  play={tl.voteCode === null ? undefined : { to: `/vote/${tl.voteCode}`, label: t("arena.preview") }}
                   menu={
                     <OptionsMenu
-                      title="Tier list settings"
+                      title={t("arena.tierlistSettings")}
                       triggerClassName={"flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"}
                       items={[
                         ...(tl.voteCode === null ? [{
-                          label: "Rename",
+                          label: t("library.groupRename"),
                           onClick: () => {
                             setTierlistNameDraft(tl.name);
                             setRenamingTierlistId(tl.id);
                           }
                         }] : []),
-                        { label: "Delete", onClick: () => void handleDeleteTierlist(tl), danger: true }
+                        { label: t("shell.delete"), onClick: () => void handleDeleteTierlist(tl), danger: true }
                       ]}
                     />
                   }
@@ -240,7 +245,7 @@ export function ArenaListPage() {
 
           {votedTierlists.length > 0 && (
             <>
-              <h3 className="mb-3 mt-6 text-sm font-semibold">Voted on</h3>
+              <h3 className="mb-3 mt-6 text-sm font-semibold">{t("arena.votedOn")}</h3>
               <div className="game-ticket-grid">
                 {votedTierlists.map((tl) => (
                   <GameTicket
@@ -262,13 +267,13 @@ export function ArenaListPage() {
 
       {tab === "quizzes" && (
         <>
-          {showQuizSkeleton && <SkeletonCardGrid count={3} label="Loading quizzes" tileClassName="min-h-[260px]" gridClassName="game-ticket-grid" />}
+          {showQuizSkeleton && <SkeletonCardGrid count={3} label={t("arena.loadingQuizzes")} tileClassName="min-h-[260px]" gridClassName="game-ticket-grid" />}
 
           {!quizzesLoading && quizzes.length === 0 && (
             <EmptyState
               icon={ArenaIcon}
-              title="No quizzes yet."
-              body="A quiz turns your books into trivia — guess the title from a blurred cover, or the book from a famous line."
+              title={t("arena.noQuizzes")}
+              body={t("arena.noQuizzesBody")}
             />
           )}
 
@@ -279,16 +284,16 @@ export function ArenaListPage() {
                 kind="quiz"
                 name={quiz.name}
                 to={`/dashboard/arena/quiz/${quiz.id}`}
-                meta={`${quiz.data.books.length} books`}
+                meta={t("arena.quizBooks", { count: quiz.data.books.length })}
                 badges={<QuizStatusBadge status={quizStatus(quiz)} />}
-                stats={[{ value: quiz.data.questionCount, label: quiz.data.questionCount === 1 ? "question" : "questions" }]}
+                stats={[{ value: quiz.data.questionCount, label: shared("shared.helpers.questionNoun", { count: quiz.data.questionCount }) }]}
                 covers={[]}
                 preview={quizPreview(quiz.data)}
                 menu={
                   <OptionsMenu
-                    title="Quiz settings"
+                    title={t("arena.quizSettings")}
                     triggerClassName={"flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"}
-                    items={[{ label: "Delete", onClick: () => void handleDeleteQuiz(quiz), danger: true }]}
+                    items={[{ label: t("shell.delete"), onClick: () => void handleDeleteQuiz(quiz), danger: true }]}
                   />
                 }
               />
@@ -302,17 +307,18 @@ export function ArenaListPage() {
 
 // Shared by both tournament sections — a voted tournament is never
 // seeding, but the card markup is identical either way.
-function TournamentCard({ t }: { t: Tournament }) {
+function TournamentCard({ tournament }: { tournament: Tournament }) {
   const locale = useLocale();
+  const t = useT();
   return (
     <GameTicket
       kind="tournament"
-      name={t.name}
-      to={t.status === "seeding" ? `/dashboard/arena/${t.id}/seed` : `/arena/${t.id}`}
-      meta={`Created ${formatDate(t.createdAt, locale)}`}
-      badges={<TournamentStatusBadge status={t.status} round={t.currentRound} />}
-      stats={[{ value: t.bracketSize, label: itemNoun(t.subject, t.bracketSize, locale) }]}
-      covers={t.covers}
+      name={tournament.name}
+      to={tournament.status === "seeding" ? `/dashboard/arena/${tournament.id}/seed` : `/arena/${tournament.id}`}
+      meta={t("arena.created", { date: formatDate(tournament.createdAt, locale) })}
+      badges={<TournamentStatusBadge status={tournament.status} round={tournament.currentRound} />}
+      stats={[{ value: tournament.bracketSize, label: itemNoun(tournament.subject, tournament.bracketSize, locale) }]}
+      covers={tournament.covers}
     />
   );
 }

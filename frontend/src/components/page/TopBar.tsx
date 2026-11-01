@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { useT } from "../../i18n";
 import type { Area, AreaId } from "../../lib/areas";
 import { BrandLockup } from "../BrandLockup";
 
@@ -11,6 +12,7 @@ export function TopBar({ areas, activeId, homeBadge, brandTo, end, desktopOnly }
   end: ReactNode;
   desktopOnly?: boolean;
 }) {
+  const t = useT();
   return (
     <header
       data-top-bar
@@ -20,14 +22,14 @@ export function TopBar({ areas, activeId, homeBadge, brandTo, end, desktopOnly }
         href="#content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-40 focus:rounded-lg focus:bg-(--color-surface) focus:px-4 focus:py-2.5 focus:font-semibold"
       >
-        Skip to content
+        {t("shell.skipToContent")}
       </a>
       <div className="flex h-16 items-center gap-4 px-4 sm:px-6 lg:px-8 xl:gap-7">
-        <Link to={brandTo} aria-label="Atmyshelf home" className="inline-flex min-h-11 items-center">
+        <Link to={brandTo} aria-label={t("shell.brandHome")} className="inline-flex min-h-11 items-center">
           <BrandLockup />
         </Link>
         {areas.length > 0 && (
-          <nav aria-label="Main" className="flex min-w-0 flex-1 items-center gap-0.5">
+          <nav aria-label={t("shell.mainNav")} className="flex min-w-0 flex-1 items-center gap-0.5">
             {areas.map((item) => {
               const active = item.id === activeId;
               const badge = item.id === "home" ? homeBadge : null;
@@ -36,7 +38,7 @@ export function TopBar({ areas, activeId, homeBadge, brandTo, end, desktopOnly }
                   key={item.id}
                   to={item.to}
                   aria-current={active ? "page" : undefined}
-                  aria-label={badge ? `${item.label}, ${badge} new` : undefined}
+                  aria-label={badge ? t("shell.badgeNew", { label: item.label, badge }) : undefined}
                   className={`inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-semibold xl:px-3.5 ${
                     active
                       ? "bg-(--color-accent-soft) text-(--color-accent)"

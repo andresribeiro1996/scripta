@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type DragEvent } from "react";
+import { decimalText, type Locale } from "@scripta/shared";
 import { useConfirm } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 import { GalleryIcon } from "../components/NavIcons";
@@ -12,11 +13,12 @@ import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { area } from "../lib/areas";
 import { resolveLibraryStyle } from "../lib/libraryStyle";
+import { useLocale, useT } from "../i18n";
 
-function formatBytes(bytes: number): string {
+function formatBytes(bytes: number, locale: Locale): string {
   if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024) return `${decimalText(bytes / 1024, locale, 0)} KB`;
+  return `${decimalText(bytes / (1024 * 1024), locale, 1)} MB`;
 }
 
 /** /dashboard/gallery — the account's pool of uploaded images, primarily
@@ -27,6 +29,8 @@ function formatBytes(bytes: number): string {
  *  modal uses, so a book currently using a deleted image is scrubbed back
  *  to its normal auto-detected cover the same way either place. */
 export function GalleryPage() {
+  const t = useT();
+  const locale = useLocale();
   const { images, isLoading, upload } = useGalleryImages();
   const showSkeleton = useDelayedShow(isLoading);
   const deleteImage = useDeleteGalleryImage();
@@ -72,7 +76,7 @@ export function GalleryPage() {
     try {
       await upload(file);
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Couldn't upload that image.");
+      setUploadError(err instanceof Error ? err.message : t("library.galleryUploadFailed"));
     } finally {
       setUploading(false);
     }
@@ -80,11 +84,8 @@ export function GalleryPage() {
 
   async function handleDelete(id: string) {
     const usedBy = usageByImageId.get(id) ?? 0;
-    const warning =
-      usedBy > 0
-        ? `Currently the cover for ${usedBy} book${usedBy === 1 ? "" : "s"} — deleting it will revert ${usedBy === 1 ? "that book" : "those books"} to its normal auto-detected cover. This can't be undone.`
-        : "This can't be undone.";
-    if (!(await confirm({ title: "Delete this image from your gallery?", body: warning }))) return;
+    const warning = usedBy > 0 ? t("library.galleryDeleteInUse", { count: usedBy }) : t("library.cannotUndo");
+    if (!(await confirm({ title: t("library.galleryDeleteTitle"), body: warning }))) return;
     setDeletingId(id);
     try {
       await deleteImage(id);
@@ -96,15 +97,15 @@ export function GalleryPage() {
   return (
     <Page
       width="wide"
-      title="Library"
-      subtitle={isLoading ? undefined : `${images.length} image${images.length === 1 ? "" : "s"}`}
+      title={t("shell.areaLibrary")}
+      subtitle={isLoading ? undefined : t("library.galleryImageCount", { count: images.length })}
       tabs={area("library").tabs}
       reserveSubtitle
       maxWidth={style.contentMaxWidth}
       actions={
         <>
           <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className={BUTTON_PRIMARY}>
-            {uploading ? "Uploading…" : "Upload image…"}
+            {uploading ? t("shell.uploading") : t("library.galleryUpload")}
           </button>
           <input
             ref={fileInputRef}
@@ -130,14 +131,14 @@ export function GalleryPage() {
           above, which opens the OS file/photo picker. */}
       {isLoading || images.length === 0 ? null : (
         <div className={`mb-6 hidden items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-8 text-sm transition-colors sm:flex ${dragOver ? "border-(--color-accent) bg-(--color-accent-soft)" : "border-(--color-border)"}`} {...dropHandlers}>
-          <span className="text-(--color-text-dim)">Drag an image here to upload it — JPEG, PNG, or WebP, up to 20 MB.</span>
+          <span className="text-(--color-text-dim)">{t("library.galleryDragHint")}</span>
         </div>
       )}
 
       {showSkeleton && (
         <SkeletonCardGrid
           count={10}
-          label="Loading images"
+          label={t("library.galleryLoading")}
           tileClassName="aspect-square"
           gridClassName="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
         />
@@ -147,8 +148,8 @@ export function GalleryPage() {
         <div className={`rounded-xl ${dragOver ? "ring-2 ring-(--color-accent)" : ""}`} {...dropHandlers}>
           <EmptyState
             icon={GalleryIcon}
-            title="No images yet."
-            body={<>Upload one with the button above, or add one from a book&rsquo;s &ldquo;Cover&rdquo; button.<span className="hidden sm:inline"> You can also drag an image onto this panel.</span> JPEG, PNG, or WebP, up to 20 MB.</>}
+            title={t("library.galleryEmptyTitle")}
+            body={<>{t("library.galleryEmptyBody")}<span className="hidden sm:inline"> {t("library.galleryEmptyDrag")}</span> {t("library.galleryFormats")}</>}
           />
         </div>
       )}
@@ -164,18 +165,18 @@ export function GalleryPage() {
                 </div>
                 <div className="p-2 text-xs text-(--color-text-dim)">
                   <div>
-                    {image.width}×{image.height} · {formatBytes(image.byteSize)}
+                    {image.width}×{image.height} · {formatBytes(image.byteSize, locale)}
                   </div>
                   {usedBy > 0 && (
                     <div className="mt-0.5 text-(--color-accent)">
-                      Cover for {usedBy} book{usedBy === 1 ? "" : "s"}
+                      {t("library.galleryUsedBy", { count: usedBy })}
                     </div>
                   )}
                 </div>
                 <button
                   onClick={() => void handleDelete(image.id)}
                   disabled={deletingId === image.id}
-                  title="Delete from gallery"
+                  title={t("library.galleryDeleteImage")}
                   className="absolute top-0 right-0 flex h-11 w-11 items-center justify-center text-sm font-bold text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 disabled:opacity-100 pointer-coarse:opacity-100"
                 >
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] backdrop-blur-xs">

@@ -28,6 +28,7 @@ import { muralThemeStyle, useResolvedTheme } from "../lib/theme";
 import type { BlockStyle } from "../lib/libraryStyle";
 import { useAuth } from "../auth/AuthContext";
 import { avatarUrlFor } from "../components/Avatar";
+import { useT } from "../i18n";
 import {
   addBlock,
   createBlockCandidate,
@@ -54,6 +55,7 @@ import {
  *  (what you'd actually show someone), Edit reveals drag handles, resize
  *  corners, and each block's configure/delete controls. */
 export function MuralEditorPage() {
+  const t = useT();
   const { session } = useAuth();
   const { muralId } = useParams<{ muralId: string }>();
   const navigate = useNavigate();
@@ -69,7 +71,7 @@ export function MuralEditorPage() {
   // ceremony).
   const { data: tierlists } = useTierlists();
   const tierlistData = (tierlistId: string) => {
-    const tierlist = tierlists && bookTierlists(tierlists).find((t) => t.id === tierlistId);
+    const tierlist = tierlists && bookTierlists(tierlists).find((item) => item.id === tierlistId);
     return tierlist ? { name: tierlist.name, tiers: tierlist.data.tiers, pool: tierlist.data.pool } : undefined;
   };
   const books = useWorkBooks(library);
@@ -96,7 +98,7 @@ export function MuralEditorPage() {
   const backFolderId = mural?.folderId ?? draftFolderId;
   const muralsBack = backTo("mural");
   const backToMurals = { ...muralsBack, to: backFolderId ? `${muralsBack.to}?folder=${encodeURIComponent(backFolderId)}` : muralsBack.to };
-  const [draftName, setDraftName] = useState("Untitled mural");
+  const [draftName, setDraftName] = useState(() => t("muralEditor.untitledMural"));
   const [draftTheme, setDraftTheme] = useState<ThemeId>(viewerTheme);
   // Guards against a double-create: two quick actions on a draft (add a
   // block, then another before the first resolves) would otherwise each
@@ -115,7 +117,7 @@ export function MuralEditorPage() {
     if (!isDraft || creatingRef.current) return null;
     creatingRef.current = true;
     try {
-      const created = await create(draftName.trim() || "Untitled mural", draftTheme, draftFolderId);
+      const created = await create(draftName.trim() || t("muralEditor.untitledMural"), draftTheme, draftFolderId);
       // `replace` so Back skips the draft URL — returning to it would
       // open a second empty draft, not the mural just created.
       navigate(`/dashboard/murals/${created.id}`, { replace: true });
@@ -301,15 +303,15 @@ export function MuralEditorPage() {
     setMobileDraft(null);
     const version = ++editVersionRef.current;
     toast({
-      message: "Block deleted.",
+      message: t("muralEditor.blockDeleted"),
       duration: 8000,
       action: {
-        label: "Undo",
+        label: t("library.undo"),
         onClick: () => {
           if (version !== editVersionRef.current) return;
           const latest = currentMural(mural.id);
           if (!latest || JSON.stringify(latest.blocks) !== JSON.stringify(saved.blocks)) return;
-          void guard(saveBlocks(mural.id, before), "Couldn't undo that.").then((restored) => {
+          void guard(saveBlocks(mural.id, before), t("muralEditor.couldntUndo")).then((restored) => {
             if (restored) editVersionRef.current++;
           });
         }
@@ -412,15 +414,15 @@ export function MuralEditorPage() {
       const version = ++editVersionRef.current;
       if (finishedDraft.kind === "move" || finishedDraft.kind === "resize") {
         toast({
-          message: finishedDraft.kind === "move" ? "Block moved." : "Block resized.",
+          message: finishedDraft.kind === "move" ? t("muralEditor.blockMoved") : t("muralEditor.blockResized"),
           duration: 8000,
           action: {
-            label: "Undo",
+            label: t("library.undo"),
             onClick: () => {
               if (version !== editVersionRef.current) return;
               const latest = currentMural(target.id);
               if (!latest || JSON.stringify(latest.blocks) !== JSON.stringify(saved.blocks)) return;
-              void guard(saveBlocks(target.id, before), "Couldn't undo that.").then((restored) => {
+              void guard(saveBlocks(target.id, before), t("muralEditor.couldntUndo")).then((restored) => {
                 if (restored) { editVersionRef.current++; setLayoutHistory((items) => items.slice(0, -1)); }
               });
             }
@@ -442,16 +444,16 @@ export function MuralEditorPage() {
 
   if (isLoading) {
     return (
-      <Page title="Mural" back={backTo("mural")}>
-        <p className="text-sm text-(--color-text-dim)">Loading…</p>
+      <Page title={t("murals.sharedTitle")} back={backTo("mural")}>
+        <p className="text-sm text-(--color-text-dim)">{t("library.loadingEllipsis")}</p>
       </Page>
     );
   }
 
   if (!mural && !isDraft) {
     return (
-      <Page title="Mural" back={backTo("mural")}>
-        <p className="text-sm text-(--color-text-dim)">No mural with that id.</p>
+      <Page title={t("murals.sharedTitle")} back={backTo("mural")}>
+        <p className="text-sm text-(--color-text-dim)">{t("muralEditor.notFound")}</p>
       </Page>
     );
   }
@@ -477,12 +479,12 @@ export function MuralEditorPage() {
           value={nameDraft}
           maxLength={200}
           onChange={(e) => setNameDraft(e.target.value)}
-          onBlur={() => void guard(handleRename(), "Couldn't save that name.")}
+          onBlur={() => void guard(handleRename(), t("muralEditor.couldntSaveName"))}
           onKeyDown={(e) => {
-            if (e.key === "Enter") void guard(handleRename(), "Couldn't save that name.");
+            if (e.key === "Enter") void guard(handleRename(), t("muralEditor.couldntSaveName"));
             if (e.key === "Escape") setEditingName(false);
           }}
-          aria-label="Mural name"
+          aria-label={t("muralEditor.muralName")}
           className={TITLE_FIELD_CLASS}
         />
       ) : (
@@ -491,7 +493,7 @@ export function MuralEditorPage() {
             setNameDraft(view.name);
             setEditingName(true);
           }}
-          title="Rename this mural"
+          title={t("muralEditor.renameMural")}
           className="flex min-h-11 min-w-0 max-w-full items-center text-left transition-colors hover:text-(--color-accent)"
         >
           <span className="min-w-0 break-words">{view.name}</span>
@@ -499,20 +501,20 @@ export function MuralEditorPage() {
       )}
       actions={<>
         <div style={{ visibility: dragging ? "hidden" : undefined }} className="flex flex-wrap items-center gap-2">
-          {editMode && !mobileDraft && <AddBlockMenu onAdd={(type) => void guard(handleAddBlock(type), "Couldn't add that block.")} />}
+          {editMode && !mobileDraft && <AddBlockMenu onAdd={(type) => void guard(handleAddBlock(type), t("muralEditor.couldntAddBlock"))} />}
           {view.blocks.length > 0 && (
             <button
               onClick={() => void enterFullscreen()}
               className={BUTTON_SECONDARY}
             >
-              Fullscreen
+              {t("muralEditor.fullscreen")}
             </button>
           )}
           <button
             onClick={() => setPickingTheme(true)}
             className={BUTTON_SECONDARY}
           >
-            Theme
+            {t("muralEditor.theme")}
           </button>
           {/* Nothing to share until the mural exists. Hidden rather
               than disabled on a draft: a greyed button invites a tap
@@ -523,14 +525,14 @@ export function MuralEditorPage() {
               onClick={() => setSharing(true)}
               className={BUTTON_SECONDARY}
             >
-              Share
+              {t("library.actionShare")}
             </button>
           )}
           <button
             onClick={toggleEditMode}
             className={editMode ? BUTTON_PRIMARY : BUTTON_SECONDARY}
           >
-            {editMode ? "Done editing" : "Edit"}
+            {editMode ? t("muralEditor.doneEditing") : t("tierlists.edit")}
           </button>
         </div>
       </>}
@@ -542,12 +544,12 @@ export function MuralEditorPage() {
         // have taken. Point at the control you actually need instead.
         <EmptyState
           icon={MuralsIcon}
-          title="This mural is empty."
-          body={editMode ? "Add your first block with the + button above." : "Turn on editing and add your first block."}
+          title={t("murals.sharedEmpty")}
+          body={editMode ? t("muralEditor.emptyBodyEditing") : t("muralEditor.emptyBodyViewing")}
           action={
             !editMode && (
               <button onClick={() => setEditMode(true)} className={BUTTON_PRIMARY}>
-                Start building
+                {t("muralEditor.startBuilding")}
               </button>
             )
           }
@@ -564,14 +566,14 @@ export function MuralEditorPage() {
           {fullscreen && (
             <div className="-mx-4 -mt-4 mb-3 flex items-center justify-between bg-(--color-bg)/95 px-4 py-3 backdrop-blur">
               <p className="truncate font-semibold">{view.name}</p>
-              <button onClick={() => void exitFullscreen()} aria-label="Exit fullscreen" className={toolbarIconClass()}>
+              <button onClick={() => void exitFullscreen()} aria-label={t("murals.exitFullscreen")} className={toolbarIconClass()}>
                 <FullscreenIcon exit />
               </button>
             </div>
           )}
           {editMode ? <div className="mb-2 flex min-h-11 items-center gap-3 bg-(--color-bg) px-2 py-1">
-            <p className="flex-1 text-xs text-(--color-text-dim)">Drag a block to place it. Move to an edge to scroll.</p>
-            <button disabled={savingLayout || savingDraft || !layoutHistory.length || layoutHistory.at(-1)?.id !== view.id || JSON.stringify(layoutHistory.at(-1)?.after) !== JSON.stringify(view.blocks)} onClick={() => void guard(undoLayout(), "Couldn't undo that move.")} className={BUTTON_SECONDARY}>Undo</button>
+            <p className="flex-1 text-xs text-(--color-text-dim)">{t("muralEditor.dragHint")}</p>
+            <button disabled={savingLayout || savingDraft || !layoutHistory.length || layoutHistory.at(-1)?.id !== view.id || JSON.stringify(layoutHistory.at(-1)?.after) !== JSON.stringify(view.blocks)} onClick={() => void guard(undoLayout(), t("muralEditor.couldntUndoMove"))} className={BUTTON_SECONDARY}>{t("library.undo")}</button>
           </div> : null}
           </div>
           <div className="mx-auto max-w-6xl">
@@ -584,20 +586,20 @@ export function MuralEditorPage() {
               images={images}
               profile={session?.user.username ? { username: session.user.username, avatarUrl: session.user.avatarId ? avatarUrlFor(session.user.avatarId) : null } : undefined}
               revertNonce={revertNonce}
-              onLayoutChange={(blockId, layout) => void guard(changeLayout((blocks) => moveMuralBlock(blocks, blockId, layout)), "Couldn't save that move.")}
+              onLayoutChange={(blockId, layout) => void guard(changeLayout((blocks) => moveMuralBlock(blocks, blockId, layout)), t("muralEditor.couldntSaveMove"))}
               topEdge={() => stickyRef.current?.getBoundingClientRect().bottom ?? 0}
-              onToggleExpansion={(blockId, axis, bottom, top) => void guard(changeLayout((blocks) => toggleMuralBlockExpansion(blocks, blockId, axis, bottom, top)), "Couldn't resize that block.")}
+              onToggleExpansion={(blockId, axis, bottom, top) => void guard(changeLayout((blocks) => toggleMuralBlockExpansion(blocks, blockId, axis, bottom, top)), t("muralEditor.couldntResizeBlock"))}
               onConfigureBlock={(block) => setConfiguringBlockId(block.id)}
               onStyleBlock={(block) => setStylingBlockId(block.id)}
-              onDuplicateBlock={(blockId) => void guard(handleDuplicateBlock(blockId), "Couldn't duplicate that block.")}
-              onDeleteBlock={(blockId) => void guard(handleDeleteBlock(blockId), "Couldn't delete that block.")}
+              onDuplicateBlock={(blockId) => void guard(handleDuplicateBlock(blockId), t("muralEditor.couldntDuplicateBlock"))}
+              onDeleteBlock={(blockId) => void guard(handleDeleteBlock(blockId), t("muralEditor.couldntDeleteBlock"))}
               selectedBlockId={selectedBlockId}
               mobileDraft={mobileDraft}
               busy={savingDraft || savingLayout}
               onSelectBlock={setSelectedBlockId}
               onStartResize={(block) => startMobileDraft("resize", block)}
               onMobileDraftChange={changeMobileDraft}
-              onApplyMobileDraft={() => void guard(applyMobileDraft(), "Couldn't save that change.")}
+              onApplyMobileDraft={() => void guard(applyMobileDraft(), t("muralEditor.couldntSaveChange"))}
               onCancelMobileDraft={() => {
                 const keepSelected = mobileDraft?.kind === "move" || mobileDraft?.kind === "resize";
                 const blockId = mobileDraft?.block.id ?? null;
@@ -616,7 +618,7 @@ export function MuralEditorPage() {
           groups={library?.data.groups ?? NO_GROUPS}
           books={books}
           images={images}
-          onSave={(block) => void guard(handleSaveBlockConfig(block), "Couldn't save those settings.")}
+          onSave={(block) => void guard(handleSaveBlockConfig(block), t("muralEditor.couldntSaveSettings"))}
           onClose={() => setConfiguringBlockId(null)}
         />
       )}
@@ -633,15 +635,15 @@ export function MuralEditorPage() {
             profile={session?.user.username ? { username: session.user.username, avatarUrl: session.user.avatarId ? avatarUrlFor(session.user.avatarId) : null } : undefined}
             tierlistData={tierlistData}
           />}
-          onSave={(blockStyle) => void guard(handleSaveBlockStyle(stylingBlock.id, blockStyle), "Couldn't save that style.")}
+          onSave={(blockStyle) => void guard(handleSaveBlockStyle(stylingBlock.id, blockStyle), t("muralEditor.couldntSaveStyle"))}
           onClose={() => setStylingBlockId(null)}
         />
       )}
 
       {pickingTheme && (
-        <Sheet title="Mural theme" onClose={() => setPickingTheme(false)}>
+        <Sheet title={t("muralEditor.muralTheme")} onClose={() => setPickingTheme(false)}>
           <div className="p-2">
-            <ThemeOptionGrid options={THEME_IDS} value={view.theme} onChange={(theme) => void guard(handleChooseTheme(theme), "Couldn't save that theme.")} />
+            <ThemeOptionGrid options={THEME_IDS} value={view.theme} onChange={(theme) => void guard(handleChooseTheme(theme), t("muralEditor.couldntSaveTheme"))} />
           </div>
         </Sheet>
       )}

@@ -24,7 +24,7 @@ import { Sheet } from "../Sheet";
 import { ProfileBlockView } from "./blocks/MiscBlocks";
 import { NO_GROUPS, useReaderCard } from "../../hooks/useReaderCard";
 import { ReaderCardViewer } from "../readerCard/ReaderCardViewer";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 function detailSheetStyle(theme: ThemeId) {
   return { ...muralThemeStyle(theme), backgroundColor: "var(--color-surface)" };
@@ -64,12 +64,13 @@ export function MuralBlockDetail({
   actions?: ReactNode;
 }) {
   const locale = useLocale();
+  const t = useT();
   const signedIn = Boolean(useAuth().session);
   const [selectedBook, setSelectedBook] = useState<Record<string, unknown> | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const collectionScroll = useRef(0);
   if (block.type === "readerCard") {
-    return <ReaderCardDetailViewer books={books} groups={libraryGroups ?? NO_GROUPS} readerCardOverride={readerCardOverride} readerName={profile?.username || "reader"} onClose={onClose} />;
+    return <ReaderCardDetailViewer books={books} groups={libraryGroups ?? NO_GROUPS} readerCardOverride={readerCardOverride} readerName={profile?.username || t("muralEditor.fallbackReader")} onClose={onClose} />;
   }
   const spotlight = block.type === "spotlight" ? books.find((book) => bookKey(book) === block.bookKey) : undefined;
   const book = selectedBook ?? spotlight;
@@ -79,7 +80,7 @@ export function MuralBlockDetail({
     block.type === "shelf" || block.type === "currentlyReading"
       ? [{ title: "", books: blockBooks(block, books) }]
       : tierlist
-        ? [...tierlist.tiers.map((tier) => ({ title: tier.label, keys: tier.workIds })), { title: "Unranked", keys: tierlist.pool }].map(
+        ? [...tierlist.tiers.map((tier) => ({ title: tier.label, keys: tier.workIds })), { title: t("muralEditor.unranked"), keys: tierlist.pool }].map(
             (group) => ({
               title: group.title,
               books: group.keys
@@ -95,7 +96,7 @@ export function MuralBlockDetail({
       : block.type === "quote"
         ? [resolveQuote(block, books)].filter((quote) => quote !== null)
         : [];
-  const title = book ? "Book details" : muralBlockTitle(block, books, locale, tierlist?.name);
+  const title = book ? t("muralEditor.bookDetails") : muralBlockTitle(block, books, locale, tierlist?.name);
   return (
     <Sheet
       title={title}
@@ -119,8 +120,8 @@ export function MuralBlockDetail({
                 <CoverImage book={book} fit="contain" />
               </div>
               <div className="min-w-0 pt-1">
-                <h3 className="text-xl leading-snug font-semibold">{String(book.Title ?? "Untitled")}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-(--color-text-dim)">{String(book.Attribution ?? "Unknown author")}</p>
+                <h3 className="text-xl leading-snug font-semibold">{String(book.Title ?? t("library.untitled"))}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-(--color-text-dim)">{String(book.Attribution ?? t("library.unknownAuthor"))}</p>
               </div>
             </div>
             {block.type === "spotlight" && block.caption && (
@@ -129,7 +130,7 @@ export function MuralBlockDetail({
             {signedIn ? <BookSummary book={book} /> : null}
             {workIdOf(book) && (
               <Link to={`/work/${workIdOf(book)}`} className="mt-4 inline-block text-sm font-semibold text-(--color-accent) hover:underline">
-                Book page
+                {t("muralEditor.bookPage")}
               </Link>
             )}
           </div>
@@ -139,7 +140,7 @@ export function MuralBlockDetail({
               <section key={index}>
                 {group.title && <h3 className="mb-3 text-base font-semibold">{group.title}</h3>}
                 {group.books.length === 0 ? (
-                  <p className="text-sm text-(--color-text-dim)">No books here yet.</p>
+                  <p className="text-sm text-(--color-text-dim)">{t("muralEditor.noBooksHere")}</p>
                 ) : (
                   <div className="grid grid-cols-2 items-start gap-x-4 gap-y-5">
                     {group.books.map((item, itemIndex) => (
@@ -155,9 +156,9 @@ export function MuralBlockDetail({
                         <div className="relative mb-2 aspect-[2/3] overflow-hidden rounded-lg bg-(--color-border)">
                           <CoverImage book={item} fit="contain" />
                         </div>
-                        <p className="line-clamp-2 text-sm leading-5 font-semibold">{String(item.Title ?? "Untitled")}</p>
+                        <p className="line-clamp-2 text-sm leading-5 font-semibold">{String(item.Title ?? t("library.untitled"))}</p>
                         <p className="mt-1 line-clamp-2 text-sm leading-5 text-(--color-text-dim)">
-                          {String(item.Attribution ?? "Unknown author")}
+                          {String(item.Attribution ?? t("library.unknownAuthor"))}
                         </p>
                       </button>
                     ))}
@@ -197,7 +198,7 @@ export function MuralBlockDetail({
                       <p className="mt-3 text-sm leading-relaxed text-(--color-text-dim)">{String(quote.highlight.Annotation)}</p>
                     ) : null}
                     <figcaption className="mt-3 text-sm leading-5 text-(--color-text-dim)">
-                      {String(quote.book.Title ?? "Untitled")} · {String(quote.book.Attribution ?? "Unknown author")}
+                      {String(quote.book.Title ?? t("library.untitled"))} · {String(quote.book.Attribution ?? t("library.unknownAuthor"))}
                     </figcaption>
                   </figure>
                 )
@@ -206,14 +207,14 @@ export function MuralBlockDetail({
         ) : (
           <p className="py-5 text-sm text-(--color-text-dim)">
             {block.type === "quote" || block.type === "quoteCollection"
-              ? "No quotes added yet."
+              ? t("muralEditor.noQuotesYet")
               : block.type === "tierlist"
-                ? "This tier list is unavailable."
+                ? t("muralEditor.tierlistUnavailable")
                 : block.type === "image"
-                  ? "No image available."
+                  ? t("muralEditor.noImageAvailable")
                   : block.type === "spotlight"
-                    ? "No book selected."
-                    : "Nothing added yet."}
+                    ? t("muralEditor.noBookSelected")
+                    : t("muralEditor.nothingAddedYet")}
           </p>
         )}
       </div>

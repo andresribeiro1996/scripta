@@ -8,7 +8,8 @@ import { QUIZ_POOL, QUIZ_QUESTION_TYPES, bookKey, booksInGroup, eligibleTypes, w
 import { Page } from "../components/page/Page";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
 import { backTo } from "../lib/areas";
-import { QUIZ_TYPE_LABELS } from "../lib/quizTypeLabels";
+import { QUIZ_TYPE_LABEL_KEYS } from "../lib/quizTypeLabels";
+import { useT } from "../i18n";
 import { createQuizApi } from "../api/quizzes";
 import { resolveCover } from "../api/covers";
 import { normalizeImageId, normalizeIsbn } from "../lib/covers";
@@ -34,6 +35,7 @@ function toQuizBook(book: Record<string, unknown>, resolvedCover: string | null 
 const BOOK_COUNT = 4;
 
 export function QuizCreatePage() {
+  const t = useT();
   const navigate = useNavigate();
   const { data: library, isLoading, isError, refetch } = useLibrary();
   const [step, setStep] = useState(0);
@@ -122,35 +124,35 @@ export function QuizCreatePage() {
     setError(null);
     try {
       const data: QuizDataInput = {
-        sourceLabel: source === "pool" ? "Famous books" : source === "collection" ? collection?.name ?? "Collection" : "My shelf",
+        sourceLabel: source === "pool" ? t("quizzes.sourceLabelPool") : source === "collection" ? collection?.name ?? t("quizzes.collection") : t("quizzes.sourceLabelShelf"),
         questionCount: effectiveQuestionCount,
         allowedTypes: effectiveTypes.length > 0 ? effectiveTypes : availableTypes,
         books,
         questions: null
       };
-      const created = await createQuizApi(name.trim() || "Untitled quiz", data);
+      const created = await createQuizApi(name.trim() || t("quizzes.untitledQuiz"), data);
       navigate(`/dashboard/arena/quiz/${created.id}`);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Couldn't create the quiz.");
+      setError(reason instanceof Error ? reason.message : t("quizzes.createFailed"));
       setBusy(false);
     }
   }
 
   return (
-    <Page width="narrow" title={["Choose books", "Set up questions"][step]} subtitle={`Step ${step + 1} of 2`} back={backTo("quiz")}>
+    <Page width="narrow" title={[t("quizzes.createStepChoose"), t("quizzes.createStepSetUp")][step]} subtitle={t("quizzes.createStepOf", { step: step + 1 })} back={backTo("quiz")}>
       <div className="flex flex-col gap-5 pb-10">
         {error && <p role="alert" className="text-sm text-(--color-danger)">{error}</p>}
         {step === 0 && (
           <>
-            <label className="flex flex-col gap-1 text-sm font-semibold">Quiz name
-              <input value={name} onChange={(event) => setName(event.target.value)} maxLength={200} placeholder="Untitled quiz" className={FIELD_CLASS} />
+            <label className="flex flex-col gap-1 text-sm font-semibold">{t("quizzes.quizName")}
+              <input value={name} onChange={(event) => setName(event.target.value)} maxLength={200} placeholder={t("quizzes.untitledQuiz")} className={FIELD_CLASS} />
             </label>
             <fieldset className="flex flex-col gap-2">
-              <legend className="mb-1 text-sm font-semibold">Question source</legend>
+              <legend className="mb-1 text-sm font-semibold">{t("quizzes.questionSource")}</legend>
               {([
-                ["shelf", "My whole shelf"],
-                ["collection", "One of my collections"],
-                ["pool", "Famous books (anyone can play)"]
+                ["shelf", t("quizzes.sourceShelf")],
+                ["collection", t("quizzes.sourceCollection")],
+                ["pool", t("quizzes.sourcePool")]
               ] as const).map(([value, label]) => (
                 <label key={value} className="flex items-center gap-1 rounded-lg border border-(--color-border) pr-3">
                   <input type="radio" className={RADIO_CLASS} checked={source === value} onChange={() => setSource(value)} />
@@ -159,9 +161,9 @@ export function QuizCreatePage() {
               ))}
             </fieldset>
             {source === "collection" && (
-              <label className="flex flex-col gap-1 text-sm font-semibold">Collection
+              <label className="flex flex-col gap-1 text-sm font-semibold">{t("quizzes.collection")}
                 <select value={collectionId} onChange={(event) => setCollectionId(event.target.value)} className={FIELD_CLASS}>
-                  <option value="">Choose a collection…</option>
+                  <option value="">{t("quizzes.chooseCollection")}</option>
                   {collections.map((group) => (
                     <option key={group.id} value={group.id}>{group.name}</option>
                   ))}
@@ -189,25 +191,25 @@ export function QuizCreatePage() {
             )}
             {source === "shelf" && (
               <p className="text-sm text-(--color-text-dim)">
-                {isLoading ? "Loading books…" : isError ? <button onClick={() => void refetch()} className="min-h-11 text-left text-(--color-accent)">Couldn't load your library. Retry</button> : `${shelfRawBooks.length} books on your shelf.`}
+                {isLoading ? t("quizzes.loadingBooks") : isError ? <button onClick={() => void refetch()} className="min-h-11 text-left text-(--color-accent)">{t("quizzes.loadLibraryFailed")}</button> : t("quizzes.booksOnShelf", { count: shelfRawBooks.length })}
               </p>
             )}
-            <p className="text-sm text-(--color-text-dim)">{books.length} {books.length === 1 ? "book" : "books"} selected</p>
+            <p className="text-sm text-(--color-text-dim)">{t("quizzes.booksSelected", { count: books.length })}</p>
           </>
         )}
         {step === 1 && (
           <>
-            <label className="flex flex-col gap-1 text-sm font-semibold">Questions
+            <label className="flex flex-col gap-1 text-sm font-semibold">{t("quizzes.questions")}
               {/* Only lengths the selected pool can actually fill — with 4–9
                   books the old fixed 5/10/15/20 list left nothing selectable. */}
               <select value={effectiveQuestionCount} onChange={(event) => setQuestionCount(Number(event.target.value))} className={FIELD_CLASS}>
                 {lengthOptions.map((count) => (
-                  <option key={count} value={count}>{count} questions</option>
+                  <option key={count} value={count}>{t("quizzes.questionCount", { count })}</option>
                 ))}
               </select>
             </label>
             <fieldset className="flex flex-col gap-2">
-              <legend className="mb-1 text-sm font-semibold">Question types</legend>
+              <legend className="mb-1 text-sm font-semibold">{t("quizzes.questionTypes")}</legend>
               {QUIZ_QUESTION_TYPES.map((type) => {
                 const offered = availableTypes.includes(type);
                 const checked = offered && effectiveTypes.includes(type);
@@ -220,17 +222,17 @@ export function QuizCreatePage() {
                       checked={checked}
                       onChange={() => setAllowedTypes((value) => (value.includes(type) ? value.filter((entry) => entry !== type) : [...value, type]))}
                     />
-                    {QUIZ_TYPE_LABELS[type]}
-                    {!offered && <span className="ml-auto text-xs text-(--color-text-dim)">no book has this data</span>}
+                    {t(QUIZ_TYPE_LABEL_KEYS[type])}
+                    {!offered && <span className="ml-auto text-xs text-(--color-text-dim)">{t("quizzes.noBookHasData")}</span>}
                   </label>
                 );
               })}
             </fieldset>
-            {charactersFailed && <p className="text-sm text-(--color-text-dim)">Characters couldn't be checked</p>}
+            {charactersFailed && <p className="text-sm text-(--color-text-dim)">{t("quizzes.charactersUnchecked")}</p>}
           </>
         )}
         <div className="flex justify-end gap-3 pt-2">
-          {step > 0 && <button type="button" onClick={() => setStep((value) => value - 1)} className={BUTTON_SECONDARY}>Back</button>}
+          {step > 0 && <button type="button" onClick={() => setStep((value) => value - 1)} className={BUTTON_SECONDARY}>{t("tierlists.back")}</button>}
           {step < 1 ? (
             <button
               type="button"
@@ -238,7 +240,7 @@ export function QuizCreatePage() {
               onClick={() => setStep(1)}
               className={BUTTON_PRIMARY}
             >
-              Next
+              {t("tierlists.next")}
             </button>
           ) : (
             <button
@@ -247,7 +249,7 @@ export function QuizCreatePage() {
               onClick={() => void submit()}
               className={BUTTON_PRIMARY}
             >
-              {busy ? "Creating…" : "Create quiz"}
+              {busy ? t("quizzes.creating") : t("quizzes.createQuiz")}
             </button>
           )}
         </div>

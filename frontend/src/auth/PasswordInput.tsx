@@ -1,11 +1,13 @@
 import { useRef, useState, type InputHTMLAttributes } from "react";
+import { useT } from "../i18n";
 
 export function PasswordInput(props: InputHTMLAttributes<HTMLInputElement> & { className: string }) {
+  const t = useT();
   const [visible, setVisible] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   return <div className="relative">
     <input {...props} ref={input} type={visible ? "text" : "password"} className={`${props.className} pr-12`} />
-    <button type="button" aria-label={visible ? "Hide password" : "Show password"} aria-pressed={visible}
+    <button type="button" aria-label={visible ? t("shell.hidePassword") : t("shell.showPassword")} aria-pressed={visible}
       disabled={props.disabled} className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-lg focus-visible:outline-2 focus-visible:outline-current"
       onMouseDown={(event) => event.preventDefault()} onClick={() => { setVisible(!visible); input.current?.focus(); }}>
       <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">

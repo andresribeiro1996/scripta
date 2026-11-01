@@ -3,6 +3,7 @@ import { extractPerCardStyle, resolvePerCardStyle, type LibraryStyleSettings, ty
 import { CardAppearanceSection, CardBorderSection, CardContentSection, CardTextSection } from "./StyleControls";
 import { Sheet } from "./Sheet";
 import { CHECKBOX_CLASS } from "./Toolbar";
+import { useT } from "../i18n";
 
 /** Generic "override the per-card style for one thing" modal — used both
  *  for a series (GroupsPage.tsx's "Style" button, series only) and a
@@ -44,6 +45,7 @@ export function PerCardStylePanel({
   onSave: (style: PerCardStyle | undefined) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const [customized, setCustomized] = useState(currentOverride !== undefined);
   // Seeded from the current saved override if there is one (resolved
   // against defaults — see resolvePerCardStyle's own comment for why a
@@ -84,9 +86,9 @@ export function PerCardStylePanel({
   }
 
   return (
-    <Sheet title={`Style for "${name}"`} onClose={onClose} style={{ maxWidth: "42rem" }}>
+    <Sheet title={t("settings.styleFor", { name })} onClose={onClose} style={{ maxWidth: "42rem" }}>
       <div className="px-2 pb-2">
-        <p className="mb-3 text-xs text-(--color-text-dim)">Takes priority over {priorityText} style.</p>
+        <p className="mb-3 text-xs text-(--color-text-dim)">{t("settings.takesPriority", { priorityText })}</p>
         <label className="mb-4 flex items-center gap-2 text-sm font-semibold" htmlFor={`${idPrefix}-style-customized`}>
           <input
             id={`${idPrefix}-style-customized`}
@@ -95,11 +97,11 @@ export function PerCardStylePanel({
             checked={customized}
             onChange={(e) => handleToggleCustomized(e.target.checked)}
           />
-          Custom style
+          {t("settings.customStyle")}
         </label>
 
         {!customized ? (
-          <p className="text-sm text-(--color-text-dim)">Currently uses {priorityText} style. Turn this on to override it.</p>
+          <p className="text-sm text-(--color-text-dim)">{t("settings.currentlyUses", { priorityText })}</p>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             <CardAppearanceSection idPrefix={idPrefix} draft={draft} onApply={applyPatch} onSaveNow={savePatchNow} />

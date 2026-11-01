@@ -7,7 +7,8 @@ import { MemoryRouter } from "react-router-dom";
 import type { Duel } from "@scripta/shared";
 import { DuelCard } from "../src/components/arena/DuelCard";
 import { MuralThumb } from "../src/components/murals/MuralThumb";
-import { QUIZ_TYPE_LABELS } from "../src/lib/quizTypeLabels";
+import { QUIZ_TYPE_LABEL_KEYS } from "../src/lib/quizTypeLabels";
+import { t } from "../src/i18n";
 import { PANEL_HEADER } from "../src/components/page/surfaceClasses";
 
 const src = (f: string) => readFileSync(new URL(`../src/${f}.tsx`, import.meta.url), "utf8");
@@ -20,7 +21,7 @@ function duelHtml(round: string) {
 }
 
 test("a duel card is headed with the bracket's own round name", () => {
-  assert.match(duelHtml("Semis"), />Semis<!-- --> · Duel <!-- -->1</);
+  assert.match(duelHtml("Semis"), />Semis · Duel 1</);
   assert.doesNotMatch(duelHtml("Semis"), /Round 1/);
   const tree = src("components/arena/BracketTree");
   assert.equal(tree.match(/renderDuel\(duel\.id, labelFor\(duel\.roundNumber\)\)/g)?.length, 2);
@@ -39,10 +40,10 @@ test("the feed card's footer is one row: like and comments left, Save, Want to r
   const card = src("components/home/FeedCard");
   assert.doesNotMatch(card, /BUTTON_SECONDARY/);
   const footer = card.slice(card.indexOf("{threaded || ref || wantable || shareable"));
-  assert.match(footer, /ml-auto flex items-center gap-1[\s\S]*aria-label="Save"[\s\S]*Want to read[\s\S]*Share \$\{title/);
-  assert.equal(card.match(/aria-label="Save"/g)?.length, 1);
+  assert.match(footer, /ml-auto flex items-center gap-1[\s\S]*aria-label=\{t\("book\.save"\)\}[\s\S]*book\.wantToRead[\s\S]*book\.shareAria/);
+  assert.equal(card.match(/aria-label=\{t\("book\.save"\)\}/g)?.length, 1);
   const header = card.slice(card.indexOf("<article"), card.indexOf("{item.kind === \"follow\" ? null"));
-  assert.doesNotMatch(header, /aria-label="Save"/);
+  assert.doesNotMatch(header, /book\.save/);
 });
 
 test("a mural card shows its title and a preview in the mural's own theme", () => {
@@ -91,7 +92,7 @@ test("Settings: Library style groups sit under a PANEL_HEADING above their panel
   assert.match(controls, /<h2 className=\{`\$\{PANEL_HEADING\} mb-3`\}>\{title\}<\/h2>\s*\}\s*<div className=\{`\$\{PANEL\} p-4`\}>/);
   assert.doesNotMatch(controls, /<h4/);
   const style = src("pages/LibraryStylePage");
-  assert.match(style, /<h2 className=\{`\$\{SECTION_HEADING\} mb-3`\}>\s*Preview/);
+  assert.match(style, /<h2 className=\{`\$\{SECTION_HEADING\} mb-3`\}>\s*\{library\?\.data\.books\.length \? t\("settings\.preview"\)/);
   assert.match(style, /className=\{`\$\{BUTTON_SECONDARY\} mb-8`\}/);
 });
 
@@ -102,20 +103,20 @@ test("Settings password fields use the shared field class, not the grey page-col
 });
 
 test("Delete account names quizzes and comments", () => {
-  assert.match(src("auth/DeleteAccountSection"), /tournaments, quizzes, comments, follows and connected accounts/);
+  assert.match(readFileSync(new URL("../src/i18n/messages/en/shell.ts", import.meta.url), "utf8"), /tournaments, quizzes, comments, follows and connected accounts/);
 });
 
 test("destructive buttons are danger buttons", () => {
-  assert.match(src("pages/LibraryPage"), /className=\{BUTTON_DANGER\}\s*>\s*Delete selected/);
-  assert.match(src("pages/GroupsPage"), /className=\{BUTTON_DANGER\}\s*>\s*Delete selected/);
-  assert.match(src("pages/QuizEditorPage"), /className=\{BUTTON_DANGER_OUTLINE\}\s*>\s*Delete\s*</);
+  assert.match(src("pages/LibraryPage"), /className=\{BUTTON_DANGER\}\s*>\s*\{t\("library\.deleteSelected"\)\}/);
+  assert.match(src("pages/GroupsPage"), /className=\{BUTTON_DANGER\}\s*>\s*\{t\("library\.deleteSelected"\)\}/);
+  assert.match(src("pages/QuizEditorPage"), /className=\{BUTTON_DANGER_OUTLINE\}\s*>\s*\{t\("shell\.delete"\)\}/);
 });
 
 test("the quiz editor and the wizard name question types the same way", () => {
-  assert.equal(QUIZ_TYPE_LABELS.cover_title, "Guess the title from a blurred cover");
+  assert.equal(t(QUIZ_TYPE_LABEL_KEYS.cover_title), "Guess the title from a blurred cover");
   for (const f of ["pages/QuizEditorPage", "pages/QuizCreatePage"]) {
     const s = src(f);
-    assert.match(s, /import \{ QUIZ_TYPE_LABELS \} from "\.\.\/lib\/quizTypeLabels"/, f);
+    assert.match(s, /import \{ QUIZ_TYPE_LABEL_KEYS \} from "\.\.\/lib\/quizTypeLabels"/, f);
     assert.doesNotMatch(s, /const TYPE_LABELS/, f);
   }
   assert.doesNotMatch(src("pages/QuizEditorPage"), /Blurred cover →/);
@@ -125,15 +126,15 @@ test("the new series / collection field: danger frame on error, Add and Cancel b
   const s = src("pages/GroupsPage");
   assert.match(s, /draftError \? "border-\(--color-danger\)" : "border-\(--color-accent\)"/);
   assert.match(s, /aria-invalid=\{draftError \? true : undefined\}/);
-  assert.match(s, /<button type="button" onMouseDown=\{\(e\) => e\.preventDefault\(\)\} onClick=\{\(\) => void handleCommitDraft\(true\)\} className=\{BUTTON_PRIMARY\}>\s*Add\s*</);
-  assert.match(s, /onClick=\{cancelDraft\} className=\{BUTTON_SECONDARY\}>\s*Cancel\s*</);
+  assert.match(s, /<button type="button" onMouseDown=\{\(e\) => e\.preventDefault\(\)\} onClick=\{\(\) => void handleCommitDraft\(true\)\} className=\{BUTTON_PRIMARY\}>\s*\{t\("library\.groupAdd"\)\}\s*</);
+  assert.match(s, /onClick=\{cancelDraft\} className=\{BUTTON_SECONDARY\}>\s*\{t\("shell\.cancel"\)\}\s*</);
   assert.match(s, /contains\(e\.relatedTarget\)/);
   assert.doesNotMatch(s, /Press Enter to add it/);
 });
 
 test("section headings: Published, day groups, Your chapters use SECTION_HEADING; the Admin panels use PANEL_HEADING", () => {
-  assert.match(src("pages/CommunityProfilePage"), /<h2 className=\{`\$\{SECTION_HEADING\} mb-3`\}>Published<\/h2>/);
-  assert.match(src("pages/DailyChapterPage"), /<h2 id="daily-history" className=\{SECTION_HEADING\}>Your chapters<\/h2>/);
+  assert.match(src("pages/CommunityProfilePage"), /<h2 className=\{`\$\{SECTION_HEADING\} mb-3`\}>\{t\("community\.published"\)\}<\/h2>/);
+  assert.match(src("pages/DailyChapterPage"), /<h2 id="daily-history" className=\{SECTION_HEADING\}>\{t\("daily\.yourChapters"\)\}<\/h2>/);
   const admin = src("pages/AdminDailyChapterPage");
   assert.equal(admin.match(/<h2 className=\{PANEL_HEADING\}>/g)?.length, 6);
   assert.doesNotMatch(admin, /SECTION_HEADING/);

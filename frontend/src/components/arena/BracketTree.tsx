@@ -24,7 +24,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { TournamentView } from "../../api/arena";
 import { OptionSheet } from "../Sheet";
 import { bracketShape, roundLabel } from "../../lib/arenaBracket";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 function ChevronLeftIcon() {
   return (
@@ -44,6 +44,7 @@ function ChevronRightIcon() {
 
 export function BracketTree({ tournament, renderDuel }: { tournament: TournamentView; renderDuel: (duelId: string, round: string) => ReactNode }) {
   const locale = useLocale();
+  const t = useT();
   const rounds = new Map<number, TournamentView["duels"]>();
   for (const duel of tournament.duels) {
     const list = rounds.get(duel.roundNumber) ?? [];
@@ -111,7 +112,7 @@ export function BracketTree({ tournament, renderDuel }: { tournament: Tournament
           <button
             onClick={() => setSelectedRound(roundNumbers[currentIndex - 1]!)}
             disabled={currentIndex <= 0}
-            aria-label="Previous round"
+            aria-label={t("arena.previousRound")}
             className="flex w-11 shrink-0 items-center justify-center text-(--color-text-dim) enabled:hover:bg-(--color-surface-hover) enabled:hover:text-(--color-text) disabled:opacity-40"
           >
             <ChevronLeftIcon />
@@ -119,12 +120,12 @@ export function BracketTree({ tournament, renderDuel }: { tournament: Tournament
 
           <button
             onClick={() => setPicking(true)}
-            aria-label={`Showing ${labelFor(activeRound!)} — choose a round`}
+            aria-label={t("arena.showingRound", { label: labelFor(activeRound!) })}
             className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-2 border-x border-(--color-border) px-3 text-sm font-semibold hover:bg-(--color-surface-hover)"
           >
             <span className="truncate">{labelFor(activeRound!)}</span>
             <span className="flex shrink-0 items-center gap-2 text-xs font-normal text-(--color-text-dim)">
-              {duelsIn(activeRound!).length} match{duelsIn(activeRound!).length === 1 ? "" : "es"}
+              {t("arena.matchCount", { count: duelsIn(activeRound!).length })}
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="6 9 12 15 18 9" />
               </svg>
@@ -134,7 +135,7 @@ export function BracketTree({ tournament, renderDuel }: { tournament: Tournament
           <button
             onClick={() => setSelectedRound(roundNumbers[currentIndex + 1]!)}
             disabled={currentIndex < 0 || currentIndex >= roundNumbers.length - 1}
-            aria-label="Next round"
+            aria-label={t("arena.nextRound")}
             className="flex w-11 shrink-0 items-center justify-center text-(--color-text-dim) enabled:hover:bg-(--color-surface-hover) enabled:hover:text-(--color-text) disabled:opacity-40"
           >
             <ChevronRightIcon />
@@ -164,14 +165,14 @@ export function BracketTree({ tournament, renderDuel }: { tournament: Tournament
 
       {picking && (
         <OptionSheet
-          title="Round"
+          title={t("arena.round")}
           // Values are strings because that's what OptionSheet keys on;
           // mapped back to a number on the way out. The match count sits
           // in the label so the sheet says how much is in each round
           // without having to open them one by one.
           options={roundNumbers.map((n) => ({
             value: String(n),
-            label: `${labelFor(n)} · ${rounds.get(n)!.length} match${rounds.get(n)!.length === 1 ? "" : "es"}`
+            label: t("arena.roundOption", { label: labelFor(n), count: rounds.get(n)!.length })
           }))}
           value={String(activeRound)}
           onSelect={(v) => setSelectedRound(Number(v))}

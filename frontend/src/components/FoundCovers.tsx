@@ -12,7 +12,7 @@ import {
   type ResolvedCoverResponse
 } from "@scripta/shared";
 import { fetchCoverCandidates, pickCover, rememberResolvedCover, type ResolveCoverParams } from "../api/covers";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
 export function FoundCovers({
   lookup: lookupProp,
@@ -26,6 +26,7 @@ export function FoundCovers({
   onPick: (cover: ResolvedCoverResponse, everyone: boolean) => void;
 }) {
   const locale = useLocale();
+  const t = useT();
   const [quick, setQuick] = useState<FoundCoversLoad>(FOUND_COVERS_PENDING);
   const [apple, setApple] = useState<FoundCoversLoad>(FOUND_COVERS_PENDING);
   const [measured, setMeasured] = useState<ReadonlyMap<string, MeasuredCoverSize>>(new Map());
@@ -80,14 +81,18 @@ export function FoundCovers({
 
   return (
     <section className="mb-4">
-      <h3 className="mb-2 text-sm font-semibold">Found covers</h3>
+      <h3 className="mb-2 text-sm font-semibold">{t("addBook.foundCovers")}</h3>
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
         {tiles.map(({ candidate, width, height }, index) => (
           <div key={candidate.url} className="flex flex-col">
             <button
               type="button"
               disabled={picking}
-              aria-label={`Use this ${coverSourceLabel(candidate.source, locale)} cover${width !== null && height !== null ? `, ${width} by ${height}` : ""}, ${index + 1} of ${tiles.length}`}
+              aria-label={
+                width !== null && height !== null
+                  ? t("addBook.useCoverSized", { source: coverSourceLabel(candidate.source, locale), width, height, position: index + 1, total: tiles.length })
+                  : t("addBook.useCover", { source: coverSourceLabel(candidate.source, locale), position: index + 1, total: tiles.length })
+              }
               aria-current={isCurrentCover(candidate, coverUrl)}
               onClick={() => void choose(candidate, false)}
               className={`relative aspect-square cursor-pointer overflow-hidden rounded-lg border-2 bg-(--color-border) disabled:cursor-default disabled:opacity-50 ${
@@ -130,13 +135,13 @@ export function FoundCovers({
         ))}
         {checkingApple && (
           <div role="status" className="flex aspect-square items-center justify-center rounded-lg border-2 border-transparent bg-(--color-border) p-2 text-center text-xs text-(--color-text-dim)">
-            Checking Apple Books…
+            {t("addBook.checkingApple")}
           </div>
         )}
       </div>
       {unavailable.map((name) => (
         <p key={name} className="mt-2 text-xs text-(--color-text-dim)">
-          {coverSourceLabel(name, locale)} didn't answer.
+          {t("addBook.sourceDidntAnswer", { source: coverSourceLabel(name, locale) })}
         </p>
       ))}
       {failures.map((message) => (

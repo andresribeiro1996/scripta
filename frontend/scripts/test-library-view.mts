@@ -54,8 +54,8 @@ test("the toolbar offers status chips with counts and announces the current one"
 
 test("the Books header: the rename control stays in the subtitle and wraps, More and Add a book on the title row, sticky toolbar under the bar", () => {
   const page = readFileSync(new URL("../src/pages/LibraryPage.tsx", import.meta.url), "utf8");
-  assert.match(page, /subtitle=\{[\s\S]*?aria-label="Library name"[\s\S]*?title="Rename your library"(?:=>|[^>])*className="[^"]*min-w-0[^"]*break-all/);
-  assert.match(page, /actions=\{[\s\S]*?Add a book/);
+  assert.match(page, /subtitle=\{[\s\S]*?aria-label=\{t\("library\.libraryName"\)\}[\s\S]*?title=\{t\("library\.renameTitle"\)\}(?:=>|[^>])*className="[^"]*min-w-0[^"]*break-all/);
+  assert.match(page, /actions=\{[\s\S]*?\{t\("library\.addBook"\)\}/);
   assert.match(readFileSync(new URL("../src/components/Toolbar.tsx", import.meta.url), "utf8"), /export function ToolbarRow[\s\S]*?sticky top-\[calc\(var\(--app-top\)\+var\(--offline-h,0px\)\)\] z-30(?![^"]*sm:static)/);
 });
 

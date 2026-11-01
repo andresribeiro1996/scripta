@@ -4,6 +4,7 @@ import { Sheet } from "../Sheet";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../page/buttonClasses";
 import { SearchField } from "../Toolbar";
 import { workIdOf, booksByWork } from "@scripta/shared";
+import { useT } from "../../i18n";
 
 /** Picks several books into a tier list's pool in one trip.
  *
@@ -27,6 +28,7 @@ export function AddBooksSheet({
   onAdd: (workIds: string[]) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const searchRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     searchRef.current?.focus();
@@ -54,13 +56,13 @@ export function AddBooksSheet({
 
   return (
     <Sheet
-      title="Add books to the pool"
+      title={t("tierlists.addBooksToPool")}
       onClose={onClose}
       style={{ maxWidth: "42rem" }}
       footer={
         <>
           <button onClick={onClose} className={BUTTON_SECONDARY}>
-            Cancel
+            {t("shell.cancel")}
           </button>
           <button
             onClick={() => {
@@ -70,17 +72,17 @@ export function AddBooksSheet({
             disabled={selected.size === 0}
             className={BUTTON_PRIMARY}
           >
-            {selected.size === 0 ? "Pick books to add" : `Add ${selected.size} ${selected.size === 1 ? "book" : "books"}`}
+            {selected.size === 0 ? t("tierlists.pickBooksToAdd") : t("tierlists.addCount", { count: selected.size })}
           </button>
         </>
       }
     >
       <div className="sticky top-0 z-10 bg-(--color-surface) p-2 pt-0">
-        <SearchField fill inputRef={searchRef} value={search} onChange={setSearch} placeholder="Search your library…" label="Search your library" />
+        <SearchField fill inputRef={searchRef} value={search} onChange={setSearch} placeholder={t("library.searchYourLibraryDots")} label={t("library.searchYourLibrary")} />
       </div>
       <div className="p-2">
         {filtered.length === 0 ? (
-          <p className="p-3 text-sm text-(--color-text-dim)">No books match.</p>
+          <p className="p-3 text-sm text-(--color-text-dim)">{t("library.noMatchTitle")}</p>
         ) : (
           <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
             {filtered.map((book, i) => {
@@ -97,7 +99,7 @@ export function AddBooksSheet({
                   // button in the grid reads identically to a screen
                   // reader ("button, not pressed" x N). The book's own
                   // title gives each one a distinct accessible name.
-                  aria-label={String(book.Title ?? "Untitled")}
+                  aria-label={String(book.Title ?? t("library.untitled"))}
                   className={`relative h-[6.5em] overflow-hidden rounded-lg ring-2 transition-shadow ${
                     isSelected ? "ring-(--color-accent)" : "ring-transparent"
                   }`}

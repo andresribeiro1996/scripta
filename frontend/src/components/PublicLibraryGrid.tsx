@@ -7,14 +7,16 @@ import { AddBookSheet } from "./AddBookSheet";
 import { BookCard } from "./BookCard";
 import { BookGrid } from "./BookGrid";
 import { LibraryCanvas } from "./LibraryCanvas";
+import { useT } from "../i18n";
 
 export function PublicLibraryGrid({ library, onOpenBook }: { library: LibraryData; onOpenBook?: (book: Record<string, unknown>) => void }) {
+  const t = useT();
   const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
   const style = resolveLibraryStyle(library.style);
   const displayBooks = useMemo(() => orderLibraryBooks(library.books, library.groups ?? []), [library]);
   const bookSeriesGroup = useMemo(() => seriesGroupByBookKey(library.books, library.groups ?? []), [library]);
 
-  if (library.books.length === 0) return <p className="text-sm text-(--color-text-dim)">This library is empty.</p>;
+  if (library.books.length === 0) return <p className="text-sm text-(--color-text-dim)">{t("library.emptyLibrary")}</p>;
   return (
     <>
       <LibraryCanvas style={style}>

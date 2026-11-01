@@ -32,10 +32,12 @@ import { useMuralFullscreen } from "../hooks/useMuralFullscreen";
 import { ensureBookBlockHeights, muralThemeId, type Mural } from "../lib/murals";
 import { buildReconstructedBooks } from "../lib/sharedMural";
 import { muralThemeStyle } from "../lib/theme";
+import { useT } from "../i18n";
 
 function InfoScreen({ message }: { message: string }) {
+  const t = useT();
   return (
-    <Page title="Mural">
+    <Page title={t("murals.sharedTitle")}>
       <p className="text-sm text-(--color-text-dim)">{message}</p>
     </Page>
   );
@@ -43,6 +45,7 @@ function InfoScreen({ message }: { message: string }) {
 
 export function SharedMuralPage() {
   const { token } = useParams<{ token: string }>();
+  const t = useT();
   const { ref: fullscreenRef, fullscreen, enterFullscreen, exitFullscreen } = useMuralFullscreen();
 
   const { data, isLoading, isError } = useQuery({
@@ -65,10 +68,10 @@ export function SharedMuralPage() {
   }, [data]);
 
   if (!token || isError) {
-    return <InfoScreen message="This link is invalid or no longer active." />;
+    return <InfoScreen message={t("murals.sharedInvalid")} />;
   }
   if (isLoading || !data) {
-    return <InfoScreen message="Loading…" />;
+    return <InfoScreen message={t("library.loadingEllipsis")} />;
   }
 
   // A minimal, view-only stand-in for the private Mural shape MuralCanvas
@@ -91,17 +94,17 @@ export function SharedMuralPage() {
   return (
     <Page
       title={mural.name}
-      subtitle={data.profile ? `by @${data.profile.username}` : undefined}
+      subtitle={data.profile ? t("murals.sharedBy", { username: data.profile.username }) : undefined}
       actions={
         mural.blocks.length > 0 && (
-          <button onClick={() => void enterFullscreen()} aria-label="View mural fullscreen" title="View mural fullscreen" className={toolbarIconClass()}>
+          <button onClick={() => void enterFullscreen()} aria-label={t("murals.viewFullscreen")} title={t("murals.viewFullscreen")} className={toolbarIconClass()}>
             <FullscreenIcon />
           </button>
         )
       }
     >
       {mural.blocks.length === 0 ? (
-        <p className="text-sm text-(--color-text-dim)">This mural is empty.</p>
+        <p className="text-sm text-(--color-text-dim)">{t("murals.sharedEmpty")}</p>
       ) : (
         <div
           ref={fullscreenRef}
@@ -111,7 +114,7 @@ export function SharedMuralPage() {
           {fullscreen && (
             <div className="sticky top-(--app-top) z-40 -mx-4 -mt-4 mb-3 flex items-center justify-between bg-(--color-bg)/95 px-4 py-3 backdrop-blur">
               <p className="truncate font-semibold">{mural.name}</p>
-              <button onClick={() => void exitFullscreen()} aria-label="Exit fullscreen" className={toolbarIconClass()}>
+              <button onClick={() => void exitFullscreen()} aria-label={t("murals.exitFullscreen")} className={toolbarIconClass()}>
                 <FullscreenIcon exit />
               </button>
             </div>

@@ -14,7 +14,7 @@ import { MobileBlockPreview } from "./MobileBlockPreview";
 import { MuralBlockDetail } from "./MuralBlockDetail";
 import { DraggableMuralBlock, useMuralDrag } from "./useMuralDrag";
 import { MuralExpandButtons } from "./MuralExpandButtons";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 const CANVAS_WIDTH = 1200;
 const ROW_HEIGHT = 28;
@@ -29,6 +29,8 @@ export interface MobileMuralDraft {
 
 function SizeStepper({
   label,
+  decreaseLabel,
+  increaseLabel,
   value,
   decreaseDisabled,
   increaseDisabled,
@@ -36,6 +38,8 @@ function SizeStepper({
   onIncrease
 }: {
   label: string;
+  decreaseLabel: string;
+  increaseLabel: string;
   value: number;
   decreaseDisabled?: boolean;
   increaseDisabled?: boolean;
@@ -46,9 +50,9 @@ function SizeStepper({
     <div className="rounded-xl bg-(--color-bg) p-2">
       <p className="mb-1.5 text-xs font-medium text-(--color-text-dim)">{label}</p>
       <div className="grid grid-cols-[2.5rem_1fr_2.5rem] items-center overflow-hidden rounded-lg border border-(--color-border)">
-        <button onClick={onDecrease} disabled={decreaseDisabled} aria-label={`Decrease ${label.toLowerCase()}`} className="h-10 text-xl text-(--color-text-dim) hover:bg-(--color-surface-hover) disabled:opacity-30">−</button>
+        <button onClick={onDecrease} disabled={decreaseDisabled} aria-label={decreaseLabel} className="h-10 text-xl text-(--color-text-dim) hover:bg-(--color-surface-hover) disabled:opacity-30">−</button>
         <span className="flex h-10 items-center justify-center border-x border-(--color-border) text-sm font-semibold tabular-nums">{value}</span>
-        <button onClick={onIncrease} disabled={increaseDisabled} aria-label={`Increase ${label.toLowerCase()}`} className="h-10 text-xl text-(--color-text-dim) hover:bg-(--color-surface-hover) disabled:opacity-30">+</button>
+        <button onClick={onIncrease} disabled={increaseDisabled} aria-label={increaseLabel} className="h-10 text-xl text-(--color-text-dim) hover:bg-(--color-surface-hover) disabled:opacity-30">+</button>
       </div>
     </div>
   );
@@ -94,6 +98,7 @@ function BlockFrame({
   editing: boolean;
 }) {
   const locale = useLocale();
+  const t = useT();
   const style = resolveBlockStyle(block.style);
   const effects = blockEffects(style, themeColors);
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
@@ -104,7 +109,7 @@ function BlockFrame({
       data-own-font=""
       role="button"
       tabIndex={0}
-      aria-label={`${selected ? "Selected: " : "Open "}${muralBlockTitle(block, books, locale, block.type === "tierlist" ? tierlistData?.(block.tierlistId)?.name : undefined)}`}
+      aria-label={t(selected ? "muralEditor.blockSelected" : "muralEditor.blockOpen", { title: muralBlockTitle(block, books, locale, block.type === "tierlist" ? tierlistData?.(block.tierlistId)?.name : undefined) })}
       onPointerDown={(event) => {
         pointerStart.current = { x: event.clientX, y: event.clientY };
       }}
@@ -208,6 +213,7 @@ export function MobileMuralCanvas({
   tierlistData?: (tierlistId: string) => ResolvedTierlist | undefined;
   revertNonce?: number;
 }) {
+  const t = useT();
   const viewportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
@@ -350,9 +356,9 @@ export function MobileMuralCanvas({
 
       {editMode && selected && !draft && !drag.drop && (
         <div ref={dockRef} className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] z-40 mx-auto grid max-w-xl grid-cols-3 gap-1 rounded-2xl border border-(--color-border) bg-(--color-surface)/95 p-1.5 shadow-xl backdrop-blur">
-          <button onClick={() => setFocusedBlockId(selected.id)} className="min-h-11 rounded-xl px-3 text-sm font-semibold hover:bg-(--color-surface-hover)">Open</button>
-          <button onClick={() => onStartResize?.(selected)} className="min-h-11 rounded-xl px-3 text-sm font-semibold hover:bg-(--color-surface-hover)">Resize</button>
-          <button onClick={() => setMoreOpen(true)} className="min-h-11 rounded-xl px-3 text-sm font-semibold hover:bg-(--color-surface-hover)">More</button>
+          <button onClick={() => setFocusedBlockId(selected.id)} className="min-h-11 rounded-xl px-3 text-sm font-semibold hover:bg-(--color-surface-hover)">{t("muralEditor.open")}</button>
+          <button onClick={() => onStartResize?.(selected)} className="min-h-11 rounded-xl px-3 text-sm font-semibold hover:bg-(--color-surface-hover)">{t("muralEditor.resize")}</button>
+          <button onClick={() => setMoreOpen(true)} className="min-h-11 rounded-xl px-3 text-sm font-semibold hover:bg-(--color-surface-hover)">{t("shell.more")}</button>
           <div className="col-span-3 flex gap-1"><MuralExpandButtons block={selected} canvas={canvasRef} scale={scale} busy={busy} bottomEdge={() => dockRef.current?.getBoundingClientRect().top ?? window.innerHeight} topEdge={topEdge} onToggle={onToggleExpansion} /></div>
         </div>
       )}
@@ -362,12 +368,14 @@ export function MobileMuralCanvas({
           {draft.kind === "resize" ? (
             <>
               <div className="mb-2 flex items-center justify-between px-1">
-                <p className="text-sm font-semibold">Resize block</p>
+                <p className="text-sm font-semibold">{t("muralEditor.resizeBlock")}</p>
                 <span className="text-xs text-(--color-text-dim) tabular-nums">{draft.block.layout.w} × {draft.block.layout.h}</span>
               </div>
               <div className="mb-3 grid grid-cols-2 gap-2">
                 <SizeStepper
-                  label="Width"
+                  label={t("muralEditor.width")}
+                  decreaseLabel={t("muralEditor.decreaseWidth")}
+                  increaseLabel={t("muralEditor.increaseWidth")}
                   value={draft.block.layout.w}
                   decreaseDisabled={draft.block.layout.w <= 1}
                   increaseDisabled={draft.block.layout.x + draft.block.layout.w >= GRID_COLUMNS}
@@ -375,7 +383,9 @@ export function MobileMuralCanvas({
                   onIncrease={() => changeDraft({ w: draft.block.layout.w + 1 })}
                 />
                 <SizeStepper
-                  label="Height"
+                  label={t("muralEditor.height")}
+                  decreaseLabel={t("muralEditor.decreaseHeight")}
+                  increaseLabel={t("muralEditor.increaseHeight")}
                   value={draft.block.layout.h}
                   decreaseDisabled={draft.block.layout.h <= 1}
                   onDecrease={() => changeDraft({ h: draft.block.layout.h - 1 })}
@@ -385,17 +395,17 @@ export function MobileMuralCanvas({
             </>
           ) : (
             <div className="mb-3 px-1">
-              <p className="text-sm font-semibold">Place block</p>
-              <p className="mt-0.5 text-xs text-(--color-text-dim)">Drag it anywhere in the mural.</p>
+              <p className="text-sm font-semibold">{t("muralEditor.placeBlock")}</p>
+              <p className="mt-0.5 text-xs text-(--color-text-dim)">{t("muralEditor.placeHint")}</p>
             </div>
           )}
-          {!draft.valid && <p role="alert" className="mb-3 px-1 text-sm text-(--color-danger)">Choose a free position inside the mural.</p>}
+          {!draft.valid && <p role="alert" className="mb-3 px-1 text-sm text-(--color-danger)">{t("muralEditor.invalidPosition")}</p>}
           <div className="grid grid-cols-2 gap-2">
             <button onClick={onCancelDraft} disabled={busy} className={BUTTON_SECONDARY}>
-              {draft.kind === "add" || draft.kind === "duplicate" ? "Discard" : "Cancel"}
+              {draft.kind === "add" || draft.kind === "duplicate" ? t("muralEditor.discard") : t("shell.cancel")}
             </button>
             <button onClick={onApplyDraft} disabled={busy || !draft.valid} className={BUTTON_PRIMARY}>
-              {busy ? "Saving…" : draft.kind === "add" || draft.kind === "duplicate" ? "Place" : "Save size"}
+              {busy ? t("shell.saving") : draft.kind === "add" || draft.kind === "duplicate" ? t("muralEditor.place") : t("muralEditor.saveSize")}
             </button>
           </div>
         </div>
@@ -403,13 +413,13 @@ export function MobileMuralCanvas({
 
       {moreOpen && selected && !drag.drop && (
         <ActionSheet
-          title="Block actions"
+          title={t("muralEditor.blockActions")}
           onClose={() => setMoreOpen(false)}
           items={[
-            ...(isConfigurable(selected.type) ? [{ label: "Configure", onClick: () => onConfigureBlock?.(selected) }] : []),
-            { label: "Style", onClick: () => onStyleBlock?.(selected) },
-            { label: "Duplicate", onClick: () => onDuplicateBlock?.(selected.id) },
-            { label: "Delete", onClick: () => onDeleteBlock?.(selected.id), danger: true }
+            ...(isConfigurable(selected.type) ? [{ label: t("muralEditor.configure"), onClick: () => onConfigureBlock?.(selected) }] : []),
+            { label: t("library.styleButton"), onClick: () => onStyleBlock?.(selected) },
+            { label: t("muralEditor.duplicate"), onClick: () => onDuplicateBlock?.(selected.id) },
+            { label: t("shell.delete"), onClick: () => onDeleteBlock?.(selected.id), danger: true }
           ]}
         />
       )}

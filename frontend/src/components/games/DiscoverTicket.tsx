@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import type { DiscoverItem } from "@scripta/shared/community";
-import { TIER_LADDER, contentStats, contentStatus, contentTarget, gameActionLabel } from "@scripta/shared/community";
+import { TIER_LADDER, contentStats, contentStatus, contentStatusBadge, contentTarget, gameActionLabel } from "@scripta/shared/community";
 import { AuthorAvatar } from "../CommunityAuthorAvatar";
 import { ReaderGlyph } from "../ReaderGlyph";
 import { GameTicket, StatusBadge } from "./GameTicket";
@@ -37,7 +37,7 @@ export function DiscoverTicket({ item }: { item: DiscoverItem }) {
         badges={
           <>
             <StatusBadge label={status.label} tone={status.tone} />
-            {status.votedBadge && <StatusBadge label="Voted" tone="info" />}
+            {status.votedBadge && <StatusBadge {...contentStatusBadge("voted", locale)} />}
           </>
         }
       />

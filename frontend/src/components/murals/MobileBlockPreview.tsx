@@ -1,20 +1,20 @@
-import type { Group, PublicReaderCard } from "@scripta/shared";
+import { genreLabel, type Group, type PublicReaderCard } from "@scripta/shared";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import { NO_GROUPS } from "../../hooks/useReaderCard";
 import { bookKey } from "../../lib/merge";
 import { computeStat } from "../../lib/muralStats";
-import { blockBooks, calculateShelfTheme, muralBlockTitle, resolveQuote, resolveQuoteCollection, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
+import { blockBooks, calculateShelfTheme, muralBlockTitle, resolveQuote, resolveQuoteCollection, type MuralBlock, type ReaderProfile, type ShelfTheme, type StatMetric } from "../../lib/murals";
 import { CoverImage } from "../BookCard";
 import { ReaderCardBlockView } from "./blocks/ReaderCardBlock";
-import { useLocale } from "../../i18n";
+import { useLocale, useT, type WebMessages } from "../../i18n";
 
-const PREVIEW_STAT_LABELS = {
-  totalBooks: "Library",
-  booksFinished: "Finished",
-  booksFinishedThisYear: "This year",
-  booksInProgress: "Reading",
-  totalHighlights: "Highlights"
+const PREVIEW_STAT_LABELS: Record<StatMetric, Extract<keyof WebMessages, `muralEditor.previewStat${string}`>> = {
+  totalBooks: "muralEditor.previewStatLibrary",
+  booksFinished: "muralEditor.previewStatFinished",
+  booksFinishedThisYear: "muralEditor.previewStatThisYear",
+  booksInProgress: "muralEditor.previewStatReading",
+  totalHighlights: "muralEditor.previewStatHighlights"
 };
 
 export function MobileBlockPreview({
@@ -45,6 +45,7 @@ export function MobileBlockPreview({
   editing?: boolean;
 }) {
   const locale = useLocale();
+  const t = useT();
   const title = muralBlockTitle(block, books, locale, block.type === "tierlist" ? tierlistData?.(block.tierlistId)?.name : undefined);
   const compact = height < 64 || width < 80;
   const heading = <p className="shrink-0 truncate text-[14px] leading-5 font-semibold">{title}</p>;
@@ -59,12 +60,12 @@ export function MobileBlockPreview({
   if (block.type === "profile") {
     const theme = shelfThemeOverride ?? calculateShelfTheme(books);
     const avatarSize = Math.max(16, Math.min(40, height - 8));
-    return <div className={`flex h-full flex-col gap-2 overflow-hidden ${height < 56 ? "justify-center block-px-2" : "block-p-2"}`}><div className="flex items-center gap-2">{profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" className="shrink-0 rounded-full object-cover" style={{ width: avatarSize, height: avatarSize }} /> : <div className="flex shrink-0 items-center justify-center rounded-full bg-(--color-accent-soft) font-bold text-(--color-accent)" style={{ width: avatarSize, height: avatarSize }}>{(profile?.username || "Reader")[0]?.toUpperCase()}</div>}<div className="min-w-0"><p className="truncate font-semibold">@{profile?.username || "reader"}</p>{block.bio && height >= 80 ? <p className="line-clamp-2 text-[12px] text-(--color-text-dim)">{block.bio}</p> : null}</div></div>{height >= 100 && theme.genres.length > 0 ? <p className="truncate text-[12px] text-(--color-text-dim)">{theme.genres.join(" · ")}</p> : null}</div>;
+    return <div className={`flex h-full flex-col gap-2 overflow-hidden ${height < 56 ? "justify-center block-px-2" : "block-p-2"}`}><div className="flex items-center gap-2">{profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" className="shrink-0 rounded-full object-cover" style={{ width: avatarSize, height: avatarSize }} /> : <div className="flex shrink-0 items-center justify-center rounded-full bg-(--color-accent-soft) font-bold text-(--color-accent)" style={{ width: avatarSize, height: avatarSize }}>{(profile?.username || t("muralEditor.fallbackReader"))[0]?.toUpperCase()}</div>}<div className="min-w-0"><p className="truncate font-semibold">@{profile?.username || t("muralEditor.fallbackReader")}</p>{block.bio && height >= 80 ? <p className="line-clamp-2 text-[12px] text-(--color-text-dim)">{block.bio}</p> : null}</div></div>{height >= 100 && theme.genres.length > 0 ? <p className="truncate text-[12px] text-(--color-text-dim)">{theme.genres.map((genre) => genreLabel(genre, locale)).join(" · ")}</p> : null}</div>;
   }
   if (block.type === "readerCard") {
     return (
       <div className="flex h-full items-center justify-center overflow-hidden block-p-1">
-        <ReaderCardBlockView books={books} groups={groups ?? NO_GROUPS} readerCardOverride={readerCardOverride} readerName={profile?.username || "reader"} />
+        <ReaderCardBlockView books={books} groups={groups ?? NO_GROUPS} readerCardOverride={readerCardOverride} readerName={profile?.username || t("muralEditor.fallbackReader")} />
       </div>
     );
   }
@@ -102,7 +103,7 @@ export function MobileBlockPreview({
         <div className="flex h-full gap-2 overflow-hidden block-p-1.5">
           <div className="flex w-20 shrink-0 flex-col">
             <div className="line-clamp-3 text-[14px] leading-5 font-semibold">{title}</div>
-            <span className="mt-auto text-[12px] text-(--color-text-dim)">{resolved.length} books ›</span>
+            <span className="mt-auto text-[12px] text-(--color-text-dim)">{t("muralEditor.previewBooksMore", { count: resolved.length })}</span>
           </div>
           <div className="flex min-w-0 flex-1 justify-start gap-2 overflow-hidden">
             {visible.map((book, index) => (
@@ -130,7 +131,7 @@ export function MobileBlockPreview({
             ))}
           </div>
         )}
-        {resolved.length === 0 && height >= 60 && <p className="text-[12px] text-(--color-text-dim)">No books yet</p>}
+        {resolved.length === 0 && height >= 60 && <p className="text-[12px] text-(--color-text-dim)">{t("muralEditor.noBooksYet")}</p>}
       </div>
     );
   }
@@ -145,7 +146,7 @@ export function MobileBlockPreview({
             <p className="truncate text-[20px] leading-6 font-bold text-[var(--block-accent,var(--color-accent))]">
               {statsOverride && metric in statsOverride ? statsOverride[metric] : computeStat(metric, books)}
             </p>
-            {height >= 48 && <p className="truncate text-[12px] leading-4 text-(--color-text-dim)">{PREVIEW_STAT_LABELS[metric]}</p>}
+            {height >= 48 && <p className="truncate text-[12px] leading-4 text-(--color-text-dim)">{t(PREVIEW_STAT_LABELS[metric])}</p>}
           </div>
         ))}
         {visible.length < block.metrics.length && width >= 90 && (
@@ -165,7 +166,7 @@ export function MobileBlockPreview({
     <div className="flex h-full flex-col gap-1 overflow-hidden block-p-2">
       <p className={`shrink-0 text-[14px] leading-5 font-semibold ${height >= 56 ? "line-clamp-2" : "truncate"}`}>{title}</p>
       {!compact && body && <p className="line-clamp-3 text-[14px] leading-5 whitespace-pre-wrap">{body}</p>}
-      {!compact && !body && <p className="text-[12px] text-(--color-text-dim)">Tap to open</p>}
+      {!compact && !body && <p className="text-[12px] text-(--color-text-dim)">{t("muralEditor.tapToOpen")}</p>}
     </div>
   );
 }

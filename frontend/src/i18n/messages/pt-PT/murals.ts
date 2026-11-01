@@ -1,0 +1,36 @@
+import type { CatalogOf } from "@scripta/shared/i18n";
+import type { murals as en } from "../en/murals";
+
+export const murals: CatalogOf<typeof en> = {
+  "murals.sortUpdatedDesc": "Atualizados recentemente",
+  "murals.sortUpdatedAsc": "Atualizados há mais tempo",
+  "murals.sortCreatedDesc": "Criados recentemente",
+  "murals.sortCreatedAsc": "Criados há mais tempo",
+  "murals.startFromPreset": "Começar a partir de uma predefinição",
+  "murals.newMural": "Novo mural",
+  "murals.newFolder": "Nova pasta",
+  "murals.allMurals": "Todos os murais",
+  "murals.loading": "A carregar murais",
+  "murals.emptyTitle": "Ainda sem murais.",
+  "murals.emptyBody": "Um mural é um painel livre que constrói à sua maneira — uma estante “Os 5 melhores livros deste ano”, uma citação favorita, uma fotografia, o que quiser pendurar na parede. Use “Novo mural”, acima, para começar.",
+  "murals.searchLabel": "Pesquisar murais por nome",
+  "murals.sort": "Ordenar murais",
+  "murals.sortCurrent": "Ordenar murais ({sort})",
+  "murals.folder": "Pasta",
+  "murals.folderCurrent": "Pasta ({path})",
+  "murals.noMatch": "Nenhum mural corresponde a este filtro.",
+  "murals.noneInFolder": "Não há murais nesta pasta.",
+  "murals.deleteTitle": "Eliminar “{name}”?",
+  "murals.deleteFolderBody": "Os murais e as subpastas que contém sobem um nível. Nada é eliminado.",
+  "murals.settings": "Definições do mural",
+  "murals.addCover": "Adicionar capa",
+  "murals.removeCover": "Remover capa",
+  "murals.moveTo": "Mover para…",
+  "murals.cardMeta": { one: "{count} bloco · Atualizado em {date}", other: "{count} blocos · Atualizado em {date}" },
+  "murals.sharedTitle": "Mural",
+  "murals.sharedInvalid": "Esta ligação é inválida ou já não está ativa.",
+  "murals.sharedBy": "por @{username}",
+  "murals.sharedEmpty": "Este mural está vazio.",
+  "murals.viewFullscreen": "Ver o mural em ecrã inteiro",
+  "murals.exitFullscreen": "Sair do ecrã inteiro"
+};

@@ -9,7 +9,7 @@ import { Sheet } from "./Sheet";
 import { useToast } from "./Toaster";
 import { statusLabel } from "../lib/covers";
 import { localDay } from "../lib/libraryView";
-import { getLocale, useLocale } from "../i18n";
+import { getLocale, useLocale, useT } from "../i18n";
 
 /** Add-one-book sheet for the public pages (shared library, arena,
  *  tier-list voting): a link recipient sees a book they like, picks a
@@ -28,6 +28,7 @@ export function AddBookSheet({
   onClose: () => void;
 }) {
   const locale = useLocale();
+  const t = useT();
   const { session } = useAuth();
   const location = useLocation();
   const toast = useToast();
@@ -43,15 +44,15 @@ export function AddBookSheet({
 
   if (!session) {
     return (
-      <Sheet title="Add to your library" onClose={onClose}>
+      <Sheet title={t("addBook.addToLibrary")} onClose={onClose}>
         <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
-          <p className="text-sm text-(--color-text-dim)">Sign in to add books to your library.</p>
+          <p className="text-sm text-(--color-text-dim)">{t("addBook.signInPrompt")}</p>
           <Link
             to="/login"
             state={{ from: location }}
             className={BUTTON_PRIMARY}
           >
-            Sign in
+            {t("addBook.signIn")}
           </Link>
         </div>
       </Sheet>
@@ -69,10 +70,10 @@ export function AddBookSheet({
         readStatus,
         day: localDay()
       });
-      toast({ message: updated ? "Updated in your library." : "Added to your library." });
+      toast({ message: updated ? t("addBook.updatedInLibrary") : t("addBook.addedToLibrary") });
       onClose();
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Could not add the book.", getLocale()), kind: "error" });
+      toast({ message: saveFailureMessage(error, t("addBook.couldNotAdd"), getLocale()), kind: "error" });
     } finally {
       setBusyStatus(null);
     }
@@ -82,7 +83,7 @@ export function AddBookSheet({
     "min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-medium hover:bg-(--color-surface-hover) disabled:opacity-60";
 
   return (
-    <Sheet title="Add to your library" onClose={onClose}>
+    <Sheet title={t("addBook.addToLibrary")} onClose={onClose}>
       <div className="flex gap-3 p-3">
         <div className="relative aspect-[2/3] w-20 shrink-0 overflow-hidden rounded-lg bg-(--color-border)">
           <CoverImage book={coverBook} />
@@ -100,7 +101,7 @@ export function AddBookSheet({
             disabled={busyStatus !== null}
             className={`${actionClass} w-full`}
           >
-            {busyStatus === status ? "Adding…" : statusLabel(status, locale)}
+            {busyStatus === status ? t("addBook.adding") : statusLabel(status, locale)}
           </button>
         ))}
       </div>

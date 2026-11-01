@@ -28,7 +28,7 @@ import {
   type CardFontFamily,
   type PerCardStyle
 } from "../lib/libraryStyle";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
 // Shared building blocks for /dashboard/style (the full library-wide
 // panel, LibraryStylePage.tsx), the per-series/per-book style panel
@@ -88,20 +88,21 @@ export function SliderRow({
   );
 }
 
-function ColorValueInput({ value, fallback, onChange, label = "Custom color" }: { value: string; fallback: string; onChange: (color: string) => void; label?: string }) {
+function ColorValueInput({ value, fallback, onChange, label }: { value: string; fallback: string; onChange: (color: string) => void; label?: string }) {
   const locale = useLocale();
+  const t = useT();
   const themeKey = parseThemeColorRef(value);
   if (themeKey) {
     return (
       <span className="flex items-center gap-2 text-sm text-(--color-text-dim)">
-        Theme color: {blockThemeColorLabels(locale)[themeKey]}
+        {t("settings.themeColor", { color: blockThemeColorLabels(locale)[themeKey] })}
         <button type="button" onClick={() => onChange(fallback)} className="min-h-11 font-semibold text-(--color-text) underline decoration-(--color-accent)">
-          Use a custom color
+          {t("settings.useCustomColor")}
         </button>
       </span>
     );
   }
-  return <input type="color" aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className="h-11 w-16 rounded border border-(--color-border) bg-transparent" />;
+  return <input type="color" aria-label={label ?? t("settings.customColor")} value={value} onChange={(e) => onChange(e.target.value)} className="h-11 w-16 rounded border border-(--color-border) bg-transparent" />;
 }
 
 export function ToggleRow({
@@ -143,11 +144,12 @@ interface CardStyleSectionProps {
 
 export function CardAppearanceSection({ idPrefix, draft, onApply, onSaveNow }: CardStyleSectionProps) {
   const locale = useLocale();
+  const t = useT();
   return (
-    <Section title="Card appearance">
+    <Section title={t("settings.cardAppearance")}>
       <SliderRow
         id={`${idPrefix}-card-radius`}
-        label="Corner radius"
+        label={t("settings.cornerRadius")}
         value={draft.cardRadius}
         range={CARD_RADIUS_RANGE}
         onChange={(v) => onApply({ cardRadius: v })}
@@ -155,7 +157,7 @@ export function CardAppearanceSection({ idPrefix, draft, onApply, onSaveNow }: C
 
       <div className="mb-4">
         <label className="mb-1 block text-sm font-semibold" htmlFor={`${idPrefix}-card-aspect`}>
-          Cover shape
+          {t("settings.coverShape")}
         </label>
         <select
           id={`${idPrefix}-card-aspect`}
@@ -173,7 +175,7 @@ export function CardAppearanceSection({ idPrefix, draft, onApply, onSaveNow }: C
 
       <SliderRow
         id={`${idPrefix}-overlay-intensity`}
-        label="Text overlay darkness"
+        label={t("settings.overlayDarkness")}
         value={draft.overlayIntensity}
         unit="%"
         range={OVERLAY_INTENSITY_RANGE}
@@ -182,19 +184,19 @@ export function CardAppearanceSection({ idPrefix, draft, onApply, onSaveNow }: C
 
       <SliderRow
         id={`${idPrefix}-card-opacity`}
-        label="Card opacity"
+        label={t("settings.cardOpacity")}
         value={draft.cardOpacity}
         unit="%"
         range={CARD_OPACITY_RANGE}
         onChange={(v) => onApply({ cardOpacity: v })}
       />
 
-      <ToggleRow id={`${idPrefix}-card-shadow`} label="Drop shadow" checked={draft.cardShadow} onChange={(v) => onSaveNow({ cardShadow: v })} />
+      <ToggleRow id={`${idPrefix}-card-shadow`} label={t("settings.dropShadow")} checked={draft.cardShadow} onChange={(v) => onSaveNow({ cardShadow: v })} />
       <ToggleRow
         id={`${idPrefix}-card-hover`}
-        label="Hover animation"
+        label={t("settings.hoverAnimation")}
         checked={draft.cardHoverEffect}
-        hint="Lift, scale up slightly, and deepen the shadow when you hover a card."
+        hint={t("settings.cardHoverHint")}
         onChange={(v) => onSaveNow({ cardHoverEffect: v })}
       />
     </Section>
@@ -202,6 +204,8 @@ export function CardAppearanceSection({ idPrefix, draft, onApply, onSaveNow }: C
 }
 
 const BORDER_SIDE_KEYS = ["top", "right", "bottom", "left"] as const;
+
+const BORDER_SIDE_LABELS = { top: "settings.sideTop", right: "settings.sideRight", bottom: "settings.sideBottom", left: "settings.sideLeft" } as const;
 
 type CardBorderFields = "cardBorderWidth" | "cardBorderStyle" | "cardBorderColor" | "cardBorderOpacity" | "cardBorderSides";
 
@@ -214,20 +218,21 @@ interface CardBorderSectionProps {
 
 export function CardBorderSection({ idPrefix, draft, onApply, onSaveNow }: CardBorderSectionProps) {
   const locale = useLocale();
+  const t = useT();
   const usingCustomBorderColor = draft.cardBorderColor !== null;
 
   return (
-    <Section title="Card border">
+    <Section title={t("settings.cardBorder")}>
       <SliderRow
         id={`${idPrefix}-card-border-width`}
-        label="Border width"
+        label={t("settings.borderWidth")}
         value={draft.cardBorderWidth}
         range={CARD_BORDER_WIDTH_RANGE}
         onChange={(v) => onApply({ cardBorderWidth: v })}
       />
 
       <div className="mb-4">
-        <span className="mb-1 block text-sm font-semibold">Sides</span>
+        <span className="mb-1 block text-sm font-semibold">{t("settings.sides")}</span>
         <div className="flex flex-wrap gap-3">
           {BORDER_SIDE_KEYS.map((side) => (
             <label key={side} className="flex items-center gap-1.5 text-sm capitalize" htmlFor={`${idPrefix}-border-side-${side}`}>
@@ -239,7 +244,7 @@ export function CardBorderSection({ idPrefix, draft, onApply, onSaveNow }: CardB
                 checked={draft.cardBorderSides[side]}
                 onChange={(e) => onSaveNow({ cardBorderSides: { ...draft.cardBorderSides, [side]: e.target.checked } })}
               />
-              {side}
+              {t(BORDER_SIDE_LABELS[side])}
             </label>
           ))}
         </div>
@@ -247,7 +252,7 @@ export function CardBorderSection({ idPrefix, draft, onApply, onSaveNow }: CardB
 
       <div className="mb-4">
         <label className="mb-1 block text-sm font-semibold" htmlFor={`${idPrefix}-card-border-style`}>
-          Border style
+          {t("settings.borderStyle")}
         </label>
         <select
           id={`${idPrefix}-card-border-style`}
@@ -266,7 +271,7 @@ export function CardBorderSection({ idPrefix, draft, onApply, onSaveNow }: CardB
 
       <SliderRow
         id={`${idPrefix}-card-border-opacity`}
-        label="Border opacity"
+        label={t("settings.borderOpacity")}
         value={draft.cardBorderOpacity}
         unit="%"
         range={CARD_BORDER_OPACITY_RANGE}
@@ -290,25 +295,26 @@ export function CardBorderSection({ idPrefix, draft, onApply, onSaveNow }: CardB
               }
             }}
           />
-          Custom border color
+          {t("settings.customBorderColor")}
         </label>
         {usingCustomBorderColor && (
           <ColorValueInput value={draft.cardBorderColor ?? "#45403a"} fallback="#45403a" onChange={(color) => onApply({ cardBorderColor: color })} />
         )}
       </div>
-      {draft.cardBorderWidth === 0 && <p className="mt-1 text-xs text-(--color-text-dim)">Set a border width above to enable a border.</p>}
+      {draft.cardBorderWidth === 0 && <p className="mt-1 text-xs text-(--color-text-dim)">{t("settings.borderWidthHint")}</p>}
     </Section>
   );
 }
 
 export function CardContentSection({ idPrefix, draft, onSaveNow }: CardStyleSectionProps) {
+  const t = useT();
   return (
-    <Section title="Card content" wide>
+    <Section title={t("settings.cardContent")} wide>
       <ToggleRow
         id={`${idPrefix}-show-title-author`}
-        label="Show title and author on cards"
+        label={t("settings.showTitleAuthor")}
         checked={draft.showTitleAuthor}
-        hint="Always shown for a book with no cover — otherwise there'd be nothing on the card at all."
+        hint={t("settings.showTitleAuthorHint")}
         onChange={(v) => onSaveNow({ showTitleAuthor: v })}
       />
     </Section>
@@ -325,13 +331,14 @@ type CardTextFields = "cardFontFamily" | "cardFontSize" | "cardTextColor" | "car
  *  BlockTextSection below — see CardFontFamily's own comment for why. */
 export function CardTextSection({ idPrefix, draft, onApply, onSaveNow }: { idPrefix: string; draft: Pick<PerCardStyle, CardTextFields>; onApply: (patch: Partial<Pick<PerCardStyle, CardTextFields>>) => void; onSaveNow: (patch: Partial<Pick<PerCardStyle, CardTextFields>>) => void }) {
   const locale = useLocale();
+  const t = useT();
   const usingCustomTextColor = draft.cardTextColor !== null;
 
   return (
-    <Section title="Card text" wide>
+    <Section title={t("settings.cardText")} wide>
       <div className="mb-4">
         <label className="mb-1 block text-sm font-semibold" htmlFor={`${idPrefix}-card-font-family`}>
-          Font
+          {t("settings.font")}
         </label>
         <select
           id={`${idPrefix}-card-font-family`}
@@ -349,15 +356,15 @@ export function CardTextSection({ idPrefix, draft, onApply, onSaveNow }: { idPre
 
       <SliderRow
         id={`${idPrefix}-card-font-size`}
-        label="Text size"
+        label={t("settings.textSize")}
         value={draft.cardFontSize}
         range={CARD_FONT_SIZE_RANGE}
         onChange={(v) => onApply({ cardFontSize: v })}
       />
 
       <div className="mb-4 flex gap-4">
-        <ToggleRow id={`${idPrefix}-card-bold`} label="Bold" checked={draft.cardBold} onChange={(v) => onSaveNow({ cardBold: v })} />
-        <ToggleRow id={`${idPrefix}-card-italic`} label="Italic" checked={draft.cardItalic} onChange={(v) => onSaveNow({ cardItalic: v })} />
+        <ToggleRow id={`${idPrefix}-card-bold`} label={t("settings.bold")} checked={draft.cardBold} onChange={(v) => onSaveNow({ cardBold: v })} />
+        <ToggleRow id={`${idPrefix}-card-italic`} label={t("settings.italic")} checked={draft.cardItalic} onChange={(v) => onSaveNow({ cardItalic: v })} />
       </div>
 
       <div className="flex items-center justify-between">
@@ -369,7 +376,7 @@ export function CardTextSection({ idPrefix, draft, onApply, onSaveNow }: { idPre
             checked={usingCustomTextColor}
             onChange={(e) => onSaveNow({ cardTextColor: e.target.checked ? "#ffffff" : null })}
           />
-          Custom text color
+          {t("settings.customTextColor")}
         </label>
         {usingCustomTextColor && (
           <input
@@ -381,8 +388,7 @@ export function CardTextSection({ idPrefix, draft, onApply, onSaveNow }: { idPre
         )}
       </div>
       <p className="mt-1 text-xs text-(--color-text-dim)">
-        Applies to the title, author, and status text shown over the cover art — defaults to white since that text
-        always sits on a dark scrim, regardless of your theme.
+        {t("settings.cardTextNote")}
       </p>
     </Section>
   );
@@ -403,11 +409,12 @@ export function BlockBackgroundSection({
   onSaveNow: (patch: Partial<Pick<BlockStyle, BlockBackgroundFields>>) => void;
 }) {
   const locale = useLocale();
+  const t = useT();
   const transparent = draft.backgroundColor === "transparent";
   const usingCustomBackground = draft.backgroundColor !== null && !transparent;
 
   return (
-    <Section title="Background">
+    <Section title={t("settings.background")}>
       <label className="mb-3 flex items-center gap-2 text-sm font-semibold" htmlFor={`${idPrefix}-no-bg-toggle`}>
         <input
           id={`${idPrefix}-no-bg-toggle`}
@@ -416,7 +423,7 @@ export function BlockBackgroundSection({
           checked={transparent}
           onChange={(e) => onSaveNow(e.target.checked ? { backgroundColor: "transparent", cardShadow: false } : { backgroundColor: null })}
         />
-        No background
+        {t("settings.noBackground")}
       </label>
       <div className="mb-4 flex items-center justify-between">
         <label className="flex items-center gap-2 text-sm font-semibold" htmlFor={`${idPrefix}-custom-bg-toggle`}>
@@ -435,23 +442,23 @@ export function BlockBackgroundSection({
               }
             }}
           />
-          Custom background color
+          {t("settings.customBackgroundColor")}
         </label>
         {usingCustomBackground && (
           <ColorValueInput value={draft.backgroundColor ?? "#ffffff"} fallback="#ffffff" onChange={(color) => onApply({ backgroundColor: color })} />
         )}
       </div>
 
-      <ToggleRow id={`${idPrefix}-gradient`} label="Gradient background" checked={draft.gradientColor !== null} onChange={(enabled) => onSaveNow({ gradientColor: enabled ? "theme:accent" : null, ...(enabled && transparent ? { backgroundColor: null } : {}) })} />
+      <ToggleRow id={`${idPrefix}-gradient`} label={t("settings.gradientBackground")} checked={draft.gradientColor !== null} onChange={(enabled) => onSaveNow({ gradientColor: enabled ? "theme:accent" : null, ...(enabled && transparent ? { backgroundColor: null } : {}) })} />
       {draft.gradientColor !== null ? <div className="mb-4 space-y-3">
-        <p className="text-xs text-(--color-text-dim)">The background is the first color.</p>
-        <div className="flex items-center justify-between text-sm font-semibold"><span>Second color</span><ColorValueInput label="Gradient second color" value={draft.gradientColor} fallback="#97532d" onChange={(gradientColor) => onApply({ gradientColor })} /></div>
-        <SliderRow id={`${idPrefix}-gradient-direction`} label="Direction" value={draft.gradientAngle} unit="°" range={BLOCK_GRADIENT_ANGLE_RANGE} onChange={(gradientAngle) => onApply({ gradientAngle })} />
-        <SliderRow id={`${idPrefix}-gradient-strength`} label="Blend strength" value={draft.gradientStrength} unit="%" range={BLOCK_GRADIENT_STRENGTH_RANGE} onChange={(gradientStrength) => onApply({ gradientStrength })} />
+        <p className="text-xs text-(--color-text-dim)">{t("settings.gradientFirstColor")}</p>
+        <div className="flex items-center justify-between text-sm font-semibold"><span>{t("settings.secondColor")}</span><ColorValueInput label={t("settings.gradientSecondColor")} value={draft.gradientColor} fallback="#97532d" onChange={(gradientColor) => onApply({ gradientColor })} /></div>
+        <SliderRow id={`${idPrefix}-gradient-direction`} label={t("settings.direction")} value={draft.gradientAngle} unit="°" range={BLOCK_GRADIENT_ANGLE_RANGE} onChange={(gradientAngle) => onApply({ gradientAngle })} />
+        <SliderRow id={`${idPrefix}-gradient-strength`} label={t("settings.blendStrength")} value={draft.gradientStrength} unit="%" range={BLOCK_GRADIENT_STRENGTH_RANGE} onChange={(gradientStrength) => onApply({ gradientStrength })} />
       </div> : null}
       <div className="mb-4">
         <label className="mb-1 block text-sm font-semibold" htmlFor={`${idPrefix}-background-finish`}>
-          Finish
+          {t("settings.finish")}
         </label>
         <select
           id={`${idPrefix}-background-finish`}
@@ -465,12 +472,12 @@ export function BlockBackgroundSection({
             </option>
           ))}
         </select>
-        {transparent && <p className="mt-1 text-xs text-(--color-text-dim)">Shows when the block has a background</p>}
+        {transparent && <p className="mt-1 text-xs text-(--color-text-dim)">{t("settings.finishHint")}</p>}
       </div>
 
       <div className="mb-4">
         <label className="mb-1 block text-sm font-semibold" htmlFor={`${idPrefix}-inner-spacing`}>
-          Inner spacing
+          {t("settings.innerSpacing")}
         </label>
         <select
           id={`${idPrefix}-inner-spacing`}
@@ -496,31 +503,32 @@ export function BlockEffectsSection({ idPrefix, draft, onApply, onSaveNow }: {
   onApply: (patch: Partial<Pick<BlockStyle, BlockEffectsFields>>) => void;
   onSaveNow: (patch: Partial<Pick<BlockStyle, BlockEffectsFields>>) => void;
 }) {
-  return <Section title="Effects">
+  const t = useT();
+  return <Section title={t("settings.effects")}>
       <SliderRow
         id={`${idPrefix}-block-opacity`}
-        label="Block opacity"
+        label={t("settings.blockOpacity")}
         value={draft.cardOpacity}
         unit="%"
         range={CARD_OPACITY_RANGE}
         onChange={(v) => onApply({ cardOpacity: v })}
       />
 
-      <ToggleRow id={`${idPrefix}-block-shadow`} label="Drop shadow" checked={draft.cardShadow} onChange={(v) => onSaveNow({ cardShadow: v })} />
+      <ToggleRow id={`${idPrefix}-block-shadow`} label={t("settings.dropShadow")} checked={draft.cardShadow} onChange={(v) => onSaveNow({ cardShadow: v })} />
       {draft.cardShadow ? <>
-        <SliderRow id={`${idPrefix}-shadow-strength`} label="Shadow strength" value={draft.shadowOpacity} unit="%" range={BLOCK_SHADOW_OPACITY_RANGE} onChange={(shadowOpacity) => onApply({ shadowOpacity })} />
-        <SliderRow id={`${idPrefix}-shadow-blur`} label="Shadow softness" value={draft.shadowBlur} range={BLOCK_SHADOW_BLUR_RANGE} onChange={(shadowBlur) => onApply({ shadowBlur })} />
-        <SliderRow id={`${idPrefix}-shadow-distance`} label="Shadow distance" value={draft.shadowOffsetY} range={BLOCK_SHADOW_OFFSET_RANGE} onChange={(shadowOffsetY) => onApply({ shadowOffsetY })} />
-        <ToggleRow id={`${idPrefix}-shadow-color`} label="Custom shadow color" checked={draft.shadowColor !== null} onChange={(enabled) => onSaveNow({ shadowColor: enabled ? "#000000" : null })} />
-        {draft.shadowColor !== null ? <ColorValueInput label="Shadow color" value={draft.shadowColor} fallback="#000000" onChange={(shadowColor) => onApply({ shadowColor })} /> : null}
+        <SliderRow id={`${idPrefix}-shadow-strength`} label={t("settings.shadowStrength")} value={draft.shadowOpacity} unit="%" range={BLOCK_SHADOW_OPACITY_RANGE} onChange={(shadowOpacity) => onApply({ shadowOpacity })} />
+        <SliderRow id={`${idPrefix}-shadow-blur`} label={t("settings.shadowSoftness")} value={draft.shadowBlur} range={BLOCK_SHADOW_BLUR_RANGE} onChange={(shadowBlur) => onApply({ shadowBlur })} />
+        <SliderRow id={`${idPrefix}-shadow-distance`} label={t("settings.shadowDistance")} value={draft.shadowOffsetY} range={BLOCK_SHADOW_OFFSET_RANGE} onChange={(shadowOffsetY) => onApply({ shadowOffsetY })} />
+        <ToggleRow id={`${idPrefix}-shadow-color`} label={t("settings.customShadowColor")} checked={draft.shadowColor !== null} onChange={(enabled) => onSaveNow({ shadowColor: enabled ? "#000000" : null })} />
+        {draft.shadowColor !== null ? <ColorValueInput label={t("settings.shadowColor")} value={draft.shadowColor} fallback="#000000" onChange={(shadowColor) => onApply({ shadowColor })} /> : null}
       </> : null}
-      <ToggleRow id={`${idPrefix}-fade-color`} label="Fade to a color" checked={draft.fadeColor !== null} hint="Uses the opacity level to wash a color over the block." onChange={(enabled) => onSaveNow({ fadeColor: enabled ? "#ffffff" : null })} />
-      {draft.fadeColor !== null ? <ColorValueInput label="Fade color" value={draft.fadeColor} fallback="#ffffff" onChange={(fadeColor) => onApply({ fadeColor })} /> : null}
+      <ToggleRow id={`${idPrefix}-fade-color`} label={t("settings.fadeToColor")} checked={draft.fadeColor !== null} hint={t("settings.fadeHint")} onChange={(enabled) => onSaveNow({ fadeColor: enabled ? "#ffffff" : null })} />
+      {draft.fadeColor !== null ? <ColorValueInput label={t("settings.fadeColor")} value={draft.fadeColor} fallback="#ffffff" onChange={(fadeColor) => onApply({ fadeColor })} /> : null}
       <ToggleRow
         id={`${idPrefix}-block-hover`}
-        label="Hover animation"
+        label={t("settings.hoverAnimation")}
         checked={draft.cardHoverEffect}
-        hint="Lift, scale up slightly, and deepen the shadow when you hover the block."
+        hint={t("settings.blockHoverHint")}
         onChange={(v) => onSaveNow({ cardHoverEffect: v })}
       />
   </Section>;
@@ -544,13 +552,14 @@ export function BlockTextSection({
   onSaveNow: (patch: Partial<Pick<BlockStyle, BlockTextFields>>) => void;
 }) {
   const locale = useLocale();
+  const t = useT();
   const usingCustomTextColor = draft.textColor !== null;
 
   return (
-    <Section title="Block text" wide>
+    <Section title={t("settings.blockText")} wide>
       <div className="mb-4">
         <label className="mb-1 block text-sm font-semibold" htmlFor={`${idPrefix}-font-family`}>
-          Font
+          {t("settings.font")}
         </label>
         <select
           id={`${idPrefix}-font-family`}
@@ -568,7 +577,7 @@ export function BlockTextSection({
 
       <SliderRow
         id={`${idPrefix}-font-size`}
-        label="Text size"
+        label={t("settings.textSize")}
         value={draft.fontSize}
         range={BLOCK_FONT_SIZE_RANGE}
         onChange={(v) => onApply({ fontSize: v })}
@@ -576,7 +585,7 @@ export function BlockTextSection({
 
       <div className="mb-4">
         <label className="mb-1 block text-sm font-semibold" htmlFor={`${idPrefix}-text-align`}>
-          Alignment
+          {t("settings.alignment")}
         </label>
         <select
           id={`${idPrefix}-text-align`}
@@ -593,14 +602,14 @@ export function BlockTextSection({
       </div>
 
       <div className="mb-4 flex gap-4">
-        <ToggleRow id={`${idPrefix}-bold`} label="Bold" checked={draft.bold} onChange={(v) => onSaveNow({ bold: v })} />
-        <ToggleRow id={`${idPrefix}-italic`} label="Italic" checked={draft.italic} onChange={(v) => onSaveNow({ italic: v })} />
+        <ToggleRow id={`${idPrefix}-bold`} label={t("settings.bold")} checked={draft.bold} onChange={(v) => onSaveNow({ bold: v })} />
+        <ToggleRow id={`${idPrefix}-italic`} label={t("settings.italic")} checked={draft.italic} onChange={(v) => onSaveNow({ italic: v })} />
       </div>
       <ToggleRow
         id={`${idPrefix}-code-style`}
-        label="Code style"
+        label={t("settings.codeStyle")}
         checked={draft.codeStyle}
-        hint="Renders in monospace, like inline code — overrides the font choice above regardless of what it's set to."
+        hint={t("settings.codeStyleHint")}
         onChange={(v) => onSaveNow({ codeStyle: v })}
       />
 
@@ -620,13 +629,13 @@ export function BlockTextSection({
               }
             }}
           />
-          Custom text color
+          {t("settings.customTextColor")}
         </label>
         {usingCustomTextColor && (
           <ColorValueInput value={draft.textColor ?? "#1a1a1a"} fallback="#1a1a1a" onChange={(color) => onApply({ textColor: color })} />
         )}
       </div>
-      <p className="mt-1 text-xs text-(--color-text-dim)">Applies to the block's main text — captions, labels, and quote attributions stay their own muted color.</p>
+      <p className="mt-1 text-xs text-(--color-text-dim)">{t("settings.blockTextNote")}</p>
     </Section>
   );
 }

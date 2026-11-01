@@ -1,4 +1,5 @@
 import type { ReactNode, Ref } from "react";
+import { useT } from "../i18n";
 import { FIELD_CLASS } from "./page/buttonClasses";
 
 /** The shared bits of every list page's toolbar (Library, Series,
@@ -88,6 +89,7 @@ export function SearchField({
   fill?: boolean;
   inputRef?: Ref<HTMLInputElement>;
 }) {
+  const t = useT();
   return (
     <div className={`relative min-w-0 ${fill ? "" : "sm:w-85"} ${className}`}>
       <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-(--color-text-dim)">
@@ -97,7 +99,7 @@ export function SearchField({
       {value && (
         <button
           type="button"
-          aria-label="Clear search"
+          aria-label={t("shell.clearSearch")}
           onClick={(e) => {
             onChange("");
             e.currentTarget.parentElement?.querySelector("input")?.focus();

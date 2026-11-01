@@ -90,7 +90,7 @@ test("For you marks the feed seen through the shared gate, then clears the count
 
 test("the circle feed: Retry on a failed load, and onboarding only when there is nothing more to load", () => {
   const home = readFileSync(new URL("../src/pages/HomePage.tsx", import.meta.url), "utf8");
-  assert.match(home, /isError[\s\S]*?Retry/);
+  assert.match(home, /isError[\s\S]*?library\.retry/);
   assert.match(home, /!hasNextPage|hasNextPage === false/);
   assert.doesNotMatch(home, /BUTTON_PRIMARY[^\n]*Find people|Find people[^\n]*BUTTON_PRIMARY/);
 });
@@ -106,7 +106,7 @@ test("For you follow back refreshes the circle, and a failed refresh or page wit
   const src = readFileSync(new URL("../src/components/home/ForYouPanel.tsx", import.meta.url), "utf8");
   assert.match(src, /await invalidateAfterFollow\(queryClient\)/);
   assert.match(src, /feed\.isError && items\.length > 0/);
-  assert.match(src, /Couldn't refresh activity\./);
+  assert.match(src, /t\("book\.activityRefreshFailed"\)/);
 });
 
 test("the footer: like with its count and pressed state, comments with count, share", () => {
@@ -149,7 +149,7 @@ test("actions keep the app's limits and paths", () => {
 
 test("Home links to Saved from its header", () => {
   const home = readFileSync(new URL("../src/pages/HomePage.tsx", import.meta.url), "utf8");
-  assert.match(home, /aria-label="Saved"/);
+  assert.match(home, /aria-label=\{t\("library\.savedTitle"\)\}/);
   assert.match(home, /to="\/dashboard\/saved"/);
 });
 
@@ -196,21 +196,21 @@ test("comments: a pending post is never reset by a delete, nor a pending delete 
 test("comments: the sheet cannot be dismissed while a post is in flight", () => {
   const src = readFileSync(new URL("../src/components/home/CommentsSheet.tsx", import.meta.url), "utf8");
   assert.match(src, /const close = \(\) => \{\s*if \(!send\.isPending\) onClose\(\);/);
-  assert.match(src, /<Sheet\s+title="Comments"\s+onClose=\{close\}/);
-  assert.match(src, /<button(?=(?:=>|[^>])*disabled=\{send\.isPending\})(?=(?:=>|[^>])*onClick=\{close\})(?:=>|[^>])*>Cancel<\/button>/);
+  assert.match(src, /<Sheet\s+title=\{t\("book\.comments"\)\}\s+onClose=\{close\}/);
+  assert.match(src, /<button(?=(?:=>|[^>])*disabled=\{send\.isPending\})(?=(?:=>|[^>])*onClick=\{close\})(?:=>|[^>])*>\{t\("shell\.cancel"\)\}<\/button>/);
   assert.doesNotMatch(src, /onClick=\{onClose\}/);
 });
 
 test("comments: a failed refresh with comments shown says so and offers Retry", () => {
   const src = readFileSync(new URL("../src/components/home/CommentsSheet.tsx", import.meta.url), "utf8");
   assert.match(src, /query\.isError && items\.length > 0 && !isFetchNextPageError/);
-  assert.match(src, /Couldn't refresh comments\./);
+  assert.match(src, /t\("book\.commentsRefreshFailed"\)/);
 });
 
 test("feed actions surface a failed engagement or saved-state load, once, on Home", () => {
   const hook = readFileSync(new URL("../src/hooks/useFeedActions.ts", import.meta.url), "utf8");
-  assert.match(hook, /Couldn't load reactions\./);
-  assert.match(hook, /Couldn't load saved items\./);
+  assert.match(hook, /t\("addBook\.reactionsLoadFailed"\)/);
+  assert.match(hook, /t\("library\.savedLoadFailed"\)/);
   assert.match(hook, /retryLoad/);
   const home = readFileSync(new URL("../src/pages/HomePage.tsx", import.meta.url), "utf8");
   assert.match(home, /actions\.loadError/);

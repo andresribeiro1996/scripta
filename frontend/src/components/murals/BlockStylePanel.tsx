@@ -2,6 +2,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { CARD_RADIUS_RANGE, resolveBlockStyle, type BlockStyle } from "../../lib/libraryStyle";
 import type { MuralBlock } from "../../lib/murals";
 import { BlockBackgroundSection, BlockEffectsSection, BlockTextSection, CardBorderSection, SliderRow } from "../StyleControls";
+import { useT } from "../../i18n";
 import { Sheet } from "../Sheet";
 import { SavedLooks } from "./SavedLooks";
 
@@ -16,6 +17,7 @@ export function BlockStylePanel({
   onClose: () => void;
   preview: (style: BlockStyle) => ReactNode;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState<BlockStyle>(resolveBlockStyle(block.style));
   const saveTimerRef = useRef<number | undefined>(undefined);
 
@@ -34,25 +36,25 @@ export function BlockStylePanel({
   }
 
   return (
-    <Sheet title="Block style" onClose={onClose} style={{ maxWidth: "42rem" }}>
+    <Sheet title={t("muralEditor.blockStyle")} onClose={onClose} style={{ maxWidth: "42rem" }}>
       <div aria-hidden="true" inert className="pointer-events-none sticky top-0 z-10 max-h-40 overflow-hidden border-b border-(--color-border) bg-(--color-surface) p-3">
         {preview(draft)}
       </div>
       <div className="space-y-2 p-2">
-        <StyleGroup title="Background" initiallyOpen>
+        <StyleGroup title={t("muralEditor.background")} initiallyOpen>
           <BlockBackgroundSection idPrefix="mural-block" draft={draft} onApply={applyPatch} onSaveNow={savePatchNow} />
         </StyleGroup>
-        <StyleGroup title="Text">
+        <StyleGroup title={t("muralEditor.text")}>
           <BlockTextSection idPrefix="mural-block" draft={draft} onApply={applyPatch} onSaveNow={savePatchNow} />
         </StyleGroup>
-        <StyleGroup title="Border">
-          <SliderRow id="mural-block-block-radius" label="Corner radius" value={draft.cardRadius} range={CARD_RADIUS_RANGE} onChange={(cardRadius) => applyPatch({ cardRadius })} />
+        <StyleGroup title={t("muralEditor.border")}>
+          <SliderRow id="mural-block-block-radius" label={t("muralEditor.cornerRadius")} value={draft.cardRadius} range={CARD_RADIUS_RANGE} onChange={(cardRadius) => applyPatch({ cardRadius })} />
           <CardBorderSection idPrefix="mural-block" draft={draft} onApply={applyPatch} onSaveNow={savePatchNow} />
         </StyleGroup>
-        <StyleGroup title="Effects">
+        <StyleGroup title={t("muralEditor.effects")}>
           <BlockEffectsSection idPrefix="mural-block" draft={draft} onApply={applyPatch} onSaveNow={savePatchNow} />
         </StyleGroup>
-        <StyleGroup title="Looks">
+        <StyleGroup title={t("muralEditor.looks")}>
           <SavedLooks style={draft} onApply={(style) => savePatchNow(style)} />
         </StyleGroup>
       </div>

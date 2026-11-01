@@ -66,7 +66,7 @@ test("signed-out viewers never trigger the authenticated book details request", 
 });
 
 test("the shared mural names its owner", () => {
-  assert.match(src("pages/SharedMuralPage.tsx"), /subtitle=\{data\.profile \? `by @\$\{data\.profile\.username\}` : undefined\}/);
+  assert.match(src("pages/SharedMuralPage.tsx"), /subtitle=\{data\.profile \? t\("murals\.sharedBy", \{ username: data\.profile\.username \}\) : undefined\}/);
 });
 
 test("save status announces saving and saved, and is blank when idle", () => {
@@ -79,7 +79,7 @@ test("save status announces saving and saved, and is blank when idle", () => {
 
 test("the library style preview sits before the controls and stays in view", () => {
   const page = src("pages/LibraryStylePage.tsx");
-  assert.ok(page.indexOf("Preview{") < page.indexOf('<Section title="Card layout">'));
+  assert.ok(page.indexOf('t("settings.preview")') < page.indexOf('<Section title={t("settings.cardLayout")}>'));
   assert.match(page, /sticky top-\[calc\(var\(--app-top\)\+0\.5rem\)\]/);
   assert.match(page, /grid items-start gap-6/);
 });
@@ -102,8 +102,8 @@ test("Disclosure draws the shared plus icon instead of the browser triangle", ()
 test("the Daily Chapter page links back Home and lights the Home area", () => {
   assert.equal(areaIdForPath("/daily"), "home");
   const page = src("pages/DailyChapterPage.tsx");
-  assert.match(page, /back=\{\{ to: session\?\.user\.username \? "\/dashboard" : "\/", label: "Home" \}\}/);
-  assert.match(page, /<Disclosure title="Past results">/);
+  assert.match(page, /back=\{\{ to: session\?\.user\.username \? "\/dashboard" : "\/", label: t\("shell\.areaHome"\) \}\}/);
+  assert.match(page, /<Disclosure title=\{t\("daily\.pastResults"\)\}>/);
   assert.doesNotMatch(page, /<details>/);
 });
 
@@ -130,8 +130,8 @@ test("expected-empty lookups are not requested when the board says nothing exist
 });
 
 test("both Discover pages and People say what they are", () => {
-  assert.equal([...src("pages/DiscoverPage.tsx").matchAll(/subtitle="Tier lists, tournaments and quizzes readers have published\."/g)].length, 2);
-  assert.match(src("pages/PeoplePage.tsx"), /subtitle="Find readers and follow them/);
+  assert.equal([...src("pages/DiscoverPage.tsx").matchAll(/subtitle=\{t\("community\.discoverSubtitle"\)\}/g)].length, 2);
+  assert.match(src("pages/PeoplePage.tsx"), /subtitle=\{t\("community\.peopleSubtitle"\)\}/);
 });
 
 test("a search box with text shows one 44px Clear control and an empty one shows none", () => {

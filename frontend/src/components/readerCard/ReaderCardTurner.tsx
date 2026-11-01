@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { hasChosen, readerCardPages, readerCardShine, readerCardSummary, startTurn, turnBy, turnTo, type ReaderCardBase, type ReaderCardPage } from "@scripta/shared";
 import { prefersReducedMotion } from "../../lib/theme";
+import { useT } from "../../i18n";
 import { CardShine } from "./CardShine";
 import { ReaderCardImage } from "./ReaderCardImage";
 
@@ -8,6 +9,7 @@ const TURN = "motion-safe:transition-transform motion-safe:duration-500 motion-s
 const wideScreen = () => typeof window !== "undefined" && window.innerWidth >= 768 && !window.matchMedia?.("(pointer: coarse)").matches;
 
 export function ReaderCardTurner({ input, cardWidth, spreadWidth, onScrim = false, autoFocus = false }: { input: ReaderCardBase; cardWidth: string; spreadWidth?: string; onScrim?: boolean; autoFocus?: boolean }) {
+  const t = useT();
   const [wide] = useState(wideScreen);
   const steps = useMemo(() => readerCardPages(input.style.layout, input.view ?? "visitor", hasChosen(input.card.chosen)), [input]);
   const spread = spreadWidth && wide && steps.some(Array.isArray) ? (steps[1] as [ReaderCardPage, ReaderCardPage]) : null;
@@ -52,7 +54,7 @@ export function ReaderCardTurner({ input, cardWidth, spreadWidth, onScrim = fals
   if (spread) {
     const open = turn.index === 1;
     card = (
-      <button ref={setFocus} type="button" aria-label={open ? "Close the card" : "Open the card"} onClick={() => go(1)} className={`relative aspect-[10/7] ${spreadWidth} [perspective:2400px] ${TURN}`} style={{ transform: open ? "none" : "translateX(-25%)" }}>
+      <button ref={setFocus} type="button" aria-label={open ? t("readerCard.closeCard") : t("readerCard.openCard")} onClick={() => go(1)} className={`relative aspect-[10/7] ${spreadWidth} [perspective:2400px] ${TURN}`} style={{ transform: open ? "none" : "translateX(-25%)" }}>
         <span aria-hidden="true" className="absolute inset-y-0 right-0 w-1/2"><ReaderCardImage input={input} page={spread[1]} className="h-full w-full" /></span>
         <span aria-hidden="true" className={`absolute inset-y-0 right-0 w-1/2 origin-left [transform-style:preserve-3d] ${TURN}`} style={{ transform: open ? "rotateY(-180deg)" : "rotateY(0deg)" }}>
           <span className="absolute inset-0 [backface-visibility:hidden]"><ReaderCardImage input={input} page="front" className="h-full w-full" />{shineOn("front")}</span>
@@ -65,7 +67,7 @@ export function ReaderCardTurner({ input, cardWidth, spreadWidth, onScrim = fals
       <div
         ref={(element) => { scroller.current = element; setFocus(element); }}
         role="region"
-        aria-label="Reader card pages"
+        aria-label={t("readerCard.pagesRegion")}
         tabIndex={0}
         onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); go(1); } }}
         onScroll={(event) => syncIndex(event.currentTarget)}
@@ -76,7 +78,7 @@ export function ReaderCardTurner({ input, cardWidth, spreadWidth, onScrim = fals
     );
   } else {
     card = (
-      <button ref={setFocus} type="button" aria-label={`Turn the card, page ${turn.index + 1} of ${count}`} onClick={() => go(1)} className={`relative aspect-[5/7] ${cardWidth} [perspective:1600px]`}>
+      <button ref={setFocus} type="button" aria-label={t("readerCard.turnCard", { page: turn.index + 1, count })} onClick={() => go(1)} className={`relative aspect-[5/7] ${cardWidth} [perspective:1600px]`}>
         <span className={`absolute inset-0 [transform-style:preserve-3d] ${TURN}`} style={{ transform: `rotateY(${-turn.rotation}deg)` }}>
           {([0, 1] as const).map((face) => (
             <span key={face} aria-hidden="true" className="absolute inset-0 [backface-visibility:hidden]" style={face === 1 ? { transform: "rotateY(180deg)" } : undefined}>
@@ -92,7 +94,7 @@ export function ReaderCardTurner({ input, cardWidth, spreadWidth, onScrim = fals
   return (
     <div
       role="group"
-      aria-label="Reader card"
+      aria-label={t("shell.areaReaderCard")}
       className="flex flex-col items-center gap-3"
       onKeyDown={(event) => {
         if (event.key === "ArrowRight") { event.preventDefault(); go(1); }
@@ -100,11 +102,11 @@ export function ReaderCardTurner({ input, cardWidth, spreadWidth, onScrim = fals
       }}
     >
       {card}
-      <p className="sr-only" aria-live="polite">{`Page ${turn.index + 1} of ${count}`}</p>
+      <p className="sr-only" aria-live="polite">{t("readerCard.pageOf", { page: turn.index + 1, count })}</p>
       <ul className="sr-only">{summary.map((line) => <li key={line}>{line}</li>)}</ul>
-      <div className="flex" role="group" aria-label="Pages">
+      <div className="flex" role="group" aria-label={t("readerCard.pages")}>
         {Array.from({ length: count }, (_, i) => (
-          <button key={i} type="button" aria-label={`Page ${i + 1}`} aria-current={i === turn.index ? "true" : undefined} onClick={() => goTo(i)} className="flex h-11 w-11 items-center justify-center">
+          <button key={i} type="button" aria-label={t("readerCard.pageN", { page: i + 1 })} aria-current={i === turn.index ? "true" : undefined} onClick={() => goTo(i)} className="flex h-11 w-11 items-center justify-center">
             <span className={`block h-2 w-2 rounded-full ${dot(i === turn.index)}`} />
           </button>
         ))}

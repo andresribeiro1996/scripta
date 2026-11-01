@@ -13,14 +13,14 @@ import { useLibrary } from "../hooks/useLibrary";
 import { NO_GROUPS, useOwnCardStyle } from "../hooks/useReaderCard";
 import { useReaderCardStyle, useSaveReaderCardStyle } from "../hooks/useReaderCardStyle";
 import { useResolvedTheme } from "../lib/theme";
-import { getLocale, useLocale } from "../i18n";
+import { getLocale, useLocale, useT } from "../i18n";
 
 const NO_BOOKS: Array<Record<string, unknown>> = [];
 const AUDIENCES = ["you", "visitors"] as const;
-const AUDIENCE_LABELS = { you: "You", visitors: "Visitors" };
 
 export function ReaderCardPage() {
   const locale = useLocale();
+  const t = useT();
   const { session } = useAuth();
   const readerName = session?.user.username ?? "reader";
   const { data: library } = useLibrary();
@@ -41,26 +41,26 @@ export function ReaderCardPage() {
       await track(save(patch));
       return true;
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save your reader card.", getLocale()), kind: "error" });
+      toast({ message: saveFailureMessage(error, t("readerCard.saveFailed"), getLocale()), kind: "error" });
       return false;
     }
   };
 
   if (!style) {
-    if (isPending) return <Page title="Reader card"><p className="text-sm text-(--color-text-dim)">Loading your reader card…</p></Page>;
+    if (isPending) return <Page title={t("shell.areaReaderCard")}><p className="text-sm text-(--color-text-dim)">{t("readerCard.loading")}</p></Page>;
     return (
-      <Page title="Reader card">
-        <button type="button" onClick={() => void refetch()} className="text-sm font-semibold text-(--color-accent)">Couldn't load your reader card. Try again</button>
+      <Page title={t("shell.areaReaderCard")}>
+        <button type="button" onClick={() => void refetch()} className="text-sm font-semibold text-(--color-accent)">{t("readerCard.loadFailed")}</button>
       </Page>
     );
   }
 
   return (
-    <Page title="Reader card" subtitle={<SaveStatus state={saveState} />}>
+    <Page title={t("shell.areaReaderCard")} subtitle={<SaveStatus state={saveState} />}>
       <div className="lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-8">
         <div className="mb-6 flex flex-col items-center gap-3 lg:sticky lg:top-[calc(var(--app-top)+1.5rem)] lg:mb-0 lg:self-start">
           <div className="w-full max-w-[18rem]">
-            <Segmented label="Preview as" options={AUDIENCES} labels={AUDIENCE_LABELS} value={audience} onChange={setAudience} />
+            <Segmented label={t("readerCard.previewAs")} options={AUDIENCES} labels={{ you: t("readerCard.audienceYou"), visitors: t("readerCard.audienceVisitors") }} value={audience} onChange={setAudience} />
           </div>
           <div className="w-full">
             <ReaderCardTurner key={`${preview.view}-${preview.style.layout}-${hasChosen(preview.card.chosen)}`} input={preview} cardWidth="w-[min(100%,18rem)]" />

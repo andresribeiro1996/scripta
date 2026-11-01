@@ -40,7 +40,7 @@ import { StatsTiles } from "./BookStats";
 import { BookCover, editionCoverBook } from "./BookCover";
 import { EditionStrip } from "./EditionStrip";
 import { RatingStars } from "./RatingStars";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 type Props = {
   page: WorkPage | null;
@@ -79,6 +79,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, onAdd, onShare, frame }: Props) {
   const locale = useLocale();
+  const t = useT();
   const { data: isAdmin = false } = useQuery({ queryKey: ["books-admin"], queryFn: fetchIsAdmin, staleTime: Infinity, enabled: signedIn });
   const { data: library } = useLibrary({ enabled: Boolean(book) });
   const model = bookScreenModel(page, book, { isAdmin }, locale, editionId);
@@ -113,7 +114,7 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
   const heroBook = book ?? workCoverBook;
   if (!heroBook) throw new Error("BookScreen needs a page or a book.");
   const wantedTab = searchParams.get("tab");
-  const activeTab = model.tabs.find((t) => t.key === wantedTab)?.key ?? model.tabs[0]!.key;
+  const activeTab = model.tabs.find((tab) => tab.key === wantedTab)?.key ?? model.tabs[0]!.key;
 
   async function pickStatus(value: 0 | 1 | 2) {
     if (!book) return;
@@ -124,7 +125,7 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
 
   async function handleDeleteNote(bookmarkId: string) {
     if (!book) return;
-    if (await confirm({ title: "Delete this note?", body: "This can't be undone.", confirmLabel: "Delete" })) {
+    if (await confirm({ title: t("book.deleteNoteTitle"), body: t("library.cannotUndo"), confirmLabel: t("shell.delete") })) {
       void actions.deleteNote(book, bookmarkId);
     }
   }
@@ -168,8 +169,8 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
   }
 
   const menuItems = model.menu.map((key) => {
-    if (key === "style") return { label: "Card style", onClick: () => setStyling(true) };
-    if (key === "cover") return { label: "Change cover", onClick: () => setPickingCover(true) };
+    if (key === "style") return { label: t("book.cardStyle"), onClick: () => setStyling(true) };
+    if (key === "cover") return { label: t("book.changeCover"), onClick: () => setPickingCover(true) };
     if (key === "rejectCover") return { label: "Reject cover for everyone", onClick: () => void rejectCover() };
     return { label: "Upload cover for everyone", onClick: () => coverFile.current?.click() };
   });
@@ -181,12 +182,12 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
   const headerActions = (
     <>
       {onShare ? (
-        <button type="button" onClick={onShare} aria-label="Share" title="Share" className={roundButtonClass}>
+        <button type="button" onClick={onShare} aria-label={t("library.actionShare")} title={t("library.actionShare")} className={roundButtonClass}>
           <ShareIcon />
         </button>
       ) : null}
       {menuItems.length > 0 ? (
-        <OptionsMenu items={menuItems} title="More" trigger={<><MoreIcon /><span className="sr-only">More</span></>} triggerClassName={roundButtonClass} />
+        <OptionsMenu items={menuItems} title={t("shell.more")} trigger={<><MoreIcon /><span className="sr-only">{t("shell.more")}</span></>} triggerClassName={roundButtonClass} />
       ) : null}
     </>
   );
@@ -244,7 +245,7 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
               <h1 className="min-w-0 font-display text-4xl font-bold break-words lg:text-5xl lg:leading-14">{model.title}</h1>
               {onShare || menuItems.length > 0 ? <div className="flex shrink-0 items-center gap-2 pt-1 lg:pt-2">{headerActions}</div> : null}
             </div>
-            <p className="mt-2.5 text-lg">{`by ${model.author}`}</p>
+            <p className="mt-2.5 text-lg">{t("book.byAuthor", { author: model.author })}</p>
             {model.authorAwards ? <p className="mt-1 text-xs text-(--color-text-dim)">{model.authorAwards}</p> : null}
             {metaParts.length > 0 ? (
               <div className="mt-4 overflow-hidden text-sm text-(--color-text-dim)">
@@ -274,7 +275,7 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
                 ))}
                 {model.possibleGenres.map((genre) => (
                   <li key={genre} className="rounded-full border border-dashed border-(--color-border) px-2 text-xs text-(--color-text-dim)">
-                    {`Possibly ${genre}`}
+                    {t("book.possiblyGenre", { genre })}
                   </li>
                 ))}
               </ul>
@@ -283,14 +284,14 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
             {model.primary === "owner" && model.status ? (
               <div className="mt-6 flex flex-wrap items-center gap-2">
                 <OptionsMenu
-                  title="Reading status"
+                  title={t("book.readingStatus")}
                   trigger={<><CheckIcon />{model.status.label}<ChevronDownIcon /></>}
                   triggerClassName={statusTriggerClass}
                   items={model.status.options.map((option) => ({ label: option.label, checked: option.selected, onClick: () => void pickStatus(option.value) }))}
                 />
                 {model.feeling ? (
                   <OptionsMenu
-                    title="How it landed"
+                    title={t("book.howItLanded")}
                     trigger={<>{model.feeling.label}<ChevronDownIcon /></>}
                     triggerClassName={`${BUTTON_SECONDARY} gap-2`}
                     items={model.feeling.options.map((option) => ({ label: option.label, checked: option.selected, onClick: () => void actions.setRating(book!, option.rating) }))}
@@ -299,21 +300,21 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
               </div>
             ) : model.primary === "add" && model.addBook ? (
               <button type="button" onClick={() => onAdd(model.addBook!)} className={`${BUTTON_PRIMARY} mt-6 w-full sm:w-auto`}>
-                {model.edition ? "Add this edition" : "Add to library"}
+                {model.edition ? t("book.addThisEdition") : t("book.addToLibrary")}
               </button>
             ) : null}
 
             {model.tabs.length > 1 ? (
-              <nav aria-label="Book sections" className={`mt-9 ${TAB_NAV}`}>
-                {model.tabs.map((t) => {
-                  const current = t.key === activeTab;
+              <nav aria-label={t("book.bookSections")} className={`mt-9 ${TAB_NAV}`}>
+                {model.tabs.map((tab) => {
+                  const current = tab.key === activeTab;
                   return (
                     <Link
-                      key={t.key}
-                      to={`?tab=${t.key}`}
+                      key={tab.key}
+                      to={`?tab=${tab.key}`}
                       aria-current={current ? "page" : undefined}
                       className={tabClass(current)}
-                    >{t.label}</Link>
+                    >{tab.label}</Link>
                   );
                 })}
               </nav>
@@ -323,32 +324,32 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
               {activeTab === "about" && model.about ? (
                 <>
                   {aboutSummary ? (
-                    <Section title="About this book">
+                    <Section title={t("library.aboutThisBook")}>
                       <p className="text-base leading-7 whitespace-pre-wrap break-words">{aboutOpen || !model.about.preview ? aboutSummary : model.about.preview}</p>
                       {model.about.preview ? (
                         <button type="button" aria-expanded={aboutOpen} onClick={() => setAboutOpen(!aboutOpen)} className="min-h-11 text-sm font-semibold text-(--color-accent)">
-                          {aboutOpen ? "Show less" : "Show more"}
+                          {aboutOpen ? t("book.showLess") : t("book.showMore")}
                         </button>
                       ) : null}
                     </Section>
                   ) : null}
                   {characters.length > 0 ? (
-                    <Section title="Characters">
+                    <Section title={t("book.characters")}>
                       <p className="text-[15px] leading-6">
                         {characters.join(" · ")}
                         {model.characters.more.length > 0 && !allCharacters ? (
                           <>
                             {" "}
-                            <button type="button" aria-label="Show all characters" onClick={() => setAllCharacters(true)} className="inline-flex min-h-11 items-center font-semibold text-(--color-accent)">{`+${model.characters.more.length} more`}</button>
+                            <button type="button" aria-label={t("book.showAllCharacters")} onClick={() => setAllCharacters(true)} className="inline-flex min-h-11 items-center font-semibold text-(--color-accent)">{t("book.moreCount", { count: model.characters.more.length })}</button>
                           </>
                         ) : null}
                       </p>
                       {model.characters.canMakeGame && signedIn && page ? (
-                        <Link to={`/work/${page.work.id}/characters`} className="inline-flex min-h-11 items-center text-sm font-semibold text-(--color-accent)">Make a character game</Link>
+                        <Link to={`/work/${page.work.id}/characters`} className="inline-flex min-h-11 items-center text-sm font-semibold text-(--color-accent)">{t("book.makeCharacterGame")}</Link>
                       ) : null}
                     </Section>
                   ) : null}
-                  <Section title="Editions">
+                  <Section title={t("book.editions")}>
                     <ul className={LIST_PANEL}>
                       {editions.map((e, i) => (
                         <li key={e.bookId} className={LIST_ROW}>
@@ -357,13 +358,13 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
                             <span className="block break-words font-semibold">{e.title}</span>
                             <span className="block text-(--color-text-dim)">{editionLabel(e, locale)}</span>
                           </span>
-                          {e.mine ? <span className="shrink-0 rounded-full bg-(--color-accent-soft) px-2.5 py-0.5 text-xs font-semibold text-(--color-accent)">Yours</span> : null}
+                          {e.mine ? <span className="shrink-0 rounded-full bg-(--color-accent-soft) px-2.5 py-0.5 text-xs font-semibold text-(--color-accent)">{t("book.yours")}</span> : null}
                         </li>
                       ))}
                     </ul>
                     {model.about.editions.length > model.about.editionsPreview.length && !allEditions ? (
                       <button type="button" onClick={() => setAllEditions(true)} className="min-h-11 text-sm font-semibold text-(--color-accent)">
-                        Show all {model.about.editions.length}
+                        {t("book.showAllCount", { count: model.about.editions.length })}
                       </button>
                     ) : null}
                   </Section>
@@ -372,7 +373,7 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
 
               {activeTab === "highlights" ? (
                 <>
-                  {model.highlights.length === 0 ? <p className="text-sm text-(--color-text-dim)">No highlights yet.</p> : null}
+                  {model.highlights.length === 0 ? <p className="text-sm text-(--color-text-dim)">{t("book.noHighlights")}</p> : null}
                   <div className="flex flex-col gap-3">
                     {model.highlights.map((h, i) => {
                       const bookmarkId = String(h.BookmarkID ?? "");
@@ -389,7 +390,7 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
                               onClick={() => void handleDeleteNote(bookmarkId)}
                               className="mt-1 text-xs font-semibold text-(--color-danger) hover:opacity-80"
                             >
-                              Delete
+                              {t("shell.delete")}
                             </button>
                           )}
                         </div>
@@ -405,7 +406,7 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
                   {model.community.groups.map((group) => (
                     <ReaderList key={group.key} title={group.title} rows={group.rows} signedIn={signedIn} />
                   ))}
-                  <Section title="Games">
+                  <Section title={t("shell.areaGames")}>
                     {model.community.games.length > 0 ? (
                       <div className="grid grid-cols-1 gap-3">
                         {model.community.games.map((game) => (
@@ -416,7 +417,7 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-(--color-text-dim)">No public games use this book yet.</p>
+                      <p className="text-sm text-(--color-text-dim)">{t("book.noPublicGames")}</p>
                     )}
                   </Section>
                 </>
@@ -430,8 +431,8 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
     {book && styling ? (
         <PerCardStylePanel
           idPrefix="book"
-          name={String(book.Title ?? "Untitled")}
-          priorityText="the series and library-wide"
+          name={String(book.Title ?? t("library.untitled"))}
+          priorityText={t("library.prioritySeriesLibrary")}
           currentOverride={book._style as PerCardStyle | undefined}
           seedStyle={effectiveCardStyle(
             resolveLibraryStyle(library?.data.style),
@@ -443,12 +444,12 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
       ) : null}
       {book && pickingCover ? (
         <CoverPickerModal
-          title={String(book.Title ?? "Untitled")}
+          title={String(book.Title ?? t("library.untitled"))}
           currentImageId={typeof book._coverImageId === "string" ? book._coverImageId : null}
           lookup={coverParamsFor(book)}
           coverUrl={typeof book._coverUrl === "string" ? book._coverUrl : null}
           isAdmin={isAdmin}
-          removeCoverLabel="Remove custom cover — go back to the normal auto-detected one"
+          removeCoverLabel={t("library.removeCustomCover")}
           onSelect={(image) => void actions.saveCover(book, image)}
           onPickFound={pickFoundCover}
           onRemoveCover={() => void actions.removeCover(book)}

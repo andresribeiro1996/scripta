@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { BookGrid } from "./BookGrid";
+import { useT } from "../i18n";
 import { DEFAULT_LIBRARY_STYLE, type LibraryStyleSettings } from "../lib/libraryStyle";
 
 /** Placeholder shapes shown while a page's data is in flight, in place
@@ -24,9 +25,10 @@ export function Skeleton({ className = "", style }: { className?: string; style?
 
 /** Wraps a set of placeholder shapes so assistive tech is told the page
  *  is working rather than reading out a pile of empty boxes. */
-export function SkeletonScreen({ label = "Loading", children }: { label?: string; children: ReactNode }) {
+export function SkeletonScreen({ label, children }: { label?: string; children: ReactNode }) {
+  const t = useT();
   return (
-    <div role="status" aria-busy="true" aria-label={label}>
+    <div role="status" aria-busy="true" aria-label={label ?? t("shell.loading")}>
       {children}
     </div>
   );
@@ -36,8 +38,9 @@ export function SkeletonScreen({ label = "Loading", children }: { label?: string
  *  rectangles because a book card's title overlays its cover rather than
  *  sitting under it — there is no second line to stand in for. */
 export function SkeletonBookGrid({ style = DEFAULT_LIBRARY_STYLE, count = 12 }: { style?: LibraryStyleSettings; count?: number }) {
+  const t = useT();
   return (
-    <SkeletonScreen label="Loading books">
+    <SkeletonScreen label={t("shell.loadingBooks")}>
       <BookGrid style={style}>
         {Array.from({ length: count }, (_, i) => (
           <Skeleton key={i} className="aspect-[2/3] w-full rounded-lg" />
@@ -50,7 +53,7 @@ export function SkeletonBookGrid({ style = DEFAULT_LIBRARY_STYLE, count = 12 }: 
 /** The card grids on the murals, tournaments and tier-list lists. */
 export function SkeletonCardGrid({
   count = 6,
-  label = "Loading",
+  label,
   tileClassName = "min-h-40",
   gridClassName = "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
 }: {
@@ -75,7 +78,7 @@ export function SkeletonCardGrid({
  *  rather than as loose cards. */
 export function SkeletonGroups({ style = DEFAULT_LIBRARY_STYLE, count = 2 }: { style?: LibraryStyleSettings; count?: number }) {
   return (
-    <SkeletonScreen label="Loading">
+    <SkeletonScreen>
       <div className="flex flex-col gap-6">
         {Array.from({ length: count }, (_, i) => (
           <div key={i} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4">

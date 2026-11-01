@@ -115,7 +115,7 @@ export function applyFontPreference(slot: FontSlot, preference: FontPreference):
 }
 
 export function useFontPreference(slot: FontSlot): FontPreference {
-  return useSyncExternalStore(subscribe, () => readFontPreference(slot));
+  return useSyncExternalStore(subscribe, () => readFontPreference(slot), () => "theme");
 }
 
 export function readAppearance(): Appearance {

@@ -6,6 +6,7 @@ import { SocialIcon } from "./icons/SocialIcons";
 import { BUTTON_DANGER_OUTLINE, BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "./page/buttonClasses";
 import { ShareLinkRow } from "./ShareLinkRow";
 import { Sheet } from "./Sheet";
+import { useT } from "../i18n";
 
 type Platform = Extract<SocialProvider, "x" | "threads">;
 
@@ -49,6 +50,7 @@ export function ShareModal({
   onUnshare: () => Promise<void>;
   onClose: () => void;
 }) {
+  const t = useT();
   const { data: socials } = useSocials();
   const confirm = useConfirm();
 
@@ -83,7 +85,7 @@ export function ShareModal({
       const result = await onShare();
       setCurrent(result);
     } catch (err) {
-      setShareError(err instanceof Error ? err.message : "Couldn't create a share link.");
+      setShareError(err instanceof Error ? err.message : t("addBook.shareCreateFailed"));
     } finally {
       setSharing(false);
     }
@@ -98,7 +100,7 @@ export function ShareModal({
       if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
       copiedTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      setCopyError(err instanceof Error ? err.message : "Couldn't copy that — try selecting and copying the link manually.");
+      setCopyError(err instanceof Error ? err.message : t("addBook.shareCopyFailed"));
     }
   }
 
@@ -130,7 +132,7 @@ export function ShareModal({
       const result = await postToSocial(composing, composeText);
       setPostSuccess(result);
     } catch (err) {
-      setPostError(err instanceof ApiError ? err.message : "Couldn't post that — try again.");
+      setPostError(err instanceof ApiError ? err.message : t("addBook.sharePostFailed"));
     } finally {
       setPosting(false);
     }
@@ -139,9 +141,9 @@ export function ShareModal({
   async function handleStopSharing() {
     if (
       !(await confirm({
-        title: "Stop sharing this link?",
-        body: "Anyone who already has the link will lose access to it.",
-        confirmLabel: "Stop sharing"
+        title: t("addBook.shareStopTitle"),
+        body: t("addBook.shareStopBody"),
+        confirmLabel: t("addBook.shareStop")
       }))
     ) {
       return;
@@ -152,7 +154,7 @@ export function ShareModal({
       await onUnshare();
       setCurrent(null);
     } catch (err) {
-      setUnshareError(err instanceof ApiError ? err.message : "Couldn't stop sharing — try again.");
+      setUnshareError(err instanceof ApiError ? err.message : t("addBook.shareStopFailed"));
     } finally {
       setUnsharing(false);
     }
@@ -162,25 +164,25 @@ export function ShareModal({
 
   return (
     <Sheet
-      title={`Share "${title}"`}
+      title={t("addBook.shareTitle", { title })}
       onClose={onClose}
       footer={
         !current ? (
           <>
             <button onClick={onClose} className={BUTTON_SECONDARY}>
-              Cancel
+              {t("shell.cancel")}
             </button>
             <button onClick={() => void handleShare()} disabled={sharing} className={BUTTON_PRIMARY}>
-              {sharing ? "Creating…" : "Create share link"}
+              {sharing ? t("addBook.shareCreating") : t("addBook.shareCreate")}
             </button>
           </>
         ) : composing ? (
           <>
             <button onClick={closeCompose} disabled={posting} className={BUTTON_SECONDARY}>
-              Cancel
+              {t("shell.cancel")}
             </button>
             <button onClick={() => void handlePost()} disabled={posting || composeText.trim().length === 0} className={BUTTON_PRIMARY}>
-              {posting ? "Posting…" : `Post to ${PLATFORM_LABELS[composing]}`}
+              {posting ? t("addBook.sharePosting") : t("addBook.sharePostTo", { platform: PLATFORM_LABELS[composing] })}
             </button>
           </>
         ) : undefined
@@ -189,7 +191,7 @@ export function ShareModal({
       <div className="px-2 pb-2">
         {!current && (
           <div>
-            <p className="mb-4 text-sm text-(--color-text-dim)">Create a public link anyone can view — no account needed on their end.</p>
+            <p className="mb-4 text-sm text-(--color-text-dim)">{t("addBook.shareIntro")}</p>
             {shareError && <p className="mt-2 text-xs text-(--color-danger)">{shareError}</p>}
           </div>
         )}
@@ -201,7 +203,7 @@ export function ShareModal({
 
             {canNativeShare && (
               <button onClick={handleNativeShare} className={`${BUTTON_SECONDARY} mt-3 w-full`}>
-                Share…
+                {t("addBook.shareNative")}
               </button>
             )}
 
@@ -215,7 +217,7 @@ export function ShareModal({
                       key={platform}
                       onClick={() => openCompose(platform)}
                       disabled={!connected}
-                      title={connected ? undefined : `Connect ${PLATFORM_LABELS[platform]} in Settings to share directly.`}
+                      title={connected ? undefined : t("addBook.shareConnect", { platform: PLATFORM_LABELS[platform] })}
                       className={`${BUTTON_SECONDARY} flex-1 gap-2 disabled:cursor-not-allowed`}
                     >
                       <SocialIcon provider={platform} className="h-4 w-4" />
@@ -230,7 +232,7 @@ export function ShareModal({
               <div className="mt-3">
                 <textarea
                   autoFocus
-                  aria-label="Post text"
+                  aria-label={t("addBook.sharePostText")}
                   value={composeText}
                   onChange={(e) => setComposeText(e.target.value)}
                   rows={5}
@@ -239,10 +241,10 @@ export function ShareModal({
                 {postError && <p className="mt-2 text-xs text-(--color-danger)">{postError}</p>}
                 {postSuccess && (
                   <p className="mt-2 text-xs text-(--color-accent)">
-                    Posted to {PLATFORM_LABELS[composing]}!{" "}
+                    {t("addBook.sharePosted", { platform: PLATFORM_LABELS[composing] })}{" "}
                     {postSuccess.postUrl && (
                       <a href={postSuccess.postUrl} target="_blank" rel="noreferrer" className="underline hover:opacity-80">
-                        View post
+                        {t("addBook.shareViewPost")}
                       </a>
                     )}
                   </p>
@@ -256,7 +258,7 @@ export function ShareModal({
                 disabled={unsharing}
                 className={BUTTON_DANGER_OUTLINE}
               >
-                {unsharing ? "Stopping…" : "Stop sharing"}
+                {unsharing ? t("addBook.shareStopping") : t("addBook.shareStop")}
               </button>
               {unshareError && <p className="mt-1.5 text-xs text-(--color-danger)">{unshareError}</p>}
             </div>

@@ -2,6 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { normalizeIsbn } from "./covers";
 import { validBookRating, type BookMetadata } from "@scripta/shared";
 import { apiFetch } from "../api/client";
+import { t } from "../i18n";
 
 export type { BookMetadata };
 export { validBookRating };
@@ -30,7 +31,7 @@ export function bookMetadataOptions(book: Record<string, unknown>) {
 }
 
 export function summarySourceName(data: BookMetadata): string {
-  if (data.summarySource === "publisher") return data.publisher ?? "Publisher";
+  if (data.summarySource === "publisher") return data.publisher ?? t("addBook.publisher");
   if (data.summarySource === "bnp") return "Biblioteca Nacional de Portugal";
   return data.summarySource === "isbndb" ? "ISBNdb" : "Open Library";
 }

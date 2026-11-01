@@ -10,13 +10,14 @@ import { AuthorAvatar } from "../CommunityAuthorAvatar";
 import { ArenaIcon, CommunityIcon } from "../NavIcons";
 import { BUTTON_SECONDARY } from "../page/buttonClasses";
 import { LIST_ROW, LIST_ROW_LINK, PANEL, PANEL_HEADER, PANEL_HEADING } from "../page/surfaceClasses";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 const ACTIVITY_KEY = ["community", "dashboard", "activity"];
 const NOTE = "px-4.5 py-3 text-(--color-text-dim)";
 
 function Row({ item, isNew, children }: { item: PersonalItem; isNew: boolean; children?: ReactNode }) {
   const locale = useLocale();
+  const t = useT();
   const row = activityRowModel(item, locale);
   const person = item.kind === "follow" ? item.actor : item.kind === "participation" ? item.actors[0] : undefined;
   const time = relativeTime(item.createdAt, locale);
@@ -30,7 +31,7 @@ function Row({ item, isNew, children }: { item: PersonalItem; isNew: boolean; ch
           {row.target ? <span className="font-bold"> {row.target}</span> : null}
         </span>
         <span className="flex items-center gap-1.5 text-xs text-(--color-text-dim)">
-          {isNew ? <span role="img" aria-label="New" className="size-2 shrink-0 rounded-full bg-(--color-accent)" /> : null}
+          {isNew ? <span role="img" aria-label={t("book.new")} className="size-2 shrink-0 rounded-full bg-(--color-accent)" /> : null}
           {time}
         </span>
       </span>
@@ -41,6 +42,7 @@ function Row({ item, isNew, children }: { item: PersonalItem; isNew: boolean; ch
 
 export function ForYouPanel() {
   const locale = useLocale();
+  const t = useT();
   const queryClient = useQueryClient();
   const feed = useActivityFeed();
   const { fetchNextPage } = feed;
@@ -101,7 +103,7 @@ export function ForYouPanel() {
       await invalidateAfterFollow(queryClient);
       await feed.refetch();
     } catch (failure) {
-      setError(followFailureMessage(failure, "Couldn't follow them. Try again."));
+      setError(followFailureMessage(failure, t("book.followFailedTryAgain")));
     } finally {
       setBusyId(null);
     }
@@ -115,15 +117,15 @@ export function ForYouPanel() {
   return (
     <section aria-labelledby="home-foryou" className={`${PANEL} overflow-hidden`}>
       <div className={PANEL_HEADER}>
-        <h2 id="home-foryou" className={PANEL_HEADING}>For you</h2>
-        {count ? <span className="rounded-full bg-(--color-accent-soft) px-2.5 py-0.5 text-xs font-semibold text-(--color-accent)">{`${count} new`}</span> : null}
+        <h2 id="home-foryou" className={PANEL_HEADING}>{t("book.forYou")}</h2>
+        {count ? <span className="rounded-full bg-(--color-accent-soft) px-2.5 py-0.5 text-xs font-semibold text-(--color-accent)">{t("book.newCount", { count })}</span> : null}
       </div>
-      {feed.isLoading ? <p role="status" className={NOTE}>Loading…</p> : feed.isError && items.length === 0 ? (
+      {feed.isLoading ? <p role="status" className={NOTE}>{t("library.loadingEllipsis")}</p> : feed.isError && items.length === 0 ? (
         <div role="alert" className="space-y-3 px-4.5 py-3">
-          <p>Couldn't load activity.</p>
-          <button type="button" className={BUTTON_SECONDARY} onClick={() => void feed.refetch()}>Retry</button>
+          <p>{t("book.activityLoadFailed")}</p>
+          <button type="button" className={BUTTON_SECONDARY} onClick={() => void feed.refetch()}>{t("library.retry")}</button>
         </div>
-      ) : items.length === 0 && feed.hasNextPage && !feed.isError ? <p role="status" className={NOTE}>Loading…</p> : items.length === 0 && !feed.hasNextPage ? <p className={NOTE}>Nothing new yet. New followers and plays of your games show up here.</p> : (
+      ) : items.length === 0 && feed.hasNextPage && !feed.isError ? <p role="status" className={NOTE}>{t("library.loadingEllipsis")}</p> : items.length === 0 && !feed.hasNextPage ? <p className={NOTE}>{t("book.nothingNew")}</p> : (
         <ul ref={list} className="divide-y divide-(--color-border)">
           {items.map((item) => {
             const row = activityRowModel(item, locale);
@@ -146,8 +148,8 @@ export function ForYouPanel() {
                   <Row item={item} isNew={isNew} />
                 </Link>
                 {row.action.kind === "followBack" && item.kind === "follow" ? (
-                  <button type="button" aria-label={`Follow back ${item.actor.username}`} className={`${BUTTON_SECONDARY} shrink-0`} disabled={busyId === item.actor.userId} onClick={() => void followBack(item.actor.userId)}>Follow back</button>
-                ) : <span className="shrink-0 text-(--color-text-dim)">Following</span>}
+                  <button type="button" aria-label={t("book.followBackAria", { name: item.actor.username })} className={`${BUTTON_SECONDARY} shrink-0`} disabled={busyId === item.actor.userId} onClick={() => void followBack(item.actor.userId)}>{t("book.followBack")}</button>
+                ) : <span className="shrink-0 text-(--color-text-dim)">{t("book.following")}</span>}
               </li>
             );
           })}
@@ -155,12 +157,12 @@ export function ForYouPanel() {
       )}
       {feed.isError && items.length > 0 ? (
         <div role="alert" className="space-y-3 px-4.5 py-3">
-          <p>Couldn't refresh activity.</p>
-          <button type="button" className={BUTTON_SECONDARY} onClick={() => void feed.refetch()}>Retry</button>
+          <p>{t("book.activityRefreshFailed")}</p>
+          <button type="button" className={BUTTON_SECONDARY} onClick={() => void feed.refetch()}>{t("library.retry")}</button>
         </div>
       ) : null}
       {error ? <p role="alert" className="px-4.5 py-3 text-sm text-(--color-danger)">{error}</p> : null}
-      {feed.hasNextPage ? <div className="px-4.5 py-3"><button type="button" className={BUTTON_SECONDARY} disabled={feed.isFetching} onClick={() => void feed.fetchNextPage()}>Show more</button></div> : null}
+      {feed.hasNextPage ? <div className="px-4.5 py-3"><button type="button" className={BUTTON_SECONDARY} disabled={feed.isFetching} onClick={() => void feed.fetchNextPage()}>{t("book.showMore")}</button></div> : null}
     </section>
   );
 }

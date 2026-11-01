@@ -4,7 +4,7 @@
 // (if any) against the tournament's plain ownerUserId field — no new
 // auth primitive needed on the (deliberately unauthenticated) GET route.
 
-import { itemNoun } from "@scripta/shared";
+import { sharedT } from "@scripta/shared/i18n";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { renameTournament, resolveTiebreak, settleDuelEarly, type DuelSide } from "../api/arena";
@@ -20,10 +20,11 @@ import { EmptyState } from "../components/EmptyState";
 import { Page } from "../components/page/Page";
 import { BUTTON_SECONDARY, TITLE_FIELD_CLASS } from "../components/page/buttonClasses";
 import { backTo } from "../lib/areas";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
 export function ArenaViewPage() {
   const locale = useLocale();
+  const t = useT();
   const { id } = useParams<{ id: string }>();
   const { session } = useAuth();
   const { tournament, isLoading, vote, refetch } = useArena(id!);
@@ -35,19 +36,19 @@ export function ArenaViewPage() {
   const [nameDraft, setNameDraft] = useState("");
   const [picked, setPicked] = useState<DuelSide | null>(null);
 
-  const back = session ? backTo("tournament") : { to: "/arena", label: "Games" };
+  const back = session ? backTo("tournament") : { to: "/arena", label: t("shell.areaGames") };
 
   if (isLoading) {
     return (
-      <Page title="Tournament" back={back}>
-        <p className="text-sm text-(--color-text-dim)">Loading…</p>
+      <Page title={t("arena.tournament")} back={back}>
+        <p className="text-sm text-(--color-text-dim)">{t("library.loadingEllipsis")}</p>
       </Page>
     );
   }
   if (!tournament) {
     return (
-      <Page title="Tournament" back={back}>
-        <p className="text-sm text-(--color-text-dim)">No such tournament.</p>
+      <Page title={t("arena.tournament")} back={back}>
+        <p className="text-sm text-(--color-text-dim)">{t("arena.noSuchTournament")}</p>
       </Page>
     );
   }
@@ -59,7 +60,7 @@ export function ArenaViewPage() {
     try {
       await vote(duelId, workId);
     } catch (err) {
-      setVoteError(err instanceof Error ? err.message : "Couldn't record that vote.");
+      setVoteError(err instanceof Error ? err.message : t("arena.couldntRecordVote"));
     }
   }
 
@@ -79,7 +80,7 @@ export function ArenaViewPage() {
       await renameTournament(tournament!.id, name);
       await refetch();
     } catch (err) {
-      setOwnerActionError(err instanceof Error ? err.message : "Couldn't save that name.");
+      setOwnerActionError(err instanceof Error ? err.message : t("arena.couldntSaveName"));
     }
   }
 
@@ -90,7 +91,7 @@ export function ArenaViewPage() {
       await settleDuelEarly(tournament!.id, duelId);
       await refetch();
     } catch (err) {
-      setOwnerActionError(err instanceof Error ? err.message : "Couldn't settle that duel.");
+      setOwnerActionError(err instanceof Error ? err.message : t("arena.couldntSettle"));
     } finally {
       setBusyDuelId(null);
     }
@@ -103,7 +104,7 @@ export function ArenaViewPage() {
       await resolveTiebreak(tournament!.id, duelId, winnerWorkId);
       await refetch();
     } catch (err) {
-      setOwnerActionError(err instanceof Error ? err.message : "Couldn't resolve that tie.");
+      setOwnerActionError(err instanceof Error ? err.message : t("arena.couldntResolveTie"));
     } finally {
       setBusyDuelId(null);
     }
@@ -127,7 +128,7 @@ export function ArenaViewPage() {
               if (e.key === "Enter") void handleRename();
               if (e.key === "Escape") setEditingName(false);
             }}
-            aria-label="Tournament name"
+            aria-label={t("arena.tournamentName")}
             className={TITLE_FIELD_CLASS}
           />
         ) : isOwner ? (
@@ -136,7 +137,7 @@ export function ArenaViewPage() {
               setNameDraft(tournament.name);
               setEditingName(true);
             }}
-            title="Rename this tournament"
+            title={t("arena.renameTournament")}
             className="flex min-h-11 w-full items-center text-left font-bold transition-colors hover:text-(--color-accent)"
           >
             <span className="min-w-0 break-words">{tournament.name}</span>
@@ -147,7 +148,7 @@ export function ArenaViewPage() {
       }
       subtitle={
         <span className="flex flex-wrap items-center gap-1.5">
-          {tournament.bracketSize}-{itemNoun(tournament.subject, 1, locale)} bracket
+          {sharedT(locale)(tournament.subject ? "shared.helpers.bracketCharacters" : "shared.helpers.bracketBooks", { size: tournament.bracketSize })}
           <TournamentStatusBadge status={tournament.status} round={tournament.currentRound} />
         </span>
       }
@@ -174,7 +175,7 @@ export function ArenaViewPage() {
               i > 0 ? "border-l border-(--color-border)" : ""
             } ${view === mode ? "bg-(--color-accent-soft) text-(--color-accent)" : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"}`}
           >
-            {mode}
+            {mode === "matches" ? t("arena.viewMatches") : t("arena.viewBracket")}
             {/* How many live matches this viewer still hasn't voted in.
                 Without it the tournament never asks for anything — you
                 have to open a view and hunt for a match still running.
@@ -192,7 +193,7 @@ export function ArenaViewPage() {
           // BracketMap draws the full skeleton from bracketSize, so it
           // WOULD render an all-empty bracket here. That reads as broken
           // rather than as "not started", so say so instead.
-          <EmptyState title="This tournament hasn't started yet." body="Its bracket appears once it's seeded and running." />
+          <EmptyState title={t("arena.notStarted")} body={t("arena.notStartedBody")} />
         ) : (
           <BracketMap
             tournament={tournament}
@@ -206,7 +207,7 @@ export function ArenaViewPage() {
         tournament={tournament}
         renderDuel={(duelId, round) => {
           const duel = tournament.duels.find((d) => d.id === duelId)!;
-          const votingDisabledReason = duel.hasVoted ? "You already voted" : tournament.status !== "active" ? "Tournament not active" : null;
+          const votingDisabledReason = duel.hasVoted ? t("arena.alreadyVoted") : tournament.status !== "active" ? t("arena.notActive") : null;
           return (
             <div>
               <DuelCard
@@ -223,7 +224,7 @@ export function ArenaViewPage() {
                   disabled={busyDuelId === duel.id}
                   className={`${BUTTON_SECONDARY} mt-2 w-full`}
                 >
-                  Settle now
+                  {t("arena.settleNow")}
                 </button>
               )}
               {isOwner && duel.status === "tied_pending_tiebreak" && (
@@ -233,14 +234,14 @@ export function ArenaViewPage() {
                     disabled={busyDuelId === duel.id || duel.bookA.workId === null}
                     className={`${BUTTON_SECONDARY} flex-1`}
                   >
-                    {duel.bookA.title} wins
+                    {t("arena.winsTitle", { title: duel.bookA.title })}
                   </button>
                   <button
                     onClick={() => void handleTiebreak(duel.id, duel.bookB.workId!)}
                     disabled={busyDuelId === duel.id || duel.bookB.workId === null}
                     className={`${BUTTON_SECONDARY} flex-1`}
                   >
-                    {duel.bookB.title} wins
+                    {t("arena.winsTitle", { title: duel.bookB.title })}
                   </button>
                 </div>
               )}

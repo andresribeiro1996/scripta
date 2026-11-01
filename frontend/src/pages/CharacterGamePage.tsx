@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { bracketSizes, canCreate, defaultTicked, plural, roundMinutesFromHours, type CharacterGameMode, type WorkCast } from "@scripta/shared";
+import { bracketSizes, canCreate, defaultTicked, roundMinutesFromHours, type CharacterGameMode, type WorkCast } from "@scripta/shared";
+import { sharedT } from "@scripta/shared/i18n";
 import { createCharacterTournament } from "../api/arena";
 import { createCharacterTierlist, type Tierlist } from "../api/tierlists";
 import { fetchWorkCast } from "../api/works";
@@ -9,22 +10,27 @@ import { CoverImage } from "../components/BookCard";
 import { LibraryIcon } from "../components/NavIcons";
 import { Page } from "../components/page/Page";
 import { BUTTON_PRIMARY, FIELD_CLASS, chipClass } from "../components/page/buttonClasses";
+import { useLocale, useT } from "../i18n";
 
-const MODES = [{ value: "tierlist", label: "Tier list" }, { value: "tournament", label: "Tournament" }] as const;
+const MODES = [{ value: "tierlist", label: "arena.modeTierlist" }, { value: "tournament", label: "arena.tournament" }] as const;
 
 export function CharacterGamePage() {
+  const t = useT();
   const { id = "" } = useParams<{ id: string }>();
   const cast = useQuery({ queryKey: ["works", id, "cast"], queryFn: () => fetchWorkCast(id), retry: false });
   return (
-    <Page width="narrow" title="Character game" back={{ to: `/work/${id}`, label: "Book" }}>
+    <Page width="narrow" title={t("arena.characterGame")} back={{ to: `/work/${id}`, label: t("book.pageTitle") }}>
       <div className="pb-10">
-        {cast.isPending ? <p>Loading…</p> : cast.isError ? <button type="button" onClick={() => void cast.refetch()} className="min-h-11 text-left text-(--color-accent)">The cast couldn't be loaded. Retry</button> : <CastPicker key={id} workId={id} cast={cast.data} />}
+        {cast.isPending ? <p>{t("library.loadingEllipsis")}</p> : cast.isError ? <button type="button" onClick={() => void cast.refetch()} className="min-h-11 text-left text-(--color-accent)">{t("arena.castLoadFailed")}</button> : <CastPicker key={id} workId={id} cast={cast.data} />}
       </div>
     </Page>
   );
 }
 
 function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
+  const locale = useLocale();
+  const t = useT();
+  const shared = sharedT(locale);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const sizes = bracketSizes(cast.characters.length);
@@ -32,7 +38,7 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
   const [mode, setMode] = useState<CharacterGameMode>("tierlist");
   const [size, setSize] = useState(sizes[sizes.length - 1] ?? 0);
   const [ticked, setTicked] = useState(() => defaultTicked(cast.characters, "tierlist", size));
-  const [name, setName] = useState(`${cast.scope.label} characters`);
+  const [name, setName] = useState(t("arena.defaultGameName", { label: cast.scope.label }));
   const [duration, setDuration] = useState("24");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +59,7 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
     setError(null);
     try {
       const characters = { workId, characterIds: ticked };
-      const title = name.trim() || `${cast.scope.label} characters`;
+      const title = name.trim() || t("arena.defaultGameName", { label: cast.scope.label });
       if (mode === "tierlist") {
         const created = await createCharacterTierlist(title, characters);
         queryClient.setQueryData<Tierlist[]>(["tierlists"], (items = []) => [...items, created]);
@@ -64,7 +70,7 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
         navigate(`/arena/${created.id}`, { replace: true });
       }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Couldn't create the game.");
+      setError(reason instanceof Error ? reason.message : t("arena.couldntCreateGame"));
     } finally {
       setBusy(false);
     }
@@ -79,28 +85,28 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
         </div>
         <div className="min-w-0">
           <p className="font-semibold">{cast.scope.label}</p>
-          {cast.scope.kind === "series" && <p className="text-sm text-(--color-text-dim)">{plural(cast.scope.workCount, "book", "books")}</p>}
+          {cast.scope.kind === "series" && <p className="text-sm text-(--color-text-dim)">{shared("shared.helpers.books", { count: cast.scope.workCount })}</p>}
         </div>
       </div>
       {modes.length > 1 && (
-        <div role="group" aria-label="Game type" className="flex gap-2">
-          {modes.map((option) => <button key={option.value} type="button" aria-pressed={mode === option.value} onClick={() => chooseMode(option.value)} className={chipClass(mode === option.value)}>{option.label}</button>)}
+        <div role="group" aria-label={t("arena.gameType")} className="flex gap-2">
+          {modes.map((option) => <button key={option.value} type="button" aria-pressed={mode === option.value} onClick={() => chooseMode(option.value)} className={chipClass(mode === option.value)}>{t(option.label)}</button>)}
         </div>
       )}
       {mode === "tournament" && (
         <>
-          <div role="group" aria-label="Bracket size" className="flex flex-wrap gap-2">
+          <div role="group" aria-label={t("arena.bracketSize")} className="flex flex-wrap gap-2">
             {sizes.map((value) => <button key={value} type="button" aria-pressed={size === value} onClick={() => chooseSize(value)} className={chipClass(size === value)}>{value}</button>)}
           </div>
-          <label className="flex flex-col gap-1 text-sm font-semibold">Round duration (hours)
+          <label className="flex flex-col gap-1 text-sm font-semibold">{t("arena.roundDuration")}
             <input inputMode="decimal" value={duration} onChange={(event) => setDuration(event.target.value)} className={FIELD_CLASS} />
           </label>
         </>
       )}
-      <label className="flex flex-col gap-1 text-sm font-semibold">Name
+      <label className="flex flex-col gap-1 text-sm font-semibold">{t("library.groupName")}
         <input value={name} onChange={(event) => setName(event.target.value)} maxLength={200} className={FIELD_CLASS} />
       </label>
-      <p className="text-sm text-(--color-text-dim)">{mode === "tournament" ? `${ticked.length} of ${size} characters` : `${ticked.length} characters`}</p>
+      <p className="text-sm text-(--color-text-dim)">{mode === "tournament" ? t("arena.charactersOfSize", { count: ticked.length, size }) : t("arena.charactersCount", { count: ticked.length })}</p>
       <div className="space-y-2">
         {cast.characters.map((character) => {
           const checked = selected.has(character.id);
@@ -112,7 +118,7 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
         })}
       </div>
       <div className="flex justify-end">
-        <button type="button" disabled={busy || !canCreate(mode, ticked.length, size)} onClick={() => void create()} className={BUTTON_PRIMARY}>{busy ? "Creating…" : mode === "tierlist" ? "Create tier list" : "Create tournament"}</button>
+        <button type="button" disabled={busy || !canCreate(mode, ticked.length, size)} onClick={() => void create()} className={BUTTON_PRIMARY}>{busy ? t("arena.creating") : mode === "tierlist" ? t("arena.createTierlist") : t("arena.createTournament")}</button>
       </div>
     </div>
   );

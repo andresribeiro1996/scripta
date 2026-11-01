@@ -8,8 +8,10 @@ import { Page, SettingGroup, SettingRow } from "../components/page/Page";
 import { LIST_PANEL } from "../components/page/surfaceClasses";
 import { SocialsSection } from "../components/SocialsSection";
 import { area } from "../lib/areas";
+import { useT } from "../i18n";
 
 export function SettingsPage() {
+  const t = useT();
   const { session, setUsername, uploadAvatar, removeAvatar } = useAuth();
   const [draft, setDraft] = useState(session?.user.username ?? "");
   const [editing, setEditing] = useState(false);
@@ -29,7 +31,7 @@ export function SettingsPage() {
     try {
       await uploadAvatar(file);
     } catch (err) {
-      setAvatarError(err instanceof Error ? err.message : "Something went wrong.");
+      setAvatarError(err instanceof Error ? err.message : t("shell.somethingWentWrong"));
     } finally {
       setAvatarBusy(false);
     }
@@ -41,7 +43,7 @@ export function SettingsPage() {
     try {
       await removeAvatar();
     } catch (err) {
-      setAvatarError(err instanceof Error ? err.message : "Something went wrong.");
+      setAvatarError(err instanceof Error ? err.message : t("shell.somethingWentWrong"));
     } finally {
       setAvatarBusy(false);
     }
@@ -57,24 +59,24 @@ export function SettingsPage() {
       setEditing(false);
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setError(err instanceof Error ? err.message : t("shell.somethingWentWrong"));
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <Page title="Settings" tabs={area("settings").tabs} sideTabs>
+    <Page title={t("shell.areaSettings")} tabs={area("settings").tabs} sideTabs>
       <div className="space-y-8">
-        <SettingGroup title="Profile">
+        <SettingGroup title={t("settings.profile")}>
           <div className={LIST_PANEL}>
             {session && (
               <SettingRow
                 leading={<Avatar user={session.user} size={48} className={avatarBusy ? "animate-pulse" : ""} />}
-                label="Profile picture"
+                label={t("settings.profilePicture")}
                 description={
                   <>
-                    <span className="block">{avatarBusy ? "Working…" : "Shown on your profile, murals and games"}</span>
+                    <span className="block">{avatarBusy ? t("shell.working") : t("settings.profilePictureHint")}</span>
                     {avatarError ? <span role="alert" className="block text-(--color-danger)">{avatarError}</span> : null}
                   </>
                 }
@@ -87,22 +89,22 @@ export function SettingsPage() {
                   className="hidden"
                 />
                 <button disabled={avatarBusy} onClick={() => fileInputRef.current?.click()} className={BUTTON_SECONDARY}>
-                  Change picture
+                  {t("settings.changePicture")}
                 </button>
                 {session.user.avatarId && (
                   <button disabled={avatarBusy} onClick={() => void handleAvatarRemove()} className={BUTTON_SECONDARY}>
-                    Remove picture
+                    {t("settings.removePicture")}
                   </button>
                 )}
               </SettingRow>
             )}
             <SettingRow
-              label={<label htmlFor="settings-username">Username</label>}
+              label={<label htmlFor="settings-username">{t("shell.username")}</label>}
               description={
                 <>
                   <span className="block">@{session?.user.username ?? "—"}</span>
                   {error ? <span role="alert" className="block text-(--color-danger)">{error}</span> : null}
-                  {success ? <span role="status" className="block text-(--color-accent)">Username updated.</span> : null}
+                  {success ? <span role="status" className="block text-(--color-accent)">{t("settings.usernameUpdated")}</span> : null}
                 </>
               }
             >
@@ -116,7 +118,7 @@ export function SettingsPage() {
                   }}
                   className={BUTTON_SECONDARY}
                 >
-                  Change username
+                  {t("settings.changeUsername")}
                 </button>
               ) : (
                 <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2">
@@ -128,14 +130,14 @@ export function SettingsPage() {
                     minLength={3}
                     maxLength={30}
                     pattern="[a-zA-Z0-9_.]+"
-                    title="Letters, numbers, underscores, and periods only."
+                    title={t("shell.usernameRule")}
                     className={`${FIELD_CLASS} w-full min-w-0 sm:w-48`}
                   />
                   <button type="submit" disabled={submitting} className={BUTTON_PRIMARY}>
-                    Save
+                    {t("book.save")}
                   </button>
                   <button type="button" onClick={() => setEditing(false)} className={BUTTON_SECONDARY}>
-                    Cancel
+                    {t("shell.cancel")}
                   </button>
                 </form>
               )}

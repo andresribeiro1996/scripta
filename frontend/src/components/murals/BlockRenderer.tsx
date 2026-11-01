@@ -3,6 +3,7 @@ import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import type { MuralBlock, ReaderProfile, ShelfTheme } from "../../lib/murals";
 import { NO_GROUPS } from "../../hooks/useReaderCard";
+import { useT } from "../../i18n";
 import { CurrentlyReadingBlockView, ShelfBlockView, SpotlightBlockView, TierListBlockView } from "./blocks/BookBlocks";
 import { ImageBlockView, ProfileBlockView, StatsBlockView, TextBlockView } from "./blocks/MiscBlocks";
 import { QuoteBlockView, QuoteCollectionBlockView } from "./blocks/QuoteBlocks";
@@ -51,6 +52,7 @@ export function BlockRenderer({
    *  "unavailable" state. See this file's own top comment. */
   tierlistData?: (tierlistId: string) => ResolvedTierlist | undefined;
 }) {
+  const t = useT();
   switch (block.type) {
     case "spotlight":
       return <SpotlightBlockView block={block} books={books} />;
@@ -73,7 +75,7 @@ export function BlockRenderer({
     case "tierlist":
       return <TierListBlockView tierlist={tierlistData?.(block.tierlistId)} books={books} />;
     case "readerCard":
-      return <ReaderCardBlockView books={books} groups={groups ?? NO_GROUPS} readerCardOverride={readerCardOverride} readerName={profile?.username || "reader"} />;
+      return <ReaderCardBlockView books={books} groups={groups ?? NO_GROUPS} readerCardOverride={readerCardOverride} readerName={profile?.username || t("muralEditor.fallbackReader")} />;
     case "empty":
       // Genuinely nothing to render — the block wrapper itself
       // (MuralCanvas.tsx) already carries the whole BlockStyle

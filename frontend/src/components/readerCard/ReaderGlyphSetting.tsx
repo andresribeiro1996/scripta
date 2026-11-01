@@ -7,13 +7,13 @@ import { ReaderGlyph } from "../ReaderGlyph";
 import { useToast } from "../Toaster";
 import { PANEL_HEADING } from "../page/surfaceClasses";
 import { ToggleSwitch } from "../ToggleSwitch";
-import { getLocale, useLocale } from "../../i18n";
+import { getLocale, useLocale, useT } from "../../i18n";
 
 const OWN_PROFILE_KEY = ["community", "own-profile"] as const;
-const LABEL = "Show my reader glyph next to my name";
 
 export function ReaderGlyphSetting({ username, books, groups }: { username: string; books: Array<Record<string, unknown>>; groups: Group[] }) {
   const locale = useLocale();
+  const t = useT();
   const client = useQueryClient();
   const toast = useToast();
   const { data: profile } = useQuery({ queryKey: OWN_PROFILE_KEY, queryFn: fetchOwnProfile });
@@ -30,7 +30,7 @@ export function ReaderGlyphSetting({ username, books, groups }: { username: stri
       void client.invalidateQueries({ queryKey: ["community", "profile", username] });
     } catch (error) {
       client.setQueryData<OwnProfile>(OWN_PROFILE_KEY, profile);
-      toast({ message: saveFailureMessage(error, "Couldn't save the glyph setting.", getLocale()), kind: "error" });
+      toast({ message: saveFailureMessage(error, t("readerCard.glyphSaveFailed"), getLocale()), kind: "error" });
     } finally {
       setBusy(false);
     }
@@ -39,14 +39,14 @@ export function ReaderGlyphSetting({ username, books, groups }: { username: stri
   return (
     <section>
       <div className="flex items-center justify-between gap-3">
-        <h3 className={PANEL_HEADING}>{LABEL}</h3>
-        <ToggleSwitch checked={settings.readerGlyph ?? false} disabled={!profile || busy} label={LABEL} onChange={(next) => void toggle(next)} />
+        <h3 className={PANEL_HEADING}>{t("readerCard.showGlyph")}</h3>
+        <ToggleSwitch checked={settings.readerGlyph ?? false} disabled={!profile || busy} label={t("readerCard.showGlyph")} onChange={(next) => void toggle(next)} />
       </div>
       <p className="mt-2 flex items-center gap-1.5 text-sm text-(--color-text-dim)">
         <span aria-hidden="true"><ReaderGlyph identity={preview.glyph ?? undefined} /></span>
         {preview.line}
       </p>
-      {profile && !profile.published ? <p className="mt-1 text-xs text-(--color-text-dim)">It shows once your shelf is published.</p> : null}
+      {profile && !profile.published ? <p className="mt-1 text-xs text-(--color-text-dim)">{t("readerCard.glyphAfterPublish")}</p> : null}
     </section>
   );
 }

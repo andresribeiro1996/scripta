@@ -164,8 +164,8 @@ test("book sections are links to ?tab=, and the URL picks the current one", () =
 
 test("the cover menu items say what they do and who they affect", () => {
   const src = readFileSync(new URL("../src/components/book/BookScreen.tsx", import.meta.url), "utf8");
-  const labels = [...src.matchAll(/label: "([^"]*cover[^"]*)"/g)].map((m) => m[1]);
-  assert.deepEqual(labels, ["Change cover", "Reject cover for everyone", "Upload cover for everyone"]);
+  const labels = [...src.matchAll(/label: (t\("book\.changeCover"\)|"[^"]*cover[^"]*"),/g)].map((m) => m[1]);
+  assert.deepEqual(labels, ['t("book.changeCover")', '"Reject cover for everyone"', '"Upload cover for everyone"']);
 });
 
 test("the status menu shows its label with a check, not a ▾ glyph", () => {

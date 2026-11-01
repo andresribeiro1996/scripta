@@ -17,12 +17,14 @@ import { useDismissible } from "../hooks/useDismissible";
 import { useGenreEnrichment } from "../hooks/useGenreEnrichment";
 import { useLibrary } from "../hooks/useLibrary";
 import { useScrollLock } from "../hooks/useScrollLock";
+import { useT } from "../i18n";
 import { area, areaIdForPath, BOTTOM_BAR_AREAS, footerAreas, NAV_AREAS, TOP_BAR_AREAS } from "../lib/areas";
 
 /** Persistent top bar (bottom bar and More drawer below `lg`) wrapping every signed-in page (every area in lib/areas.ts) — one shared shell instead of each page
  *  reimplementing its own header/logout, which is how it worked before
  *  this existed (see git history on DashboardPage.tsx). */
 export function DashboardLayout() {
+  const t = useT();
   const { session, logout } = useAuth();
   const { data: library, updateLibrary } = useLibrary();
   const { personalNewCount } = useActivityFeed();
@@ -80,7 +82,7 @@ export function DashboardLayout() {
                 key={id}
                 to={item.to}
                 aria-current={id === activeId ? "page" : undefined}
-                aria-label={id === "home" && homeBadge ? `Home, ${homeBadge} new` : undefined}
+                aria-label={id === "home" && homeBadge ? t("shell.badgeNew", { label: item.label, badge: homeBadge }) : undefined}
                 className={`flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium ${
                   id === activeId ? "text-(--color-accent)" : "text-(--color-text-dim)"
                 }`}
@@ -103,7 +105,7 @@ export function DashboardLayout() {
             }`}
           >
             <MoreIcon size={22} />
-            More
+            {t("shell.more")}
           </button>
         </nav>
       )}
@@ -123,8 +125,8 @@ export function DashboardLayout() {
                 {session && (
                   <Link
                     to={`/community/u/${session.user.username}`}
-                    aria-label="My shelf"
-                    title="My shelf"
+                    aria-label={t("shell.myShelf")}
+                    title={t("shell.myShelf")}
                     onClick={() => setDrawerOpen(false)}
                     className="-m-2.5 shrink-0 rounded-full p-2.5 transition-opacity hover:opacity-80"
                   >
@@ -138,7 +140,7 @@ export function DashboardLayout() {
                 onClick={() => void logout()}
                 className="w-full rounded-lg border border-(--color-danger-soft) min-h-11 px-3 py-2.5 text-left text-sm text-(--color-danger) hover:bg-(--color-danger-soft)"
               >
-                Log out
+                {t("shell.logOut")}
               </button>
             </div>
           </aside>

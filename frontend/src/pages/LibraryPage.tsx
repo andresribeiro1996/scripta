@@ -44,11 +44,12 @@ import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../l
 import { SORT_KEYS, STATUS_FILTERS, bookHref, filterBooks, sortBooks, type SortKey, type StatusFilter } from "../lib/libraryView";
 import { bookKey } from "../lib/merge";
 import { saveWithViewTransition } from "../lib/viewTransition";
-import { getLocale } from "../i18n";
+import { getLocale, useT } from "../i18n";
 
 const scrollPositions = new Map<string, number>();
 
 export function LibraryPage() {
+  const t = useT();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { key: locationKey } = useLocation();
@@ -128,7 +129,7 @@ export function LibraryPage() {
     try {
       await updateLibrary((data) => ({ ...data, name }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save the new name.", getLocale()), kind: "error" });
+      toast({ message: saveFailureMessage(error, t("library.renameFailed"), getLocale()), kind: "error" });
     }
   }
 
@@ -154,11 +155,11 @@ export function LibraryPage() {
     setImportError(null);
     // Parsing a multi-MB SQLite file through sql.js's WASM engine can take
     // a beat — worth a status message rather than a silent pause.
-    setImportStatus(file.name.toLowerCase().endsWith(".sqlite") || file.name.toLowerCase().endsWith(".db") ? "Reading SQLite database…" : "Reading file…");
+    setImportStatus(file.name.toLowerCase().endsWith(".sqlite") || file.name.toLowerCase().endsWith(".db") ? t("library.importReadingSqlite") : t("library.importReadingFile"));
     try {
       await mergeAndSave(await parseImportedFile(file), "import");
     } catch (err) {
-      setImportError(err instanceof Error ? err.message : "Couldn't import that file.");
+      setImportError(err instanceof Error ? err.message : t("library.importFailed"));
     } finally {
       setImportStatus(null);
     }
@@ -167,7 +168,7 @@ export function LibraryPage() {
   async function handleAddBook(book: Record<string, unknown>) {
     const result = await saver.submit({ kind: "add", book });
     if (!result.ok) throw result.error;
-    toast({ message: `Added "${String(book.Title ?? "book")}".` });
+    toast({ message: t("library.bookAdded", { title: String(book.Title ?? t("library.bookFallback")) }) });
   }
 
   // Drag a card onto another to reorder — see lib/libraryOrder.ts's
@@ -195,7 +196,7 @@ export function LibraryPage() {
 
     saving.catch((err) => {
       console.error("Failed to persist new book order:", err);
-      toast({ message: saveFailureMessage(err, "Couldn't save the new order — moved back.", getLocale()), kind: "error" });
+      toast({ message: saveFailureMessage(err, t("library.reorderFailed"), getLocale()), kind: "error" });
     });
   }
 
@@ -237,24 +238,24 @@ export function LibraryPage() {
         return deleteBooks(data, keys);
       });
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't delete — nothing was changed.", getLocale()), kind: "error" });
+      toast({ message: saveFailureMessage(error, t("library.deleteFailed"), getLocale()), kind: "error" });
       return;
     }
     setSelectedKeys(new Set());
     setSelectionMode(false);
     const scrubTimer = setTimeout(() => void scrubBooks(keys), 6500);
     toast({
-      message: `Deleted ${keys.size} book${keys.size === 1 ? "" : "s"}.`,
+      message: t("library.deletedBooks", { count: keys.size }),
       action: {
-        label: "Undo",
+        label: t("library.undo"),
         onClick: () => {
           clearTimeout(scrubTimer);
           void (async () => {
             try {
               await updateLibrary((data) => restoreDeletedBooks(data, snapshot, keys));
-              toast({ message: "Restored." });
+              toast({ message: t("library.restored") });
             } catch (error) {
-              toast({ message: saveFailureMessage(error, "Couldn't restore — check your connection.", getLocale()), kind: "error" });
+              toast({ message: saveFailureMessage(error, t("library.restoreFailed"), getLocale()), kind: "error" });
             }
           })();
         }
@@ -309,14 +310,17 @@ export function LibraryPage() {
   const styleBook = styleBookKey ? books.find((b) => bookKey(b) === styleBookKey) : null;
   const coverBook = coverBookKey ? books.find((b) => bookKey(b) === coverBookKey) : null;
 
+  const [importBefore, importRest] = t("library.emptyImport").split("{libraryJson}");
+  const [importMiddle, importAfter] = importRest.split("{koboSqlite}");
+
   const actionItems: OptionsMenuItem[] = [
-    { label: "Sync Goodreads…", onClick: () => setSyncingGoodreads(true) },
-    { label: "Download CSV template", onClick: downloadCsvTemplate },
-    ...(books.length > 0 ? [{ label: "Select…", onClick: handleToggleSelectionMode }] : []),
-    { label: "Library style…", onClick: () => navigate("/dashboard/style") },
-    { label: "Share", onClick: () => setSharing(true) },
+    { label: t("library.actionSyncGoodreads"), onClick: () => setSyncingGoodreads(true) },
+    { label: t("library.actionCsvTemplate"), onClick: downloadCsvTemplate },
+    ...(books.length > 0 ? [{ label: t("library.actionSelect"), onClick: handleToggleSelectionMode }] : []),
+    { label: t("library.actionLibraryStyle"), onClick: () => navigate("/dashboard/style") },
+    { label: t("library.actionShare"), onClick: () => setSharing(true) },
     {
-      label: importing ? "Importing…" : "Import library…",
+      label: importing ? t("library.importing") : t("library.actionImport"),
       onClick: () => {
         if (!importing) fileInputRef.current?.click();
       }
@@ -326,7 +330,7 @@ export function LibraryPage() {
   return (
     <Page
       width="wide"
-      title="Library"
+      title={t("shell.areaLibrary")}
       subtitle={
         <>
           {editingName ? (
@@ -334,14 +338,14 @@ export function LibraryPage() {
               autoFocus
               value={nameDraft}
               maxLength={200}
-              aria-label="Library name"
+              aria-label={t("library.libraryName")}
               onChange={(e) => setNameDraft(e.target.value)}
               onBlur={() => void handleRenameLibrary()}
               onKeyDown={(e) => {
                 if (e.key === "Enter") void handleRenameLibrary();
                 if (e.key === "Escape") setEditingName(false);
               }}
-              placeholder="Name your library…"
+              placeholder={t("library.namePlaceholder")}
               className={`${FIELD_CLASS} max-w-full`}
             />
           ) : (
@@ -350,13 +354,13 @@ export function LibraryPage() {
                 setNameDraft(library?.data.name ?? "");
                 setEditingName(true);
               }}
-              title="Rename your library"
+              title={t("library.renameTitle")}
               className="inline-flex min-h-11 max-w-full min-w-0 items-center rounded-lg text-left break-all min-w-11 hover:text-(--color-accent)"
             >
-              {library?.data.name || "Name your library"}
+              {library?.data.name || t("library.nameYourLibrary")}
             </button>
           )}
-          {isLoading ? null : ` · ${books.length} book${books.length === 1 ? "" : "s"}`}
+          {isLoading ? null : ` · ${t("library.bookCount", { count: books.length })}`}
         </>
       }
       tabs={area("library").tabs}
@@ -366,22 +370,22 @@ export function LibraryPage() {
         <>
           {books.length > 0 && selectionMode ? (
             <>
-              <span className="text-sm text-(--color-text-dim)">{selectedKeys.size} selected</span>
+              <span className="text-sm text-(--color-text-dim)">{t("library.selectedCount", { count: selectedKeys.size })}</span>
               <button
                 onClick={() => void handleDeleteSelected()}
                 disabled={selectedKeys.size === 0}
                 className={BUTTON_DANGER}
               >
-                Delete selected
+                {t("library.deleteSelected")}
               </button>
-              <button onClick={handleToggleSelectionMode} className={BUTTON_SECONDARY}>Cancel</button>
+              <button onClick={handleToggleSelectionMode} className={BUTTON_SECONDARY}>{t("shell.cancel")}</button>
             </>
           ) : (
             <>
-              <button onClick={() => setAddingBook(true)} className={BUTTON_PRIMARY}>Add a book</button>
+              <button onClick={() => setAddingBook(true)} className={BUTTON_PRIMARY}>{t("library.addBook")}</button>
               <OptionsMenu
                 items={actionItems}
-                title="More actions"
+                title={t("library.moreActions")}
                 trigger={<MoreIcon size={22} />}
                 triggerClassName={toolbarIconClass()}
               />
@@ -401,7 +405,7 @@ export function LibraryPage() {
         </>
       }
     >
-      {searchParams.get("action") === "import" ? <div className={`mb-4 p-4 ${PANEL}`}><h2 className="font-semibold">Import library</h2><button className={`mt-2 ${BUTTON_SECONDARY}`} onClick={() => fileInputRef.current?.click()}>Choose import file</button></div> : null}
+      {searchParams.get("action") === "import" ? <div className={`mb-4 p-4 ${PANEL}`}><h2 className="font-semibold">{t("library.importHeading")}</h2><button className={`mt-2 ${BUTTON_SECONDARY}`} onClick={() => fileInputRef.current?.click()}>{t("library.chooseImportFile")}</button></div> : null}
 
       {importStatus && (
         <div className="mb-5 rounded-lg bg-(--color-accent-soft) px-3 py-2 text-sm text-(--color-accent)">{importStatus}</div>
@@ -435,16 +439,13 @@ export function LibraryPage() {
       {!isLoading && books.length === 0 && (
         <EmptyState
           icon={LibraryIcon}
-          title="No library saved yet."
+          title={t("library.emptyTitle")}
           body={
             <>
-              Import one of: a <code>library.json</code> from the exporter CLI, a <code>KoboReader.sqlite</code> straight
-              off your device's USB drive, a Goodreads library CSV export (My Books → Tools → Import/Export → Export
-              Library), a StoryGraph library CSV export (profile icon → Manage Your Account → Manage Your Data →
-              Export StoryGraph Library), a Calibre CSV catalog, a LibraryThing TSV export, a BookWyrm book-list CSV, or a spreadsheet CSV.
-              <span className="mt-2 block">LibraryThing: More → Import/Export → Tab-Delimited Text. BookWyrm: Settings → Export Book List → CSV.</span>
-              <span className="mt-2 block">For Calibre, export a CSV catalog with title and authors. For spreadsheets, Title and Author are required; other fields are optional. Status: to-read, reading, or read. Rating: 0–5. Dates: YYYY-MM-DD. Blank fields keep your saved values.</span>
-              <a href={csvTemplateUrl} download="atmyshelf-library.csv" className="mt-2 inline-block min-h-11 py-2.5 text-(--color-accent) underline">Download CSV template</a>
+              {importBefore}<code>library.json</code>{importMiddle}<code>KoboReader.sqlite</code>{importAfter}
+              <span className="mt-2 block">{t("library.emptyImportHints")}</span>
+              <span className="mt-2 block">{t("library.emptyImportColumns")}</span>
+              <a href={csvTemplateUrl} download="atmyshelf-library.csv" className="mt-2 inline-block min-h-11 py-2.5 text-(--color-accent) underline">{t("library.actionCsvTemplate")}</a>
             </>
           }
           action={
@@ -454,13 +455,13 @@ export function LibraryPage() {
                 disabled={importing}
                 className={BUTTON_SECONDARY}
               >
-                {importing ? "Importing…" : "Choose a file"}
+                {importing ? t("library.importing") : t("library.chooseFile")}
               </button>
               <button
                 onClick={() => setAddingBook(true)}
                 className="rounded-lg border border-(--color-border) bg-(--color-surface) px-4 py-2.5 text-sm hover:bg-(--color-surface-hover)"
               >
-                Add a book
+                {t("library.addBook")}
               </button>
             </div>
           }
@@ -470,8 +471,8 @@ export function LibraryPage() {
       {books.length > 0 && displayBooks.length === 0 && (
         <EmptyState
           icon={FilterIcon}
-          title="No books match."
-          body="Every book is still here — the search or filters above just don't match any of them."
+          title={t("library.noMatchTitle")}
+          body={t("library.noMatchBody")}
           action={
             toolbarActive && (
               <button
@@ -481,7 +482,7 @@ export function LibraryPage() {
                 }}
                 className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
               >
-                Clear search and filters
+                {t("library.clearFilters")}
               </button>
             )
           }
@@ -494,8 +495,8 @@ export function LibraryPage() {
           onClick={() => setReviewingDuplicates(true)}
           className="mb-3 flex min-h-11 w-full items-center justify-between rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
         >
-          <span>{possibleDuplicates.length === 1 ? "1 possible duplicate" : `${possibleDuplicates.length} possible duplicates`}</span>
-          <span className="font-semibold">Review</span>
+          <span>{t("library.possibleDuplicates", { count: possibleDuplicates.length })}</span>
+          <span className="font-semibold">{t("library.review")}</span>
         </button>
       )}
 
@@ -542,8 +543,8 @@ export function LibraryPage() {
       {styleBook && (
         <PerCardStylePanel
           idPrefix="book"
-          name={String(styleBook.Title ?? "Untitled")}
-          priorityText="the series and library-wide"
+          name={String(styleBook.Title ?? t("library.untitled"))}
+          priorityText={t("library.prioritySeriesLibrary")}
           currentOverride={styleBook._style as PerCardStyle | undefined}
           // Seed from what this book currently looks like one level up
           // the chain — its series' style if it's in a customized one,
@@ -556,12 +557,12 @@ export function LibraryPage() {
 
       {coverBook && (
         <CoverPickerModal
-          title={String(coverBook.Title ?? "Untitled")}
+          title={String(coverBook.Title ?? t("library.untitled"))}
           currentImageId={typeof coverBook._coverImageId === "string" ? coverBook._coverImageId : null}
           lookup={coverParamsFor(coverBook)}
           coverUrl={typeof coverBook._coverUrl === "string" ? coverBook._coverUrl : null}
           isAdmin={isAdmin}
-          removeCoverLabel="Remove custom cover — go back to the normal auto-detected one"
+          removeCoverLabel={t("library.removeCustomCover")}
           onSelect={(image) => void bookActions.saveCover(coverBook, image)}
           onPickFound={(cover, everyone) => {
             if (everyone) void bookActions.saveCoverForEveryone(coverBook, cover);
@@ -588,10 +589,10 @@ export function LibraryPage() {
 
       {sharing && (
         <ShareModal
-          title={library?.data.name || "Library"}
+          title={library?.data.name || t("shell.areaLibrary")}
           shareToken={library?.shareToken ?? null}
           shareUrl={library?.shareUrl ?? null}
-          defaultCaption={library?.data.name ?? "My library"}
+          defaultCaption={library?.data.name ?? t("library.myLibrary")}
           onShare={async () => {
             const updated = await shareLibraryDoc();
             return { shareToken: updated.shareToken as string, shareUrl: updated.shareUrl as string };

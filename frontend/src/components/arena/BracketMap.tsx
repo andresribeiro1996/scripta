@@ -39,7 +39,7 @@ import { Sheet } from "../Sheet";
 import { bracketShape, needsVote, roundLabel, sharePercent, type BracketSlot } from "../../lib/arenaBracket";
 import { BUTTON_SECONDARY } from "../page/buttonClasses";
 import { useCountdown } from "./useCountdown";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 function coverBookFor(side: DuelSide) {
   return { Title: side.title, Attribution: side.author, _coverUrl: side.cover ?? undefined };
@@ -120,6 +120,7 @@ function EmptyTile() {
 }
 
 function MatchTile({ duel, character, onOpen }: { duel: BracketSlot; character: boolean; onOpen: () => void }) {
+  const t = useT();
   if (!duel) return <EmptyTile />;
   const decided = duel.status === "settled";
   const winner = duelWinner(duel);
@@ -135,12 +136,12 @@ function MatchTile({ duel, character, onOpen }: { duel: BracketSlot; character: 
     // both books either way, so which half you touched never mattered.
     <button
       onClick={onOpen}
-      aria-label={
-        `${duel.bookA.title} versus ${duel.bookB.title}` +
-        (pctA === null ? ", no votes yet" : `, ${pctA}% to ${pctB}%`) +
-        (needsVote(duel) ? ", you haven't voted" : "") +
-        (winner ? `, ${winner.title} advanced` : "")
-      }
+      aria-label={[
+        t("arena.matchVersus", { a: duel.bookA.title, b: duel.bookB.title }),
+        pctA === null ? t("arena.noVotesYet") : t("arena.shareSplit", { a: pctA, b: pctB! }),
+        ...(needsVote(duel) ? [t("arena.notVotedYet")] : []),
+        ...(winner ? [t("arena.advanced", { title: winner.title })] : [])
+      ].join(", ")}
       className={`relative flex w-full items-stretch rounded border bg-(--color-surface) text-left hover:bg-(--color-surface-hover) sm:rounded-lg ${
         duel.status === "active" ? "border-(--color-accent)" : "border-(--color-border)"
       }`}
@@ -164,6 +165,7 @@ function MatchTile({ duel, character, onOpen }: { duel: BracketSlot; character: 
 
 /** One book inside the match sheet: cover, title, author, tally. */
 function SheetSide({ side, duel, character }: { side: DuelSide; duel: Duel; character: boolean }) {
+  const t = useT();
   const coverBook = useMemo(() => coverBookFor(side), [side.title, side.author, side.cover]);
   const pct = sharePercent(side.votes, duel);
   const won = duelWinner(duel) === side;
@@ -187,14 +189,14 @@ function SheetSide({ side, duel, character }: { side: DuelSide; duel: Duel; char
       )}
       {side.workId && !character && (
         <Link to={`/work/${side.workId}`} className="mt-1 text-[11px] font-semibold text-(--color-accent) hover:underline">
-          About this book
+          {t("library.aboutThisBook")}
         </Link>
       )}
       <p className={`mt-1 text-sm font-semibold tabular-nums ${won ? "text-(--color-accent)" : ""}`}>
         {pct === null ? "–" : `${pct}%`}
       </p>
       <p className="text-[11px] text-(--color-text-dim) tabular-nums">
-        {side.votes} vote{side.votes === 1 ? "" : "s"}
+        {t("arena.votesCount", { count: side.votes })}
       </p>
     </div>
   );
@@ -230,30 +232,31 @@ function MatchSheet({
   onVote: ((workId: string) => void) | undefined;
   onClose: () => void;
 }) {
+  const t = useT();
   const countdown = useCountdown(duel.closesAt);
   const decided = duel.status === "settled";
   const winner = duelWinner(duel);
   return (
-    <Sheet title="Match" onClose={onClose}>
+    <Sheet title={t("arena.match")} onClose={onClose}>
       <div className="flex items-start gap-2 px-2 pt-1">
         <SheetSide side={duel.bookA} duel={duel} character={character} />
-        <span className="self-center text-[11px] font-semibold text-(--color-text-dim)">vs</span>
+        <span className="self-center text-[11px] font-semibold text-(--color-text-dim)">{t("arena.vsLower")}</span>
         <SheetSide side={duel.bookB} duel={duel} character={character} />
       </div>
 
       <p className="mt-3 text-center text-xs text-(--color-text-dim)">
         {winner
-          ? `${winner.title} advanced`
+          ? t("arena.advanced", { title: winner.title })
           : duel.status === "settled"
-            ? "Settled"
+            ? t("arena.settled")
             : duel.status === "active"
               ? countdown
-              : "Waiting on a tiebreak"}
+              : t("arena.waitingTiebreak")}
       </p>
 
       {canVote && onVote && (
         <div className="mt-3 px-2">
-          <p className="mb-1.5 text-xs font-semibold text-(--color-text-dim)">Vote for</p>
+          <p className="mb-1.5 text-xs font-semibold text-(--color-text-dim)">{t("arena.voteFor")}</p>
           <div className="flex gap-2">
             {[duel.bookA, duel.bookB].map((s) => (
               <button
@@ -269,7 +272,7 @@ function MatchSheet({
         </div>
       )}
       {!canVote && duel.hasVoted && !decided && (
-        <p className="mt-3 px-2 text-center text-xs text-(--color-text-dim)">You've already voted in this match.</p>
+        <p className="mt-3 px-2 text-center text-xs text-(--color-text-dim)">{t("arena.alreadyVotedMatch")}</p>
       )}
     </Sheet>
   );
@@ -436,7 +439,7 @@ export function BracketMap({
 
       {finalDuel && (
         <div className="flex flex-col">
-          <p className="text-center text-[8.5px] font-semibold text-(--color-accent) sm:text-[10px]">Final</p>
+          <p className="text-center text-[8.5px] font-semibold text-(--color-accent) sm:text-[10px]">{roundLabel(1, byRound.length, locale)}</p>
           <div className="relative flex w-full flex-col justify-center">
             {/* Receives from BOTH halves, so it takes a stub on each edge
                 — the only cell in the bracket that does. */}

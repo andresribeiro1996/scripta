@@ -92,7 +92,7 @@ check("People lists use the list panel", /LIST_PANEL/.test(people));
 check("People Follow is secondary, never primary", /BUTTON_SECONDARY/.test(people) && !/BUTTON_PRIMARY/.test(people));
 check(
   "People Follow name starts with the visible label and holds no pressed state",
-  /const label = person\.viewerFollows \? "Following" : "Follow"/.test(people) && /aria-label=\{`\$\{label\} \$\{person\.user\.username\}`\}/.test(people) && !/aria-pressed/.test(people)
+  /const label = person\.viewerFollows \? t\("book\.following"\) : t\("book\.follow"\)/.test(people) && /aria-label=\{t\("community\.followPerson", \{ label, username: person\.user\.username \}\)\}/.test(people) && !/aria-pressed/.test(people)
 );
 check("People search uses the shared field", /<SearchField/.test(people));
 check("SearchField carries the field class", /FIELD_CLASS\} w-full pl-10/.test(readFileSync(new URL("../src/components/Toolbar.tsx", import.meta.url), "utf8")));

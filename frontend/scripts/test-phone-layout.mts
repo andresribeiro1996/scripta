@@ -65,5 +65,5 @@ test("a new text block is tall enough for a heading and a line of text", () => {
 
 test("the series custom-style chip never wraps between its words", () => {
   const source = readFileSync(new URL("../src/pages/GroupsPage.tsx", import.meta.url), "utf8");
-  assert.match(source, /className="[^"]*\binline-block\b[^"]*\bwhitespace-nowrap\b[^"]*">\s*custom style/);
+  assert.match(source, /className="[^"]*\binline-block\b[^"]*\bwhitespace-nowrap\b[^"]*">\s*\{t\("library\.customStyle"\)\}/);
 });

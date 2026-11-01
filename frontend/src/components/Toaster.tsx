@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
+import { useT } from "../i18n";
 import { CloseIcon } from "./Toolbar";
 
 export interface ToastOptions {
@@ -18,6 +19,7 @@ interface ToastItem {
 const ToastContext = createContext<((options: ToastOptions) => void) | null>(null);
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const translate = useT();
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const nextId = useRef(0);
 
@@ -68,7 +70,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   {action.label}
                 </button>
               )}
-              <button onClick={() => dismiss(t.id)} aria-label="Dismiss" className="-my-2 -mr-2 inline-flex min-h-11 min-w-11 items-center justify-center text-(--color-text-dim) hover:text-(--color-text)">
+              <button onClick={() => dismiss(t.id)} aria-label={translate("shell.dismiss")} className="-my-2 -mr-2 inline-flex min-h-11 min-w-11 items-center justify-center text-(--color-text-dim) hover:text-(--color-text)">
                 <CloseIcon size={16} />
               </button>
             </div>

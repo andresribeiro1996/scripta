@@ -6,10 +6,11 @@ import { buildMuralPreset, muralPresets, presetAvailability, type MuralPresetId 
 import { bookKey } from "../../lib/merge";
 import { useResolvedTheme } from "../../lib/theme";
 import { Sheet } from "../Sheet";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export function MuralPresetPicker({ folderId, onClose }: { folderId: string | null; onClose: () => void }) {
   const locale = useLocale();
+  const t = useT();
   const { data: library, isLoading, isError } = useLibrary();
   const { create, saveBlocks } = useMurals();
   const navigate = useNavigate();
@@ -33,7 +34,7 @@ export function MuralPresetPicker({ folderId, onClose }: { folderId: string | nu
       await saveBlocks(target.id, preset.blocks);
       navigate(`/dashboard/murals/${target.id}`);
     } catch {
-      setError("Couldn't save the preset. Choose the same option again to finish the mural.");
+      setError(t("muralEditor.presetSaveFailed"));
     } finally {
       working.current = false;
       setBusy(false);
@@ -41,10 +42,10 @@ export function MuralPresetPicker({ folderId, onClose }: { folderId: string | nu
   }
 
   return (
-    <Sheet title="Start from a preset" onClose={() => { if (!working.current) onClose(); }}>
-      <p className="px-3 pb-4 text-sm text-(--color-text-dim)">Filled from your library. Every block can be moved and edited.</p>
+    <Sheet title={t("murals.startFromPreset")} onClose={() => { if (!working.current) onClose(); }}>
+      <p className="px-3 pb-4 text-sm text-(--color-text-dim)">{t("muralEditor.presetIntro")}</p>
       {error && <p role="alert" className="px-3 pb-3 text-sm text-(--color-danger)">{error}</p>}
-      {isError && <p role="alert" className="px-3 pb-3 text-sm text-(--color-danger)">Couldn't load your library. Reopen presets to try again.</p>}
+      {isError && <p role="alert" className="px-3 pb-3 text-sm text-(--color-danger)">{t("muralEditor.presetLibraryFailed")}</p>}
       <div className="space-y-4 px-3 pb-4">
         {muralPresets(locale).map((preset) => {
           const built = buildMuralPreset(preset.id, books, locale, groups);
@@ -71,7 +72,7 @@ export function MuralPresetPicker({ folderId, onClose }: { folderId: string | nu
               <div className="p-3">
                 <p className="text-sm font-semibold">{preset.name}</p>
                 <p className="mt-1 text-xs text-(--color-text-dim)">{preset.description}</p>
-                <p className="mt-3 text-xs font-medium text-(--color-accent)">{busy ? "Saving…" : isLoading ? "Loading library…" : reason ?? `${built.bookCount} ${built.bookCount === 1 ? "book" : "books"} · Use preset →`}</p>
+                <p className="mt-3 text-xs font-medium text-(--color-accent)">{busy ? t("shell.saving") : isLoading ? t("muralEditor.loadingLibrary") : reason ?? t("muralEditor.presetUse", { count: built.bookCount })}</p>
               </div>
             </button>
           );
