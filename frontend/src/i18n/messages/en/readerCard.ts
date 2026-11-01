@@ -1,7 +1,6 @@
 import type { Messages } from "@scripta/shared/i18n";
 
 export const readerCard = {
-  "readerCard.title": "Reader card",
   "readerCard.loading": "Loading your reader card…",
   "readerCard.loadFailed": "Couldn't load your reader card. Try again",
   "readerCard.saveFailed": "Couldn't save your reader card.",

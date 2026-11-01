@@ -47,16 +47,16 @@ export function ReaderCardPage() {
   };
 
   if (!style) {
-    if (isPending) return <Page title={t("readerCard.title")}><p className="text-sm text-(--color-text-dim)">{t("readerCard.loading")}</p></Page>;
+    if (isPending) return <Page title={t("shell.areaReaderCard")}><p className="text-sm text-(--color-text-dim)">{t("readerCard.loading")}</p></Page>;
     return (
-      <Page title={t("readerCard.title")}>
+      <Page title={t("shell.areaReaderCard")}>
         <button type="button" onClick={() => void refetch()} className="text-sm font-semibold text-(--color-accent)">{t("readerCard.loadFailed")}</button>
       </Page>
     );
   }
 
   return (
-    <Page title={t("readerCard.title")} subtitle={<SaveStatus state={saveState} />}>
+    <Page title={t("shell.areaReaderCard")} subtitle={<SaveStatus state={saveState} />}>
       <div className="lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-8">
         <div className="mb-6 flex flex-col items-center gap-3 lg:sticky lg:top-[calc(var(--app-top)+1.5rem)] lg:mb-0 lg:self-start">
           <div className="w-full max-w-[18rem]">

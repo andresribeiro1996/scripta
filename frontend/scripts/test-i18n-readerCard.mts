@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
-import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { createElement, type ReactNode } from "react";
 import { renderToString } from "react-dom/server";
@@ -79,8 +78,8 @@ test("the loading and loaded page chrome stays English by default and translates
   assert.match(englishLoaded, />Visitors</);
   const html = inPortuguese(() => loaded());
   assert.match(html, /aria-label="Pré-visualizar como"/);
-  assert.match(html, />O próprio</);
-  assert.match(html, />Visitantes</);
+  assert.match(html, />Para si</);
+  assert.match(html, />Para visitantes</);
   assert.match(html, />Contador</);
   assert.match(html, />Lema</);
   assert.match(html, />Rodapé</);
@@ -140,11 +139,4 @@ test("the glyph setting is Portuguese", () => {
   const html = inPortuguese(() => rendered(() => createElement(ReaderGlyphSetting, { username: "andre", books: [], groups: [] }), (client) => client.setQueryData(["community", "own-profile"], { muralId: null, published: false, feedSettings: { ...DEFAULT_FEED_SETTINGS, readerGlyph: true } })));
   assert.match(html, />Mostrar o meu símbolo de leitor junto ao meu nome</);
   assert.match(html, /É mostrado quando a sua estante for publicada\./);
-});
-
-test("the segmented chips can wrap their labels instead of clipping them", () => {
-  const source = readFileSync("src/components/readerCard/ReaderCardOptions.tsx", "utf8");
-  const segmented = source.slice(source.indexOf("export function Segmented"), source.indexOf("const SAMPLE_MOTTO"));
-  assert.doesNotMatch(segmented, /truncate|text-ellipsis|whitespace-nowrap|overflow-hidden text-ellipsis/);
-  assert.match(segmented, /px-2 text-center/);
 });

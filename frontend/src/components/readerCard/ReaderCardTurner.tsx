@@ -94,7 +94,7 @@ export function ReaderCardTurner({ input, cardWidth, spreadWidth, onScrim = fals
   return (
     <div
       role="group"
-      aria-label={t("readerCard.title")}
+      aria-label={t("shell.areaReaderCard")}
       className="flex flex-col items-center gap-3"
       onKeyDown={(event) => {
         if (event.key === "ArrowRight") { event.preventDefault(); go(1); }

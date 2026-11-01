@@ -21,7 +21,7 @@ export function ReaderCardViewer({ input, onClose, onEdit }: { input: ReaderCard
 
   return (
     <div className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label={t("readerCard.title")} className="flex flex-col items-center gap-3" onClick={(event) => event.stopPropagation()} onKeyDown={keepTabInside}>
+      <div role="dialog" aria-modal="true" aria-label={t("shell.areaReaderCard")} className="flex flex-col items-center gap-3" onClick={(event) => event.stopPropagation()} onKeyDown={keepTabInside}>
         <div className="flex gap-2 self-end">
           {onEdit && input.view === "owner" ? <button type="button" onClick={onEdit} className={PILL}>{t("readerCard.editCard")}</button> : null}
           <button type="button" onClick={onClose} className={PILL}>{t("shell.close")}</button>

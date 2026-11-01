@@ -2,14 +2,13 @@ import type { CatalogOf } from "@scripta/shared/i18n";
 import type { readerCard as en } from "../en/readerCard";
 
 export const readerCard: CatalogOf<typeof en> = {
-  "readerCard.title": "Cartão de leitor",
   "readerCard.loading": "A carregar o seu cartão de leitor…",
   "readerCard.loadFailed": "Não foi possível carregar o seu cartão de leitor. Tentar novamente",
   "readerCard.saveFailed": "Não foi possível guardar o seu cartão de leitor.",
   "readerCard.glyphSaveFailed": "Não foi possível guardar a definição do símbolo.",
   "readerCard.previewAs": "Pré-visualizar como",
-  "readerCard.audienceYou": "O próprio",
-  "readerCard.audienceVisitors": "Visitantes",
+  "readerCard.audienceYou": "Para si",
+  "readerCard.audienceVisitors": "Para visitantes",
   "readerCard.counter": "Contador",
   "readerCard.secondTrait": "Segundo traço",
   "readerCard.motto": "Lema",
