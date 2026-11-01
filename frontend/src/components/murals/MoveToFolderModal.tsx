@@ -1,5 +1,6 @@
 import { buildTree } from "../../lib/muralFolders";
 import type { MuralFolder } from "../../lib/murals";
+import { useT } from "../../i18n";
 import { Sheet } from "../Sheet";
 
 export function MoveToFolderModal({
@@ -15,14 +16,15 @@ export function MoveToFolderModal({
   onSelect: (folderId: string | null) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   return (
-    <Sheet title={`Move "${title}"`} onClose={onClose}>
+    <Sheet title={t("muralEditor.moveFolderTitle", { title })} onClose={onClose}>
       <div className="flex flex-col gap-0.5 p-1">
         <button
           onClick={() => onSelect(null)}
           className="min-h-11 rounded-lg px-2 text-left text-sm text-(--color-text) hover:bg-(--color-surface-hover)"
         >
-          All murals (root)
+          {t("muralEditor.allMuralsRoot")}
         </button>
         {buildTree(folders).map(({ folder, depth }) => {
           const disabled = disabledIds.has(folder.id);

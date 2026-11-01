@@ -9,7 +9,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import { BLOCK_PAD_SCALE, blockFinishImage, blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
-import { GRID_COLUMNS, isConfigurable, muralThemeId, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
+import { GRID_COLUMNS, blockLabel, isConfigurable, muralThemeId, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
 import { useMuralBookMetadata } from "../../hooks/useMuralBookMetadata";
 import { muralThemeStyle } from "../../lib/theme";
 import { OptionsMenu } from "../OptionsMenu";
@@ -17,7 +17,7 @@ import { BlockRenderer } from "./BlockRenderer";
 import { MobileMuralCanvas, type MobileMuralDraft } from "./MobileMuralCanvas";
 import { DraggableMuralBlock, useMuralDrag } from "./useMuralDrag";
 import { MuralExpandButtons } from "./MuralExpandButtons";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 const ResponsiveGridLayout = GridLayout.WidthProvider(GridLayout);
 const ROW_HEIGHT = 28;
@@ -85,6 +85,7 @@ export function MuralCanvas({
   onCancelMobileDraft?: () => void;
 }) {
   const locale = useLocale();
+  const t = useT();
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const drag = useMuralDrag(originalMural.blocks, canvasRef, onLayoutChange, 1, onDragChange);
@@ -202,18 +203,18 @@ export function MuralCanvas({
               ...(overridden ? { "--color-text-dim": overridden.dim, "--block-accent": overridden.accent } : {})
             } as CSSProperties}
           >
-            {!editMode ? <button className="absolute inset-0 z-10 rounded-[inherit] focus-visible:outline-2 focus-visible:outline-[var(--block-accent,var(--color-accent))]" aria-label={`Open ${block.type} block`} onClick={() => onOpenBlock ? onOpenBlock(block) : setFocusedId(block.id)} /> : null}
+            {!editMode ? <button className="absolute inset-0 z-10 rounded-[inherit] focus-visible:outline-2 focus-visible:outline-[var(--block-accent,var(--color-accent))]" aria-label={t("muralEditor.openBlock", { type: locale === "en" ? block.type : blockLabel(block.type, locale) })} onClick={() => onOpenBlock ? onOpenBlock(block) : setFocusedId(block.id)} /> : null}
             <BlockRenderer block={block} books={books} images={images} profile={profile} hideProfileName={hideProfileName} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} editing={editMode} />
             {effects.fadeColor && effects.fadeOpacity > 0 ? <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[1] rounded-[inherit]" style={{ backgroundColor: effects.fadeColor, opacity: effects.fadeOpacity }} /> : null}
             {editMode && !drag.drop && (
               <div className="mural-block-controls absolute top-0 right-0 z-20 opacity-0 transition-opacity group-hover:opacity-100">
                 <OptionsMenu
-                  title="Block settings"
+                  title={t("muralEditor.blockSettings")}
                   items={[
-                    { label: "Style", onClick: () => onStyleBlock?.(originalBlock(block)) },
-                    ...(isConfigurable(block.type) ? [{ label: "Configure", onClick: () => onConfigureBlock?.(originalBlock(block)) }] : []),
-                    { label: "Duplicate", onClick: () => onDuplicateBlock?.(block.id) },
-                    { label: "Delete", onClick: () => onDeleteBlock?.(block.id), danger: true }
+                    { label: t("library.styleButton"), onClick: () => onStyleBlock?.(originalBlock(block)) },
+                    ...(isConfigurable(block.type) ? [{ label: t("muralEditor.configure"), onClick: () => onConfigureBlock?.(originalBlock(block)) }] : []),
+                    { label: t("muralEditor.duplicate"), onClick: () => onDuplicateBlock?.(block.id) },
+                    { label: t("shell.delete"), onClick: () => onDeleteBlock?.(block.id), danger: true }
                   ]}
                 />
               </div>

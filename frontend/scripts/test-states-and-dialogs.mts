@@ -56,5 +56,5 @@ test("dates on cards use the shared absolute format", () => {
 test("the mural header keeps its labelled buttons at every width", () => {
   const editor = src("pages/MuralEditorPage");
   assert.doesNotMatch(editor, /sm:hidden|hidden items-center gap-2 sm:flex/);
-  for (const label of ["Fullscreen", "Theme", "Share"]) assert.match(editor, new RegExp(`className=\\{BUTTON_SECONDARY\\}\\s*>\\s*${label}\\s*</button>`));
+  for (const key of ["muralEditor.fullscreen", "muralEditor.theme", "library.actionShare"]) assert.match(editor, new RegExp(`className=\\{BUTTON_SECONDARY\\}\\s*>\\s*\\{t\\("${key}"\\)\\}\\s*</button>`));
 });

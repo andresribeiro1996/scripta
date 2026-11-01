@@ -4,25 +4,25 @@ import { Sheet } from "../Sheet";
 import { BUTTON_SECONDARY } from "../page/buttonClasses";
 import { PlusIcon, toolbarIconClass } from "../Toolbar";
 import { blockLabel, type BlockType } from "../../lib/murals";
-import { useLocale } from "../../i18n";
+import { useLocale, useT, type WebMessages } from "../../i18n";
 
 // Label comes from blockLabel (lib/murals.ts, over the shared block table) —
 // which the history log's "X block added" entries also draw from — so a type's
 // display name only ever needs changing in one place. Only `description` is
 // local, since nothing else needs it.
-const BLOCK_CHOICES: Array<{ type: BlockType; description: string }> = [
-  { type: "spotlight", description: "One book, big cover, optional caption" },
-  { type: "shelf", description: "A titled, ordered row of books you pick" },
-  { type: "quote", description: "One featured highlight, shown large" },
-  { type: "quoteCollection", description: "Several curated highlights together" },
-  { type: "image", description: "A photo from your gallery" },
-  { type: "text", description: "A heading or freeform note" },
-  { type: "profile", description: "Your avatar, biography, favourite genres, and shelf theme" },
-  { type: "readerCard", description: "Your reading identity, drawn as a bookplate" },
-  { type: "currentlyReading", description: "Auto-updates from your reading status" },
-  { type: "stats", description: "Auto-computed numbers, e.g. books finished this year" },
-  { type: "empty", description: "A plain styled block — no content, just background/border/etc." },
-  { type: "tierlist", description: "Rank books into S/A/B/C… rows — tiers are yours to configure" }
+const BLOCK_CHOICES: Array<{ type: BlockType; description: Extract<keyof WebMessages, `muralEditor.addDesc${string}`> }> = [
+  { type: "spotlight", description: "muralEditor.addDescSpotlight" },
+  { type: "shelf", description: "muralEditor.addDescShelf" },
+  { type: "quote", description: "muralEditor.addDescQuote" },
+  { type: "quoteCollection", description: "muralEditor.addDescQuoteCollection" },
+  { type: "image", description: "muralEditor.addDescImage" },
+  { type: "text", description: "muralEditor.addDescText" },
+  { type: "profile", description: "muralEditor.addDescProfile" },
+  { type: "readerCard", description: "muralEditor.addDescReaderCard" },
+  { type: "currentlyReading", description: "muralEditor.addDescCurrentlyReading" },
+  { type: "stats", description: "muralEditor.addDescStats" },
+  { type: "empty", description: "muralEditor.addDescEmpty" },
+  { type: "tierlist", description: "muralEditor.addDescTierlist" }
 ];
 
 /** The "+" that opens the 10 block types. Clicking one adds it to the
@@ -42,6 +42,7 @@ const BLOCK_CHOICES: Array<{ type: BlockType; description: string }> = [
  *  across the split. */
 export function AddBlockMenu({ onAdd }: { onAdd: (type: BlockType) => void }) {
   const locale = useLocale();
+  const t = useT();
   const [open, setOpen] = useState(false);
   // Only covers the desktop dropdown branch below — the mobile Sheet
   // branch already registers its own dismissible via Sheet itself. Both
@@ -57,7 +58,7 @@ export function AddBlockMenu({ onAdd }: { onAdd: (type: BlockType) => void }) {
 
   return (
     <>
-      <button onClick={() => setOpen(true)} aria-label="Add a block" title="Add a block" className={`${toolbarIconClass()} sm:hidden`}>
+      <button onClick={() => setOpen(true)} aria-label={t("muralEditor.addBlock")} title={t("muralEditor.addBlock")} className={`${toolbarIconClass()} sm:hidden`}>
         <PlusIcon />
       </button>
       <div className="relative hidden sm:block">
@@ -65,7 +66,7 @@ export function AddBlockMenu({ onAdd }: { onAdd: (type: BlockType) => void }) {
           onClick={() => setOpen((o) => !o)}
           className={BUTTON_SECONDARY}
         >
-          + Add block
+          {t("muralEditor.addBlockButton")}
         </button>
         {open && (
           <>
@@ -78,7 +79,7 @@ export function AddBlockMenu({ onAdd }: { onAdd: (type: BlockType) => void }) {
                   className="block w-full rounded-lg px-3 py-2 text-left hover:bg-(--color-surface-hover)"
                 >
                   <div className="text-sm font-semibold">{blockLabel(choice.type, locale)}</div>
-                  <div className="text-xs text-(--color-text-dim)">{choice.description}</div>
+                  <div className="text-xs text-(--color-text-dim)">{t(choice.description)}</div>
                 </button>
               ))}
             </div>
@@ -87,7 +88,7 @@ export function AddBlockMenu({ onAdd }: { onAdd: (type: BlockType) => void }) {
       </div>
       {open && (
         <div className="sm:hidden">
-          <Sheet title="Add a block" onClose={() => setOpen(false)}>
+          <Sheet title={t("muralEditor.addBlock")} onClose={() => setOpen(false)}>
             {BLOCK_CHOICES.map((choice) => (
               <button
                 key={choice.type}
@@ -95,7 +96,7 @@ export function AddBlockMenu({ onAdd }: { onAdd: (type: BlockType) => void }) {
                 className="flex min-h-12 w-full flex-col items-start gap-0.5 rounded-lg px-3 py-2 text-left hover:bg-(--color-surface-hover)"
               >
                 <span className="text-[15px] font-semibold">{blockLabel(choice.type, locale)}</span>
-                <span className="text-xs text-(--color-text-dim)">{choice.description}</span>
+                <span className="text-xs text-(--color-text-dim)">{t(choice.description)}</span>
               </button>
             ))}
           </Sheet>

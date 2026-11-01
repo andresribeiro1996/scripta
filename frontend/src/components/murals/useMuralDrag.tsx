@@ -1,6 +1,7 @@
 import { KeyboardSensor, PointerSensor, useDraggable, useSensor, useSensors, type DragMoveEvent, type Modifier } from "@dnd-kit/core";
 import { GRID_COLUMNS, moveMuralBlock, type BlockLayout, type MuralBlock } from "@scripta/shared";
 import { useCallback, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { useT } from "../../i18n";
 
 export function useMuralDrag(blocks: MuralBlock[], canvas: RefObject<HTMLDivElement | null>, onDrop?: (id: string, layout: BlockLayout) => void, scale = 1, onDragChange?: (dragging: boolean) => void) {
   const [drop, setDrop] = useState<{ id: string; layout: BlockLayout } | null>(null);
@@ -66,6 +67,7 @@ export function useMuralDrag(blocks: MuralBlock[], canvas: RefObject<HTMLDivElem
 }
 
 export function DraggableMuralBlock({ id, disabled, scale = 1, children }: { id: string; disabled: boolean; scale?: number; children: ReactNode }) {
+  const t = useT();
   const node = useRef<HTMLDivElement | null>(null);
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id, disabled, data: { node } });
   const setRef = useCallback((element: HTMLDivElement | null) => { node.current = element; setNodeRef(element); }, [setNodeRef]);
@@ -77,7 +79,7 @@ export function DraggableMuralBlock({ id, disabled, scale = 1, children }: { id:
       if ((event.target as Element).closest(".mural-block-controls, .react-resizable-handle, button, input, textarea, a")) return;
       listeners?.onPointerDown?.(event);
     }}
-    aria-label={disabled ? undefined : "Move block"}
+    aria-label={disabled ? undefined : t("muralEditor.moveBlock")}
     className={`h-full w-full rounded-[inherit] ${disabled ? "" : "touch-none cursor-grab"}`}
     style={{ position: "relative", zIndex: isDragging ? 10 : undefined, transform: transform ? `translate3d(${transform.x / scale}px, ${transform.y / scale}px, 0)` : undefined, opacity: isDragging ? 0.75 : 1 } as CSSProperties}
   >{children}</div>;

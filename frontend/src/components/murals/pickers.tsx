@@ -8,6 +8,7 @@
 import { useMemo, useState } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import { useDeleteGalleryImage } from "../../hooks/useDeleteGalleryImage";
+import { useT } from "../../i18n";
 import { useConfirm } from "../ConfirmDialog";
 import { CloseIcon, SearchField } from "../Toolbar";
 
@@ -20,14 +21,16 @@ export function BookSearchList({
   books,
   isSelected,
   onSelect,
-  placeholder = "Search your library…"
+  placeholder
 }: {
   books: Array<Record<string, unknown>>;
   isSelected?: (book: Record<string, unknown>) => boolean;
   onSelect: (book: Record<string, unknown>) => void;
   placeholder?: string;
 }) {
+  const t = useT();
   const [search, setSearch] = useState("");
+  const label = placeholder ?? t("library.searchYourLibraryDots");
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return books;
@@ -37,10 +40,10 @@ export function BookSearchList({
   return (
     <div className="rounded-lg border border-(--color-border)">
       <div className="border-b border-(--color-border) p-2">
-        <SearchField fill value={search} onChange={setSearch} placeholder={placeholder} label={placeholder} />
+        <SearchField fill value={search} onChange={setSearch} placeholder={label} label={label} />
       </div>
       <div className="max-h-48 overflow-y-auto">
-        {filtered.length === 0 && <p className="p-3 text-sm text-(--color-text-dim)">No books match.</p>}
+        {filtered.length === 0 && <p className="p-3 text-sm text-(--color-text-dim)">{t("library.noMatchTitle")}</p>}
         {filtered.map((book, i) => (
           <button
             key={String(book.ContentID ?? i)}
@@ -50,8 +53,8 @@ export function BookSearchList({
             }`}
           >
             <span className="min-w-0 truncate">
-              {String(book.Title ?? "Untitled")}
-              <span className="text-(--color-text-dim)"> — {String(book.Attribution ?? "Unknown author")}</span>
+              {String(book.Title ?? t("library.untitled"))}
+              <span className="text-(--color-text-dim)"> — {String(book.Attribution ?? t("library.unknownAuthor"))}</span>
             </span>
             {isSelected?.(book) && <span className="shrink-0 text-(--color-accent)">✓</span>}
           </button>
@@ -91,12 +94,13 @@ export function GalleryImageGrid({
   onSelect: (image: GalleryImage) => void;
   onImageDeleted?: (imageId: string) => void;
 }) {
+  const t = useT();
   const deleteImage = useDeleteGalleryImage();
   const confirm = useConfirm();
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function handleDelete(id: string) {
-    if (!(await confirm({ title: "Delete this image from your gallery?", body: "This can't be undone." }))) return;
+    if (!(await confirm({ title: t("library.galleryDeleteTitle"), body: t("library.cannotUndo") }))) return;
     setDeletingId(id);
     try {
       await deleteImage(id);
@@ -107,7 +111,7 @@ export function GalleryImageGrid({
   }
 
   if (images.length === 0) {
-    return <p className="text-sm text-(--color-text-dim)">No images in your gallery yet — upload one from the Gallery page first.</p>;
+    return <p className="text-sm text-(--color-text-dim)">{t("muralEditor.galleryEmpty")}</p>;
   }
   return (
     <div className="grid grid-cols-4 gap-2">
@@ -119,7 +123,7 @@ export function GalleryImageGrid({
         <div
           key={image.id}
           role="button"
-          aria-label="Use this image"
+          aria-label={t("muralEditor.useThisImage")}
           tabIndex={0}
           onClick={() => onSelect(image)}
           onKeyDown={(e) => {
@@ -138,7 +142,7 @@ export function GalleryImageGrid({
               e.stopPropagation();
               void handleDelete(image.id);
             }}
-            title="Delete from gallery"
+            title={t("library.galleryDeleteImage")}
             className="absolute top-0 right-0 flex h-11 w-11 items-center justify-center text-xs font-bold text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
           >
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] backdrop-blur-xs">

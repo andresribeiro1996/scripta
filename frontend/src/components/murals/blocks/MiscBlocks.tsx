@@ -1,8 +1,9 @@
 import type { GalleryImage } from "../../../api/gallery";
 import { computeStat, libraryBreakdown } from "../../../lib/muralStats";
+import { genreLabel } from "@scripta/shared";
 import { calculateShelfTheme, statMetricLabels, type MuralBlock, type ReaderProfile, type ShelfTheme, type StatMetric } from "../../../lib/murals";
 import { BlockEyebrow, EmptyBlockState } from "./BookBlocks";
-import { useLocale } from "../../../i18n";
+import { useLocale, useT } from "../../../i18n";
 
 /** A heading and/or freeform note — connective tissue between the other
  *  blocks ("2026 was a big reading year because..."). Either field can be
@@ -14,8 +15,9 @@ import { useLocale } from "../../../i18n";
  *  muted regardless" reason to override it here. Sizes are `em` (see
  *  BookBlocks.tsx's MiniBookTile comment for why). */
 export function TextBlockView({ block, editing = false }: { block: Extract<MuralBlock, { type: "text" }>; editing?: boolean }) {
+  const t = useT();
   if (!block.heading && !block.body) {
-    return editing ? <EmptyBlockState message="Add a heading or some text." /> : null;
+    return editing ? <EmptyBlockState message={t("muralEditor.addHeadingOrText")} /> : null;
   }
   return (
     <div className="flex h-full flex-col gap-1.5 overflow-y-auto block-p-3.5">
@@ -26,15 +28,17 @@ export function TextBlockView({ block, editing = false }: { block: Extract<Mural
 }
 
 export function ProfileBlockView({ block, books, profile, shelfThemeOverride, hideName }: { block: Extract<MuralBlock, { type: "profile" }>; books: Array<Record<string, unknown>>; profile?: ReaderProfile; shelfThemeOverride?: ShelfTheme; hideName?: boolean }) {
+  const locale = useLocale();
+  const t = useT();
   const theme = shelfThemeOverride ?? calculateShelfTheme(books);
-  const initial = (profile?.username || "Reader")[0]?.toUpperCase();
+  const initial = (profile?.username || t("muralEditor.fallbackReader"))[0]?.toUpperCase();
   return <div className="flex h-full flex-col gap-3 overflow-y-auto block-p-3.5">
     <div className="flex items-center gap-3">
       {profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" className="h-14 w-14 shrink-0 rounded-full object-cover" /> : <div aria-hidden="true" className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-(--color-accent-soft) text-xl font-bold text-(--color-accent)">{initial}</div>}
-      <div className="min-w-0">{!hideName && <h3 className="truncate text-[1.25em] font-bold">@{profile?.username || "reader"}</h3>}{block.bio && <p className="line-clamp-3 text-[0.9em] text-(--color-text-dim)">{block.bio}</p>}</div>
+      <div className="min-w-0">{!hideName && <h3 className="truncate text-[1.25em] font-bold">@{profile?.username || t("muralEditor.fallbackReader")}</h3>}{block.bio && <p className="line-clamp-3 text-[0.9em] text-(--color-text-dim)">{block.bio}</p>}</div>
     </div>
-    {block.favoriteGenres.length > 0 && <section><p className="mb-1 text-[0.7em] font-bold text-(--color-text-dim)">What I like</p><div className="flex flex-wrap gap-1.5">{block.favoriteGenres.map((genre) => <span key={genre} className="rounded-full bg-(--color-accent-soft) px-2.5 py-1 text-[0.8em] text-(--color-accent)">{genre}</span>)}</div></section>}
-    {theme.genres.length > 0 && <section><p className="mb-1 text-[0.7em] font-bold text-(--color-text-dim)">My shelf theme</p><p>{theme.genres.join(" · ")}</p><p className="text-[0.75em] text-(--color-text-dim)">Based on {theme.matchedBooks} of {theme.totalBooks} books</p></section>}
+    {block.favoriteGenres.length > 0 && <section><p className="mb-1 text-[0.7em] font-bold text-(--color-text-dim)">{t("muralEditor.whatILike")}</p><div className="flex flex-wrap gap-1.5">{block.favoriteGenres.map((genre) => <span key={genre} className="rounded-full bg-(--color-accent-soft) px-2.5 py-1 text-[0.8em] text-(--color-accent)">{genreLabel(genre, locale)}</span>)}</div></section>}
+    {theme.genres.length > 0 && <section><p className="mb-1 text-[0.7em] font-bold text-(--color-text-dim)">{t("muralEditor.myShelfTheme")}</p><p>{theme.genres.map((genre) => genreLabel(genre, locale)).join(" · ")}</p><p className="text-[0.75em] text-(--color-text-dim)">{t("muralEditor.basedOn", { matched: theme.matchedBooks, count: theme.totalBooks })}</p></section>}
   </div>;
 }
 
@@ -43,9 +47,10 @@ export function ProfileBlockView({ block, books, profile, shelfThemeOverride, hi
  *  list (MuralEditorPage.tsx, via useGalleryImages()) — looked up by id
  *  rather than re-fetching per block. */
 export function ImageBlockView({ block, images }: { block: Extract<MuralBlock, { type: "image" }>; images: GalleryImage[] }) {
+  const t = useT();
   const image = images.find((img) => img.id === block.imageId);
   if (!image) {
-    return <EmptyBlockState message="Pick an image from your gallery." />;
+    return <EmptyBlockState message={t("muralEditor.pickGalleryImage")} />;
   }
   return (
     <div className="relative h-full w-full overflow-hidden bg-(--color-border)">
@@ -89,8 +94,9 @@ export function StatsBlockView({
   statsOverride?: Record<string, number>;
 }) {
   const locale = useLocale();
+  const t = useT();
   if (block.metrics.length === 0) {
-    return <EmptyBlockState message="Pick which numbers to show." />;
+    return <EmptyBlockState message={t("muralEditor.pickNumbers")} />;
   }
   const value = (metric: StatMetric) => (statsOverride && metric in statsOverride ? statsOverride[metric] : computeStat(metric, books));
   const breakdown = libraryBreakdown(block.metrics, value);
@@ -112,27 +118,27 @@ export function StatsBlockView({
     );
   }
   const segments = [
-    { count: breakdown.finished, color: "bg-[var(--block-accent,var(--color-accent))]", label: "finished" },
-    { count: breakdown.reading, color: "bg-(--color-accent-fill)", label: "reading" },
-    { count: breakdown.toRead, color: "bg-(--color-border)", label: "to read" }
+    { count: breakdown.finished, color: "bg-[var(--block-accent,var(--color-accent))]", key: "finished", label: t("muralEditor.segmentFinished", { count: breakdown.finished }) },
+    { count: breakdown.reading, color: "bg-(--color-accent-fill)", key: "reading", label: t("muralEditor.segmentReading", { count: breakdown.reading }) },
+    { count: breakdown.toRead, color: "bg-(--color-border)", key: "toRead", label: t("muralEditor.segmentToRead", { count: breakdown.toRead }) }
   ];
   return (
     <div className="h-full overflow-y-auto block-p-2.5">
-      <BlockEyebrow>Your library</BlockEyebrow>
+      <BlockEyebrow>{t("muralEditor.yourLibrary")}</BlockEyebrow>
       <p>
         <span className="text-[2.8em] leading-none font-bold text-[var(--block-accent,var(--color-accent))]">{breakdown.finished}</span>{" "}
-        <span className="text-[0.85em] text-(--color-text-dim)">of {breakdown.total} finished</span>
+        <span className="text-[0.85em] text-(--color-text-dim)">{t("muralEditor.ofTotalFinished", { count: breakdown.total })}</span>
       </p>
       <div className={`mt-2 flex h-2.5 gap-0.5 overflow-hidden rounded-full ${breakdown.total === 0 ? "bg-(--color-border)" : ""}`}>
         {segments.filter((segment) => segment.count > 0).map((segment) => (
-          <div key={segment.label} className={segment.color} style={{ flexGrow: segment.count }} />
+          <div key={segment.key} className={segment.color} style={{ flexGrow: segment.count }} />
         ))}
       </div>
       <div className="mt-2 flex flex-col gap-1 text-[0.85em] text-(--color-text-dim)">
         {segments.map((segment) => (
-          <div key={segment.label} className="flex items-center gap-1.5">
+          <div key={segment.key} className="flex items-center gap-1.5">
             <span className={`h-2 w-2 shrink-0 rounded-full ${segment.color}`} />
-            {segment.count} {segment.label}
+            {segment.label}
           </div>
         ))}
       </div>
