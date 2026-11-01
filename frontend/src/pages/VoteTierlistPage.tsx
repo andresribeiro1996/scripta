@@ -40,11 +40,12 @@ import { useTierlistVoting } from "../hooks/useTierlistVoting";
 import { backTo } from "../lib/areas";
 import { toPrivateBook } from "../lib/sharedMural";
 import { toPlacements } from "../lib/tierlistResults";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
 function InfoScreen({ message, back }: { message: string; back?: { to: string; label: string } }) {
+  const t = useT();
   return (
-    <Page title="Tier list" back={back}>
+    <Page title={t("arena.modeTierlist")} back={back}>
       <p className="text-sm text-(--color-text-dim)">{message}</p>
     </Page>
   );
@@ -61,6 +62,7 @@ function HideBottomNav() {
 
 export function VoteTierlistPage() {
   const locale = useLocale();
+  const t = useT();
   const { code } = useParams<{ code: string }>();
   const location = useLocation();
   const { session } = useAuth();
@@ -74,13 +76,13 @@ export function VoteTierlistPage() {
   const back = session?.user.username ? backTo("tierlist") : undefined;
 
   if (!code || error) {
-    return <InfoScreen message="No tier list at that link." back={back} />;
+    return <InfoScreen message={t("tierlists.noTierlistAtLink")} back={back} />;
   }
   if (isLoading || !board) {
-    return <InfoScreen message="Loading…" back={back} />;
+    return <InfoScreen message={t("library.loadingEllipsis")} back={back} />;
   }
   if (ballotError) {
-    return <InfoScreen message="Couldn't load your ballot. Reload to try again." back={back} />;
+    return <InfoScreen message={t("tierlists.ballotLoadFailed")} back={back} />;
   }
 
   const subject = board.subject;
@@ -88,7 +90,7 @@ export function VoteTierlistPage() {
   const header = subject ? <CharacterHeader subject={subject} /> : null;
   const booksButton = subject ? null : (
     <button onClick={() => setBooksOpen(true)} className={BUTTON_SECONDARY}>
-      Books
+      {t("shell.tabBooks")}
     </button>
   );
   const signedIn = Boolean(session);
@@ -96,7 +98,7 @@ export function VoteTierlistPage() {
   const showResults = (alreadySubmitted || !board.votingOpen) && !editing;
 
   const booksSheet = booksOpen && !picked ? (
-    <Sheet title="Books" onClose={() => setBooksOpen(false)}>
+    <Sheet title={t("shell.tabBooks")} onClose={() => setBooksOpen(false)}>
       <div className="flex flex-col">
         {publicBooks.map((entry) => {
           const pub = entry as unknown as PublicBookData;
@@ -157,7 +159,7 @@ export function VoteTierlistPage() {
                 }}
                 className={BUTTON_SECONDARY}
               >
-                Edit ballot
+                {t("tierlists.editBallot")}
               </button>
             )}
             {booksButton}
@@ -165,10 +167,9 @@ export function VoteTierlistPage() {
         }
       >
         {header}
-        {board.ranksWorstFirst ? <p className="mb-2 text-xs text-(--color-text-dim)">Top tier = worst</p> : null}
+        {board.ranksWorstFirst ? <p className="mb-2 text-xs text-(--color-text-dim)">{t("tierlists.topTierWorst")}</p> : null}
         <p className="mb-4 text-sm text-(--color-text-dim)">
-          {justSubmitted ? "Your ballot is in. " : alreadySubmitted ? "You've already ranked this one. " : ""}
-          {board.promotedAt ? "Permanent public reference." : board.votingOpen ? "Voting is still open." : "Voting is closed."}
+          {[justSubmitted ? t("tierlists.ballotIsIn") : alreadySubmitted ? t("tierlists.alreadyRanked") : "", board.promotedAt ? t("tierlists.permanentReference") : board.votingOpen ? t("tierlists.votingOpenStill") : t("tierlists.votingClosed")].filter(Boolean).join(" ")}
         </p>
         <TierlistResultsView
           histogram={histogram}
@@ -194,7 +195,7 @@ export function VoteTierlistPage() {
       await submit(toPlacements(data));
       setEditing(false);
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Couldn't submit your ballot.");
+      setSubmitError(err instanceof Error ? err.message : t("tierlists.couldntSubmit"));
     } finally {
       setSubmitting(false);
     }
@@ -208,7 +209,7 @@ export function VoteTierlistPage() {
         <>
           {membersOnlyBlocked ? (
             <Link to="/login" state={{ from: location }} className={BUTTON_PRIMARY}>
-              Sign in to vote
+              {t("tierlists.signInToVote")}
             </Link>
           ) : (
             <>
@@ -220,11 +221,11 @@ export function VoteTierlistPage() {
                   }}
                   className={BUTTON_SECONDARY}
                 >
-                  Cancel
+                  {t("shell.cancel")}
                 </button>
               )}
               <button onClick={() => void handleSubmit()} disabled={submitting || toPlacements(data).length === 0} className={BUTTON_PRIMARY}>
-                {submitting ? "Submitting…" : editing ? "Update ballot" : "Submit ballot"}
+                {submitting ? t("tierlists.submitting") : editing ? t("tierlists.updateBallot") : t("tierlists.submitBallot")}
               </button>
             </>
           )}
@@ -233,11 +234,9 @@ export function VoteTierlistPage() {
       }
     >
       {header}
-      {board.ranksWorstFirst ? <p className="mb-2 text-xs text-(--color-text-dim)">Top tier = worst</p> : null}
+      {board.ranksWorstFirst ? <p className="mb-2 text-xs text-(--color-text-dim)">{t("tierlists.topTierWorst")}</p> : null}
       <p className="mb-4 text-sm text-(--color-text-dim)">
-        {membersOnlyBlocked
-          ? "This tier list only accepts votes from signed-in members — rank away, then sign in to cast your ballot."
-          : `Drag ${itemNoun(subject, 2, locale)} into tiers to rank them, then submit your ballot.`}
+        {membersOnlyBlocked ? t("tierlists.membersOnlyNote") : t("tierlists.dragToRank", { noun: itemNoun(subject, 2, locale) })}
       </p>
       {submitError && <p className="mb-4 text-sm text-(--color-danger)">{submitError}</p>}
       <HideBottomNav />

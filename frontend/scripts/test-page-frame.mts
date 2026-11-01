@@ -224,11 +224,11 @@ test("rename fields inside a title keep the heading size and stay 44px", () => {
 
 test("the tier list editor's one header primary is Open for voting, and the panel no longer hosts it", () => {
   const s = src("pages/TierListEditorPage");
-  assert.equal(s.match(/>\s*Open for voting\s*</g)?.length, 1);
+  assert.equal(s.match(/\{t\("tierlists\.openForVoting"\)\}/g)?.length, 1);
   const actions = s.slice(s.indexOf("actions={"), s.indexOf("{subject ?"));
-  assert.match(actions, /<button onClick=\{\(\) => setOpenPanelOpen\(true\)\} className=\{BUTTON_PRIMARY\}>\s*Open for voting/);
+  assert.match(actions, /<button onClick=\{\(\) => setOpenPanelOpen\(true\)\} className=\{BUTTON_PRIMARY\}>\s*\{t\("tierlists\.openForVoting"\)\}/);
   assert.equal(actions.match(/BUTTON_PRIMARY/g)?.length, 1);
-  assert.match(actions, /className=\{BUTTON_SECONDARY\}\s*>\s*\{editing \? "Done" : "Edit"\}/);
+  assert.match(actions, /className=\{BUTTON_SECONDARY\}\s*>\s*\{editing \? t\("addBook\.done"\) : t\("tierlists\.edit"\)\}/);
 });
 
 test("the author avatar letter scales with its size", () => {

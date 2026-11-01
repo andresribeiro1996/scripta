@@ -12,7 +12,7 @@ import { aggregate, aggregationModes, type AggregationMode, type BookResult, typ
 import { MiniBookTile } from "../murals/blocks/BookBlocks";
 import { TierRowEmpty, TierRowShell, TierRowTiles } from "./TierRowShell";
 import { useState } from "react";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export interface TierlistResultsViewProps {
   histogram: HistogramCell[];
@@ -24,6 +24,7 @@ export interface TierlistResultsViewProps {
 }
 
 function ResultTile({ result, book }: { result: BookResult; book: Record<string, unknown> }) {
+  const t = useT();
   const agreement = Math.round((1 - result.spread) * 100);
   const content = (
     <>
@@ -31,13 +32,13 @@ function ResultTile({ result, book }: { result: BookResult; book: Record<string,
         <MiniBookTile book={book} showTitle={false} showAuthor={false} />
       </div>
       <p className="text-center text-[0.65rem] leading-tight text-(--color-text-dim)">
-        {result.votes} {result.votes === 1 ? "vote" : "votes"} · {agreement}% agree
+        {t("tierlists.voteAgree", { count: result.votes, pct: agreement })}
       </p>
     </>
   );
   if (isCharacterBook(book)) return <div className="flex w-[4em] flex-col gap-0.5">{content}</div>;
   return (
-    <Link to={`/work/${result.workId}`} aria-label={`About ${String(book.Title ?? "Untitled")}`} className="flex w-[4em] flex-col gap-0.5">
+    <Link to={`/work/${result.workId}`} aria-label={t("tierlists.aboutBook", { title: String(book.Title ?? t("library.untitled")) })} className="flex w-[4em] flex-col gap-0.5">
       {content}
     </Link>
   );
@@ -45,6 +46,7 @@ function ResultTile({ result, book }: { result: BookResult; book: Record<string,
 
 export function TierlistResultsView({ histogram, tierIds, tiers, pool, books, ballotCount }: TierlistResultsViewProps) {
   const locale = useLocale();
+  const t = useT();
   const [mode, setMode] = useState<AggregationMode>("average");
   const results = aggregate(histogram, tierIds, pool, mode);
   const byWork = booksByWork(books);
@@ -67,7 +69,7 @@ export function TierlistResultsView({ histogram, tierIds, tiers, pool, books, ba
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs text-(--color-text-dim)">
-          {ballotCount} {ballotCount === 1 ? "ballot" : "ballots"}
+          {t("tierlists.ballotCount", { count: ballotCount })}
         </p>
         {/* Segmented control — markup matches ArenaViewPage's Matches/Bracket
             switch exactly (border + divider + accent-soft active state). */}
@@ -93,7 +95,7 @@ export function TierlistResultsView({ histogram, tierIds, tiers, pool, books, ba
           return (
             <TierRowShell key={tier.id} tier={{ ...tier, workIds: [] }}>
               {rows.length === 0 ? (
-                <TierRowEmpty message={`Nobody ranked a ${noun} here.`} />
+                <TierRowEmpty message={t("tierlists.nobodyRankedHere", { noun })} />
               ) : (
                 <TierRowTiles>
                   {rows.map((result) => {
@@ -109,7 +111,7 @@ export function TierlistResultsView({ histogram, tierIds, tiers, pool, books, ba
 
       {unranked.length > 0 && (
         <div className="flex flex-col gap-1">
-          <span className="px-1 text-xs font-semibold text-(--color-text-dim)">Nobody ranked these</span>
+          <span className="px-1 text-xs font-semibold text-(--color-text-dim)">{t("tierlists.nobodyRankedThese")}</span>
           <div className="flex flex-wrap gap-1.5 rounded-lg border border-dashed border-(--color-border) p-2">
             {unranked.map((result) => {
               const book = byWork.get(result.workId);
@@ -124,7 +126,7 @@ export function TierlistResultsView({ histogram, tierIds, tiers, pool, books, ba
                 <Link
                   key={result.workId}
                   to={`/work/${result.workId}`}
-                  aria-label={`About ${String(book.Title ?? "Untitled")}`}
+                  aria-label={t("tierlists.aboutBook", { title: String(book.Title ?? t("library.untitled")) })}
                   className="block h-[6em] w-[4em] overflow-hidden rounded-lg"
                 >
                   <MiniBookTile book={book} showTitle={false} showAuthor={false} />

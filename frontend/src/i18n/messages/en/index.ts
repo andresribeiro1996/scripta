@@ -7,6 +7,7 @@ import { errors } from "./errors";
 import { library } from "./library";
 import { settings } from "./settings";
 import { shell } from "./shell";
+import { tierlists } from "./tierlists";
 
-export const en = { ...addBook, ...arena, ...book, ...community, ...errors, ...library, ...settings, ...shell } satisfies Messages;
+export const en = { ...addBook, ...arena, ...book, ...community, ...errors, ...library, ...settings, ...shell, ...tierlists } satisfies Messages;
 export type WebMessages = typeof en;

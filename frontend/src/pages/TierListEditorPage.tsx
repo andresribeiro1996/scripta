@@ -17,15 +17,16 @@ import { useLibrary } from "../hooks/useLibrary";
 import { useTierlists } from "../hooks/useTierlists";
 import { useTierlistResults, useTierlistVoting } from "../hooks/useTierlistVoting";
 import { useWorkBooks } from "../hooks/useWorkBooks";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
 export function TierListEditorPage() {
   const locale = useLocale();
+  const t = useT();
   const { id } = useParams<{ id: string }>();
   const { data: library } = useLibrary();
   const { data: tierlistsData, isLoading, rename, saveData, refetch } = useTierlists();
   const libraryBooks = useWorkBooks(library);
-  const tierlist = (tierlistsData ?? []).find((t) => t.id === id);
+  const tierlist = (tierlistsData ?? []).find((entry) => entry.id === id);
   const subject = tierlist?.subject ?? null;
   const books = subject ? characterBooks(subject) : libraryBooks;
   const [editingName, setEditingName] = useState(false);
@@ -95,16 +96,16 @@ export function TierListEditorPage() {
 
   if (isLoading) {
     return (
-      <Page title="Tier list" back={backTo("tierlist")}>
-        <p className="text-sm text-(--color-text-dim)">Loading…</p>
+      <Page title={t("arena.modeTierlist")} back={backTo("tierlist")}>
+        <p className="text-sm text-(--color-text-dim)">{t("library.loadingEllipsis")}</p>
       </Page>
     );
   }
 
   if (!tierlist) {
     return (
-      <Page title="Tier list" back={backTo("tierlist")}>
-        <p className="text-sm text-(--color-text-dim)">No tier list with that id.</p>
+      <Page title={t("arena.modeTierlist")} back={backTo("tierlist")}>
+        <p className="text-sm text-(--color-text-dim)">{t("tierlists.noTierlistWithId")}</p>
       </Page>
     );
   }
@@ -121,7 +122,7 @@ export function TierListEditorPage() {
     try {
       await navigator.clipboard.writeText(voteLink);
     } catch {
-      setVotingActionError("Couldn't copy the link.");
+      setVotingActionError(t("tierlists.couldntCopyLink"));
       return;
     }
     setVotingActionError(null);
@@ -134,7 +135,7 @@ export function TierListEditorPage() {
     try {
       await saveData(tierlistId, next);
     } catch (err) {
-      setVotingActionError(err instanceof Error ? err.message : "Couldn't save the tier list.");
+      setVotingActionError(err instanceof Error ? err.message : t("tierlists.couldntSave"));
     }
   }
 
@@ -146,7 +147,7 @@ export function TierListEditorPage() {
     try {
       await rename(tierlistId, name);
     } catch (err) {
-      setVotingActionError(err instanceof Error ? err.message : "Couldn't rename the tier list.");
+      setVotingActionError(err instanceof Error ? err.message : t("tierlists.couldntRename"));
     }
   }
 
@@ -158,7 +159,7 @@ export function TierListEditorPage() {
       await refetch();
       setOpenPanelOpen(false);
     } catch (err) {
-      setVotingActionError(err instanceof Error ? err.message : "Couldn't open voting.");
+      setVotingActionError(err instanceof Error ? err.message : t("tierlists.couldntOpenVoting"));
     } finally {
       setOpeningVoting(false);
     }
@@ -172,7 +173,7 @@ export function TierListEditorPage() {
       await setVotingStateApi(tierlistId, { access });
       await refetch();
     } catch (err) {
-      setVotingActionError(err instanceof Error ? err.message : "Couldn't change who can vote.");
+      setVotingActionError(err instanceof Error ? err.message : t("tierlists.couldntChangeAccess"));
     } finally {
       setSavingAccess(false);
     }
@@ -185,14 +186,14 @@ export function TierListEditorPage() {
       await setVotingStateApi(tierlistId, { open: !votingOpen });
       await refetch();
     } catch (err) {
-      setVotingActionError(err instanceof Error ? err.message : "Couldn't update voting.");
+      setVotingActionError(err instanceof Error ? err.message : t("tierlists.couldntUpdateVoting"));
     } finally {
       setSavingOpenState(false);
     }
   }
 
   function addBooksToPool(workIds: string[]) {
-    const taken = new Set([...data.pool, ...data.tiers.flatMap((t) => t.workIds)]);
+    const taken = new Set([...data.pool, ...data.tiers.flatMap((tier) => tier.workIds)]);
     const fresh = workIds.filter((id) => !taken.has(id));
     if (fresh.length === 0) return;
     void commit({ ...data, pool: [...data.pool, ...fresh] });
@@ -214,7 +215,7 @@ export function TierListEditorPage() {
             if (e.key === "Enter") void handleRename();
             if (e.key === "Escape") setEditingName(false);
           }}
-          aria-label="Tier list name"
+          aria-label={t("arena.tierlistName")}
           className={TITLE_FIELD_CLASS}
         />
       ) : (
@@ -224,7 +225,7 @@ export function TierListEditorPage() {
             setNameDraft(tierlist.name);
             setEditingName(true);
           }}
-          title="Rename this tier list"
+          title={t("tierlists.renameTitle")}
           className="flex min-h-11 min-w-0 max-w-full items-center text-left transition-colors hover:text-(--color-accent)"
         >
           <span className="min-w-0 break-words">{tierlist.name}</span>
@@ -236,11 +237,11 @@ export function TierListEditorPage() {
             onClick={() => (editing ? exitEditing() : setEditing(true))}
             className={BUTTON_SECONDARY}
           >
-            {editing ? "Done" : "Edit"}
+            {editing ? t("addBook.done") : t("tierlists.edit")}
           </button>
           {openPanelOpen ? null : (
             <button onClick={() => setOpenPanelOpen(true)} className={BUTTON_PRIMARY}>
-              Open for voting
+              {t("tierlists.openForVoting")}
             </button>
           )}
         </>
@@ -254,7 +255,7 @@ export function TierListEditorPage() {
         openPanelOpen ? (
           <div className="mb-6 rounded-xl border border-(--color-border) bg-(--color-surface) p-3">
             <div className="flex flex-col gap-2">
-              <p className="text-sm text-(--color-text-dim)">Who can vote?</p>
+              <p className="text-sm text-(--color-text-dim)">{t("tierlists.whoCanVote")}</p>
               <div className="flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface)">
                 {(["anonymous", "members"] as const).map((access, i) => (
                   <button
@@ -269,7 +270,7 @@ export function TierListEditorPage() {
                         : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"
                     }`}
                   >
-                    {access === "anonymous" ? "Anyone" : "Members only"}
+                    {access === "anonymous" ? t("tierlists.anyone") : t("tierlists.membersOnly")}
                   </button>
                 ))}
               </div>
@@ -279,14 +280,14 @@ export function TierListEditorPage() {
                   disabled={openingVoting}
                   className={`${BUTTON_PRIMARY} flex-1`}
                 >
-                  {openingVoting ? "Opening…" : "Confirm and open"}
+                  {openingVoting ? t("tierlists.opening") : t("tierlists.confirmAndOpen")}
                 </button>
                 <button
                   onClick={() => setOpenPanelOpen(false)}
                   disabled={openingVoting}
                   className={BUTTON_SECONDARY}
                 >
-                  Cancel
+                  {t("shell.cancel")}
                 </button>
               </div>
             </div>
@@ -294,20 +295,20 @@ export function TierListEditorPage() {
         ) : null
       ) : (
         <div className="mb-6 flex flex-col gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-3">
-          <p className="text-sm text-(--color-text-dim)">This public tier list is locked. At 100 distinct signed-in voters, it becomes an app-owned reference.</p>
+          <p className="text-sm text-(--color-text-dim)">{t("tierlists.lockedNote")}</p>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0 flex-1 basis-80">
               <ShareLinkRow url={voteLink} copied={copied} onCopy={() => void copyVoteLink()} />
             </div>
             <span className="text-xs text-(--color-text-dim)">
-              {votingBoard?.ballotCount ?? 0} {(votingBoard?.ballotCount ?? 0) === 1 ? "ballot" : "ballots"} · {votingBoard?.eligibleVoteCount ?? 0}/100 eligible voters
+              {t("tierlists.ballotsEligible", { count: votingBoard?.ballotCount ?? 0, eligible: votingBoard?.eligibleVoteCount ?? 0 })}
             </span>
           </div>
           <a
             href={`/vote/${voteCode}`}
             className={`${BUTTON_SECONDARY} self-start`}
           >
-            {ownBallot?.placements.length ? "Edit your ballot" : "Rank your ballot"}
+            {ownBallot?.placements.length ? t("tierlists.editYourBallot") : t("tierlists.rankYourBallot")}
           </a>
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface)">
@@ -325,7 +326,7 @@ export function TierListEditorPage() {
                       : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"
                   }`}
                 >
-                  {access === "anonymous" ? "Anyone" : "Members only"}
+                  {access === "anonymous" ? t("tierlists.anyone") : t("tierlists.membersOnly")}
                 </button>
               ))}
             </div>
@@ -334,7 +335,7 @@ export function TierListEditorPage() {
               disabled={savingOpenState}
               className={BUTTON_SECONDARY}
             >
-              {votingOpen ? (savingOpenState ? "Closing…" : "Close voting") : savingOpenState ? "Reopening…" : "Reopen voting"}
+              {votingOpen ? (savingOpenState ? t("tierlists.closing") : t("tierlists.closeVoting")) : savingOpenState ? t("tierlists.reopening") : t("tierlists.reopenVoting")}
             </button>
           </div>
         </div>
@@ -345,13 +346,13 @@ export function TierListEditorPage() {
       ) : !editing ? (
         <div className="flex flex-col gap-2">
           {data.tiers.length === 0 ? (
-            <p className="text-sm text-(--color-text-dim)">No tiers yet — tap Edit to add one.</p>
+            <p className="text-sm text-(--color-text-dim)">{t("tierlists.noTiersTapEdit")}</p>
           ) : (
             data.tiers.map((tier) => <TierRow key={tier.id} tier={tier} books={books} />)
           )}
           {resolvedPool.length > 0 && (
             <p className="mt-1 text-xs text-(--color-text-dim)">
-              {resolvedPool.length} {itemNoun(subject, resolvedPool.length, locale)} still unranked — tap Edit to place them.
+              {t("tierlists.stillUnranked", { count: resolvedPool.length, noun: itemNoun(subject, resolvedPool.length, locale) })}
             </p>
           )}
         </div>
@@ -364,7 +365,7 @@ export function TierListEditorPage() {
         // true viewport bottom (see its own comment), which would otherwise
         // sit on top of whatever scrolls to the end of this results section.
         <div className="mt-6 pb-[13rem]">
-          <h2 className="mb-2 text-sm font-bold">Results</h2>
+          <h2 className="mb-2 text-sm font-bold">{t("tierlists.results")}</h2>
           {votingBoard && ownerResults ? (
             <TierlistResultsView
               histogram={ownerResults.histogram}
@@ -375,7 +376,7 @@ export function TierListEditorPage() {
               ballotCount={ownerResults.ballotCount}
             />
           ) : (
-            <p className="text-sm text-(--color-text-dim)">Loading results…</p>
+            <p className="text-sm text-(--color-text-dim)">{t("tierlists.loadingResults")}</p>
           )}
         </div>
       )}

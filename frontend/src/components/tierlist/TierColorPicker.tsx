@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Sheet } from "../Sheet";
+import { useT } from "../../i18n";
 
 /** The ladder colours the backend seeds a new tier list with
  *  (backend/src/modules/tierlists/service.ts) — offered as presets so a
@@ -12,7 +13,7 @@ const PRESETS = [
   { label: "B", color: "#c9a53d" },
   { label: "C", color: "#5c9e5c" },
   { label: "D", color: "#4a7fc9" },
-  { label: "Grey", color: "#8a8580" }
+  { label: null, color: "#8a8580" }
 ];
 
 /** The swatch inside a tier's colour chip. Opens a sheet of presets
@@ -21,35 +22,39 @@ const PRESETS = [
  *  detour for what is almost always "make this one red like an S rung".
  *  The custom option is still there for anyone who wants the wheel. */
 export function TierColorPicker({ color, onChange }: { color: string; onChange: (color: string) => void }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   return (
     <>
       <button
         onClick={() => setOpen(true)}
-        title="Tier color"
-        aria-label="Tier color"
+        title={t("tierlists.tierColor")}
+        aria-label={t("tierlists.tierColor")}
         className="-mx-1 -my-1.5 flex h-11 w-11 shrink-0 items-center justify-center"
       >
         <span className="h-8 w-8 rounded-sm ring-1 ring-white/70" style={{ backgroundColor: color }} />
       </button>
       {open && (
-        <Sheet title="Tier color" onClose={() => setOpen(false)}>
+        <Sheet title={t("tierlists.tierColor")} onClose={() => setOpen(false)}>
           <div className="flex flex-wrap gap-2 p-2">
-            {PRESETS.map((preset) => (
-              <button
-                key={preset.color}
-                onClick={() => {
-                  onChange(preset.color);
-                  setOpen(false);
-                }}
-                aria-label={preset.label}
-                title={preset.label}
-                className={`h-11 w-11 rounded-lg ring-2 ${preset.color === color ? "ring-(--color-accent)" : "ring-transparent"}`}
-                style={{ backgroundColor: preset.color }}
-              />
-            ))}
+            {PRESETS.map((preset) => {
+              const label = preset.label ?? t("tierlists.colorGrey");
+              return (
+                <button
+                  key={preset.color}
+                  onClick={() => {
+                    onChange(preset.color);
+                    setOpen(false);
+                  }}
+                  aria-label={label}
+                  title={label}
+                  className={`h-11 w-11 rounded-lg ring-2 ${preset.color === color ? "ring-(--color-accent)" : "ring-transparent"}`}
+                  style={{ backgroundColor: preset.color }}
+                />
+              );
+            })}
             <label className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg border border-dashed border-(--color-border) text-[10px] font-semibold text-(--color-text-dim)">
-              Custom
+              {t("tierlists.colorCustom")}
               <input
                 type="color"
                 defaultValue={color}
