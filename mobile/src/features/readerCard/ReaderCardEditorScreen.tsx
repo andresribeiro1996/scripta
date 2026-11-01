@@ -25,7 +25,7 @@ export function ReaderCardEditorScreen() {
   const t = useT();
   const { colors } = useTheme();
   const { user } = useAuth();
-  const readerName = user?.username ?? "reader";
+  const readerName = user?.username ?? t("community.readerFallback");
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const { data: library } = useLibrary();
   const books = library?.data.books ?? NO_BOOKS;
