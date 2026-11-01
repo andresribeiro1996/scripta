@@ -84,7 +84,7 @@ export const book: CatalogOf<typeof en> = {
   "book.castLoadFailed": "Não foi possível carregar o elenco.",
   "book.castDefaultName": "Personagens de {label}",
   "book.gameType": "Tipo de jogo",
-  "book.bracketSize": "Tamanho do quadro",
+  "book.bracketSize": "Tamanho da chave",
   "book.roundDurationHours": "Duração da ronda (horas)",
   "book.castTicked": "{count} de {size} personagens",
   "book.castSelected": { one: "{count} personagem", other: "{count} personagens" },

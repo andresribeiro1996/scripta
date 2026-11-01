@@ -138,6 +138,6 @@ export const sharing: CatalogOf<typeof en> = {
   "sharing.recapCtaSeeHowItEnded": "Veja como terminou",
   "sharing.recapCtaRank": "Ordene também — conta para {month}",
   "sharing.recapCtaPlay": "Jogue também — conta para {month}",
-  "sharing.recapCtaVote": "Vote no quadro — conta para {month}",
+  "sharing.recapCtaVote": "Vote na chave — conta para {month}",
   "sharing.recapCtaBook": "Veja {title} no Atmyshelf",
 };

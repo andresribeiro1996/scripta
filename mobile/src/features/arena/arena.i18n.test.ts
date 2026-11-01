@@ -47,7 +47,7 @@ test("the tournament screens stay English by default", () => {
 test("the tournament screens follow the Portuguese pick", () => {
   setLocalePreference("pt-PT");
   try {
-    assert.equal(t("arena.tabBracket"), "Quadro");
+    assert.equal(t("arena.tabBracket"), "Chave");
     assert.equal(t("arena.winsTiebreak", { title: "Dune" }), "Dune vence o desempate");
     assert.equal(t(GAMES_TABS[0].labelKey), "Explorar");
   } finally {
@@ -61,9 +61,9 @@ test("the tournament models take the locale they are given", () => {
   assert.equal(tournamentProgress(tournament, "pt-PT").label, "3 de 8 posições preenchidas");
   assert.equal(tournamentProgress({ ...tournament, status: "active", currentRound: 2 }, "pt-PT").label, "Ronda 2 de 3");
   const row = gameRow({ kind: "owned", key: "t1", item: ownedItems("tournaments", [tournament], [], "pt-PT")[0]! }, "pt-PT");
-  assert.equal(row.meta, "Quadro de 8 livros");
+  assert.equal(row.meta, "Chave de 8 livros");
   assert.deepEqual(row.badges, [{ label: "Em preparação", tone: "neutral" }]);
-  assert.deepEqual(arenaViewTabs("active", "pt-PT").map((option) => option.label), ["Quadro", "Votar"]);
+  assert.deepEqual(arenaViewTabs("active", "pt-PT").map((option) => option.label), ["Chave", "Votar"]);
   assert.equal(matchEmptyCopy("active", true, "pt-PT").title, "Está tudo em dia");
   assert.equal(matchNote(duel({ status: "tied_pending_tiebreak" }), "pt-PT"), "Desempate necessário");
   assert.equal(matchNote(duel({ status: "settled", winnerWorkId: "a" }), "pt-PT"), "Decidido · sem votos");
