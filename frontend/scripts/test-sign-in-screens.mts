@@ -85,7 +85,7 @@ test("chip rows that scroll share one right-edge fade and keep focus rings", () 
   const fade = read("src/components/page/surfaceClasses.ts");
   assert.match(fade, /export const SCROLL_FADE = "max-sm:\[mask-image:/);
   for (const f of ["src/pages/DiscoverPage.tsx", "src/components/LibraryToolbar.tsx"]) {
-    const group = read(f).match(/<div role="group" aria-label="(?:Type|Status)" className=\{`([^`]*)`\}/)?.[1] ?? "";
+    const group = read(f).match(/<div role="group" aria-label=(?:"Type"|\{t\("library\.status"\)\}) className=\{`([^`]*)`\}/)?.[1] ?? "";
     for (const cls of ["-my-1", "py-1", "overflow-x-auto", "${SCROLL_FADE}"]) assert.ok(group.includes(cls), `${f} ${cls}`);
   }
 });

@@ -2,7 +2,7 @@ import { chipClass, FIELD_CLASS } from "./page/buttonClasses";
 import { SCROLL_FADE } from "./page/surfaceClasses";
 import { SearchField, ToolbarRow } from "./Toolbar";
 import { sortOptions, statusFilterOptions, type SortKey, type StatusFilter } from "../lib/libraryView";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
 export function LibraryToolbar({
   query,
@@ -22,14 +22,15 @@ export function LibraryToolbar({
   onSortChange: (k: SortKey) => void;
 }) {
   const locale = useLocale();
+  const t = useT();
   return (
     <ToolbarRow>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <SearchField value={query} onChange={onQueryChange} placeholder="Search" label="Search your library" className="flex-1 sm:flex-none" />
+        <SearchField value={query} onChange={onQueryChange} placeholder={t("library.search")} label={t("library.searchYourLibrary")} className="flex-1 sm:flex-none" />
         <select
           value={sort}
           onChange={(e) => onSortChange(e.target.value as SortKey)}
-          aria-label="Sort books"
+          aria-label={t("library.sortBooks")}
           className={`${FIELD_CLASS} sm:order-last sm:ml-auto`}
         >
           {sortOptions(locale).map((o) => (
@@ -38,10 +39,10 @@ export function LibraryToolbar({
             </option>
           ))}
         </select>
-        <div role="group" aria-label="Status" className={`-mx-4 -my-1 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 py-1 ${SCROLL_FADE} sm:mx-0 sm:my-0 sm:w-auto sm:overflow-visible sm:p-0`}>
+        <div role="group" aria-label={t("library.status")} className={`-mx-4 -my-1 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 py-1 ${SCROLL_FADE} sm:mx-0 sm:my-0 sm:w-auto sm:overflow-visible sm:p-0`}>
           {statusFilterOptions(locale).map((o) => (
             <button key={o.value} type="button" aria-pressed={status === o.value} onClick={() => onStatusChange(o.value)} className={chipClass(status === o.value)}>
-              {o.value === "all" ? "All" : o.label}
+              {o.value === "all" ? t("library.filterAll") : o.label}
               <span className="font-normal opacity-70">{counts[o.value]}</span>
             </button>
           ))}

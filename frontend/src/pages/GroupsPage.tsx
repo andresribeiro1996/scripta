@@ -38,26 +38,31 @@ import { area } from "../lib/areas";
 import { seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
 import { bookKey } from "../lib/merge";
-import { getLocale } from "../i18n";
+import { getLocale, useT, type WebMessages } from "../i18n";
 
-const COPY: Record<GroupType, { title: string; noun: string; plural: string; emptyTitle: string; emptyBody: string; untitled: string; icon: ComponentType<{ size?: number }> }> = {
+type MessageKey = Extract<keyof WebMessages, string>;
+
+const COPY: Record<GroupType, { subtitle: MessageKey; search: MessageKey; emptyTitle: MessageKey; emptyBody: MessageKey; nameError: MessageKey; newLabel: MessageKey; namePlaceholder: MessageKey; settings: MessageKey; icon: ComponentType<{ size?: number }> }> = {
   series: {
-    title: "Series",
-    noun: "series",
-    plural: "series",
-    emptyTitle: "No series yet.",
-    emptyBody:
-      "Series are picked up automatically from your books' Series field on import — or add one by hand with the button above.",
-    untitled: "Untitled series",
+    subtitle: "library.groupSeriesSubtitle",
+    search: "library.searchSeries",
+    emptyTitle: "library.seriesEmptyTitle",
+    emptyBody: "library.seriesEmptyBody",
+    nameError: "library.nameSeriesError",
+    newLabel: "library.newSeries",
+    namePlaceholder: "library.nameSeriesPlaceholder",
+    settings: "library.seriesSettings",
     icon: SeriesIcon
   },
   collection: {
-    title: "Collections",
-    noun: "collection",
-    plural: "collections",
-    emptyTitle: "No collections yet.",
-    emptyBody: "Create one to start organizing your books your own way.",
-    untitled: "Untitled collection",
+    subtitle: "library.groupCollectionSubtitle",
+    search: "library.searchCollections",
+    emptyTitle: "library.collectionsEmptyTitle",
+    emptyBody: "library.collectionsEmptyBody",
+    nameError: "library.nameCollectionError",
+    newLabel: "library.newCollection",
+    namePlaceholder: "library.nameCollectionPlaceholder",
+    settings: "library.collectionSettings",
     icon: CollectionsIcon
   }
 };
@@ -66,6 +71,7 @@ const COPY: Record<GroupType, { title: string; noun: string; plural: string; emp
  *  the same underlying resource (see lib/groups.ts), differing only in
  *  copy and in that series also get auto-seeded from book metadata. */
 export function GroupsPage({ type }: { type: GroupType }) {
+  const t = useT();
   const saver = useLibrarySaver();
   const { data: library, isLoading, updateLibrary } = useLibrary();
   const { scrubBooks } = useMurals();
@@ -137,7 +143,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
   async function handleCommitDraft(fromEnter = false) {
     const name = draftName.trim();
     if (fromEnter && !name) {
-      setDraftError(`Give this ${copy.noun} a name.`);
+      setDraftError(t(copy.nameError));
       return;
     }
     setDrafting(false);
@@ -148,7 +154,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
     try {
       await updateLibrary((data) => ({ ...data, groups: [...(data.groups ?? []), makeGroup(type, name)] }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection.", getLocale()), kind: "error" });
+      toast({ message: saveFailureMessage(error, t("library.saveFailed"), getLocale()), kind: "error" });
     } finally {
       setCreating(false);
     }
@@ -161,7 +167,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
     try {
       await updateLibrary((data) => ({ ...data, groups: renameGroup(data.groups ?? [], id, name) }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection.", getLocale()), kind: "error" });
+      toast({ message: saveFailureMessage(error, t("library.saveFailed"), getLocale()), kind: "error" });
     }
   }
 
@@ -169,13 +175,13 @@ export function GroupsPage({ type }: { type: GroupType }) {
     try {
       await updateLibrary((data) => ({ ...data, groups: deleteGroup(data.groups ?? [], group.id) }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't delete — nothing was changed.", getLocale()), kind: "error" });
+      toast({ message: saveFailureMessage(error, t("library.deleteFailed"), getLocale()), kind: "error" });
       return;
     }
     toast({
-      message: `Deleted "${group.name}".`,
+      message: t("library.groupDeleted", { name: group.name }),
       action: {
-        label: "Undo",
+        label: t("library.undo"),
         onClick: () => {
           void (async () => {
             try {
@@ -187,9 +193,9 @@ export function GroupsPage({ type }: { type: GroupType }) {
                 if (exists) return data;
                 return { ...data, groups: [...(data.groups ?? []), group] };
               });
-              toast({ message: "Restored." });
+              toast({ message: t("library.restored") });
             } catch (error) {
-              toast({ message: saveFailureMessage(error, "Couldn't restore — check your connection.", getLocale()), kind: "error" });
+              toast({ message: saveFailureMessage(error, t("library.restoreFailed"), getLocale()), kind: "error" });
             }
           })();
         }
@@ -200,14 +206,14 @@ export function GroupsPage({ type }: { type: GroupType }) {
 
   async function handleToggleBook(groupId: string, book: Record<string, unknown>, inGroup: boolean) {
     const result = await saver.submit({ kind: "membership", groupId, bookKey: bookKey(book), member: !inGroup });
-    if (!result.ok) toast({ message: saveFailureMessage(result.error, "Couldn't save — check your connection.", getLocale()), kind: "error" });
+    if (!result.ok) toast({ message: saveFailureMessage(result.error, t("library.saveFailed"), getLocale()), kind: "error" });
   }
 
   async function handleSaveGroupStyle(groupId: string, groupStyle: PerCardStyle | undefined) {
     try {
       await updateLibrary((data) => ({ ...data, groups: setGroupStyle(data.groups ?? [], groupId, groupStyle) }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection.", getLocale()), kind: "error" });
+      toast({ message: saveFailureMessage(error, t("library.saveFailed"), getLocale()), kind: "error" });
     }
   }
 
@@ -223,7 +229,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
         books: data.books.map((b) => (bookKey(b) === key ? { ...b, _style: bookStyle } : b))
       }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection.", getLocale()), kind: "error" });
+      toast({ message: saveFailureMessage(error, t("library.saveFailed"), getLocale()), kind: "error" });
     }
   }
 
@@ -238,7 +244,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
         books: data.books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b))
       }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection.", getLocale()), kind: "error" });
+      toast({ message: saveFailureMessage(error, t("library.saveFailed"), getLocale()), kind: "error" });
     }
   }
 
@@ -250,7 +256,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
         books: data.books.map((b) => (bookKey(b) === key ? setBookCoverUrl(b, url) : b))
       }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection.", getLocale()), kind: "error" });
+      toast({ message: saveFailureMessage(error, t("library.saveFailed"), getLocale()), kind: "error" });
     }
   }
 
@@ -262,7 +268,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
         books: data.books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b))
       }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection.", getLocale()), kind: "error" });
+      toast({ message: saveFailureMessage(error, t("library.saveFailed"), getLocale()), kind: "error" });
     }
   }
 
@@ -307,24 +313,24 @@ export function GroupsPage({ type }: { type: GroupType }) {
         return deleteBooks(data, keys);
       });
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't delete — nothing was changed.", getLocale()), kind: "error" });
+      toast({ message: saveFailureMessage(error, t("library.deleteFailed"), getLocale()), kind: "error" });
       return;
     }
     setSelectedKeys(new Set());
     setSelectionMode(false);
     const scrubTimer = setTimeout(() => void scrubBooks(keys), 6500);
     toast({
-      message: `Deleted ${keys.size} book${keys.size === 1 ? "" : "s"}.`,
+      message: t("library.deletedBooks", { count: keys.size }),
       action: {
-        label: "Undo",
+        label: t("library.undo"),
         onClick: () => {
           clearTimeout(scrubTimer);
           void (async () => {
             try {
               await updateLibrary((data) => restoreDeletedBooks(data, snapshot, keys));
-              toast({ message: "Restored." });
+              toast({ message: t("library.restored") });
             } catch (error) {
-              toast({ message: saveFailureMessage(error, "Couldn't restore — check your connection.", getLocale()), kind: "error" });
+              toast({ message: saveFailureMessage(error, t("library.restoreFailed"), getLocale()), kind: "error" });
             }
           })();
         }
@@ -343,33 +349,33 @@ export function GroupsPage({ type }: { type: GroupType }) {
   return (
     <Page
       width="wide"
-      title="Library"
-      subtitle={isLoading ? undefined : `${allGroups.length} ${allGroups.length === 1 ? copy.noun : copy.plural}`}
+      title={t("shell.areaLibrary")}
+      subtitle={isLoading ? undefined : t(copy.subtitle, { count: allGroups.length })}
       tabs={area("library").tabs}
       reserveSubtitle
       maxWidth={style.contentMaxWidth}
       actions={
         books.length > 0 && selectionMode ? (
           <>
-            <span className="text-sm text-(--color-text-dim)">{selectedKeys.size} selected</span>
+            <span className="text-sm text-(--color-text-dim)">{t("library.selectedCount", { count: selectedKeys.size })}</span>
             <button
               onClick={() => void handleDeleteSelected()}
               disabled={selectedKeys.size === 0}
               className={BUTTON_DANGER}
             >
-              Delete selected
+              {t("library.deleteSelected")}
             </button>
-            <button onClick={handleToggleSelectionMode} className={BUTTON_SECONDARY}>Cancel</button>
+            <button onClick={handleToggleSelectionMode} className={BUTTON_SECONDARY}>{t("shell.cancel")}</button>
           </>
         ) : (
           <>
             <button onClick={handleStartDraft} disabled={creating || drafting} className={BUTTON_PRIMARY}>
-              {creating ? "Adding…" : `New ${copy.noun}`}
+              {creating ? t("library.adding") : t(copy.newLabel)}
             </button>
             {books.length > 0 && (
               <OptionsMenu
-                items={[{ label: "Select…", onClick: handleToggleSelectionMode }]}
-                title="More actions"
+                items={[{ label: t("library.actionSelect"), onClick: handleToggleSelectionMode }]}
+                title={t("library.moreActions")}
                 trigger={<MoreIcon size={22} />}
                 triggerClassName={toolbarIconClass()}
               />
@@ -380,13 +386,13 @@ export function GroupsPage({ type }: { type: GroupType }) {
     >
       {books.length > 0 && (
         <ToolbarRow>
-          <SearchField value={search} onChange={setSearch} placeholder="Search" label={`Search ${copy.title.toLowerCase()} by name`} className="flex-1 sm:flex-none" />
+          <SearchField value={search} onChange={setSearch} placeholder={t("library.search")} label={t(copy.search)} className="flex-1 sm:flex-none" />
         </ToolbarRow>
       )}
 
-      {!isLoading && allGroups.length === 0 && <EmptyState icon={copy.icon} title={copy.emptyTitle} body={copy.emptyBody} />}
+      {!isLoading && allGroups.length === 0 && <EmptyState icon={copy.icon} title={t(copy.emptyTitle)} body={t(copy.emptyBody)} />}
       {!isLoading && allGroups.length > 0 && groups.length === 0 && (
-        <p className="text-sm text-(--color-text-dim)">Nothing matches “{search.trim()}”.</p>
+        <p className="text-sm text-(--color-text-dim)">{t("library.nothingMatches", { query: search.trim() })}</p>
       )}
 
       <div className="flex flex-col">
@@ -398,7 +404,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
             className={`mb-6 rounded-xl border-2 border-dashed p-3 ${draftError ? "border-(--color-danger)" : "border-(--color-accent)"}`}
           >
             <label htmlFor="new-group-name" className="mb-1 block text-sm font-semibold">
-              Name
+              {t("library.groupName")}
             </label>
             <input
               id="new-group-name"
@@ -415,7 +421,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
                 if (e.key === "Enter") void handleCommitDraft(true);
                 if (e.key === "Escape") cancelDraft();
               }}
-              placeholder={`Name this ${copy.noun}…`}
+              placeholder={t(copy.namePlaceholder)}
               className={`${FIELD_CLASS} w-full`}
             />
             {draftError ? (
@@ -425,10 +431,10 @@ export function GroupsPage({ type }: { type: GroupType }) {
             ) : null}
             <div className="mt-3 flex flex-wrap gap-2">
               <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => void handleCommitDraft(true)} className={BUTTON_PRIMARY}>
-                Add
+                {t("library.groupAdd")}
               </button>
               <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={cancelDraft} className={BUTTON_SECONDARY}>
-                Cancel
+                {t("shell.cancel")}
               </button>
             </div>
           </div>
@@ -466,38 +472,36 @@ export function GroupsPage({ type }: { type: GroupType }) {
                         setEditingName(group.name);
                       }}
                       className="min-h-11 wrap-anywhere text-left text-lg font-bold transition-colors hover:text-(--color-accent)"
-                      title="Rename"
+                      title={t("library.groupRename")}
                     >
                       {group.name}
                       {group.style && (
                         <span className="ml-1.5 inline-block rounded-full bg-(--color-accent-soft) px-1.5 py-0.5 align-middle whitespace-nowrap text-[10px] font-semibold text-(--color-accent)">
-                          custom style
+                          {t("library.customStyle")}
                         </span>
                       )}
                     </button>
                   )}
                 </h2>
                 <div className="flex shrink-0 items-center gap-3 text-sm text-(--color-text-dim)">
-                  <span>
-                    {members.length} book{members.length === 1 ? "" : "s"}
-                  </span>
+                  <span>{t("library.bookCount", { count: members.length })}</span>
                   <OptionsMenu
-                    title={`${copy.noun[0].toUpperCase()}${copy.noun.slice(1)} settings`}
+                    title={t(copy.settings)}
                     triggerClassName="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
                     items={[
                       // Collections don't get their own style override —
                       // same reason there's no "Style" button on a
                       // collection's card at all before this change.
-                      ...(type === "series" ? [{ label: "Style", onClick: () => setStyleGroupId(group.id) }] : []),
-                      { label: "Manage books", onClick: () => setPickerGroupId(group.id) },
-                      { label: "Delete", onClick: () => handleDelete(group), danger: true }
+                      ...(type === "series" ? [{ label: t("library.groupStyle"), onClick: () => setStyleGroupId(group.id) }] : []),
+                      { label: t("library.manageBooks"), onClick: () => setPickerGroupId(group.id) },
+                      { label: t("shell.delete"), onClick: () => handleDelete(group), danger: true }
                     ]}
                   />
                 </div>
               </div>
 
               {members.length === 0 ? (
-                <EmptyState title="No books here yet" body='Use "Manage books" to add some.' />
+                <EmptyState title={t("library.noBooksTitle")} body={t("library.noBooksBody")} />
               ) : (
                 // Layout (BookGrid's own style prop) is always the plain
                 // library style — series/book overrides never touch
@@ -539,7 +543,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
         <PerCardStylePanel
           idPrefix="series"
           name={styleGroup.name}
-          priorityText="the library-wide"
+          priorityText={t("library.priorityLibrary")}
           currentOverride={styleGroup.style}
           seedStyle={style}
           onSave={(groupStyle) => handleSaveGroupStyle(styleGroup.id, groupStyle)}
@@ -550,8 +554,8 @@ export function GroupsPage({ type }: { type: GroupType }) {
       {styleBook && (
         <PerCardStylePanel
           idPrefix="book"
-          name={String(styleBook.Title ?? "Untitled")}
-          priorityText="the series and library-wide"
+          name={String(styleBook.Title ?? t("library.untitled"))}
+          priorityText={t("library.prioritySeriesLibrary")}
           currentOverride={styleBook._style as PerCardStyle | undefined}
           // Seed from what this book currently looks like one level up the
           // chain — its series' style if it's in a customized one
@@ -566,12 +570,12 @@ export function GroupsPage({ type }: { type: GroupType }) {
 
       {coverBook && (
         <CoverPickerModal
-          title={String(coverBook.Title ?? "Untitled")}
+          title={String(coverBook.Title ?? t("library.untitled"))}
           currentImageId={typeof coverBook._coverImageId === "string" ? coverBook._coverImageId : null}
           lookup={coverParamsFor(coverBook)}
           coverUrl={typeof coverBook._coverUrl === "string" ? coverBook._coverUrl : null}
           isAdmin={isAdmin}
-          removeCoverLabel="Remove custom cover — go back to the normal auto-detected one"
+          removeCoverLabel={t("library.removeCustomCover")}
           onSelect={(image) => void handleSaveBookCover(coverBook, image)}
           onPickFound={(cover, everyone) => handlePickFoundCover(coverBook, cover, everyone)}
           onRemoveCover={() => void handleRemoveBookCover(coverBook)}
@@ -593,6 +597,7 @@ function BookPickerModal({
   onToggle: (book: Record<string, unknown>, inGroup: boolean) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const searchRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     searchRef.current?.focus();
@@ -607,12 +612,12 @@ function BookPickerModal({
   }, [allBooks, search]);
 
   return (
-    <Sheet title={`Books in "${group.name}"`} onClose={onClose}>
+    <Sheet title={t("library.booksIn", { name: group.name })} onClose={onClose}>
       <div className="sticky top-0 z-10 bg-(--color-surface) p-2 pt-0">
-        <SearchField fill inputRef={searchRef} value={search} onChange={setSearch} placeholder="Search your library…" label="Search your library" />
+        <SearchField fill inputRef={searchRef} value={search} onChange={setSearch} placeholder={t("library.searchYourLibraryDots")} label={t("library.searchYourLibrary")} />
       </div>
       <div className="p-2">
-        {filtered.length === 0 && <p className="p-3 text-sm text-(--color-text-dim)">No books match.</p>}
+        {filtered.length === 0 && <p className="p-3 text-sm text-(--color-text-dim)">{t("library.noMatchTitle")}</p>}
         {filtered.map((book, i) => {
           const key = bookKey(book);
           const inGroup = memberKeys.has(key);
@@ -623,8 +628,8 @@ function BookPickerModal({
             >
               <input type="checkbox" className={CHECKBOX_CLASS} checked={inGroup} onChange={() => onToggle(book, inGroup)} />
               <span className="min-w-0 flex-1 truncate">
-                {String(book.Title ?? "Untitled")}
-                <span className="text-(--color-text-dim)"> — {String(book.Attribution ?? "Unknown author")}</span>
+                {String(book.Title ?? t("library.untitled"))}
+                <span className="text-(--color-text-dim)"> — {String(book.Attribution ?? t("library.unknownAuthor"))}</span>
               </span>
             </label>
           );

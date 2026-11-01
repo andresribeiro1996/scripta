@@ -319,8 +319,8 @@ test("the four Admin tabs fit a 328px row: a tighter gap below sm and short labe
 
 test("Series and Collections use the Library's toolbar: SearchField and a More actions menu holding Select", () => {
   const s = src("pages/GroupsPage");
-  assert.match(s, /<SearchField\b(?:=>|[^>])*label=\{`Search \$\{copy\.title\.toLowerCase\(\)\} by name`\}/);
-  assert.match(s, /<OptionsMenu\b(?:=>|[^>])*items=\{\[\{ label: "Select…"[^\]]*\]\}(?:=>|[^>])*title="More actions"/);
+  assert.match(s, /<SearchField\b(?:=>|[^>])*label=\{t\(copy\.search\)\}/);
+  assert.match(s, /<OptionsMenu\b(?:=>|[^>])*items=\{\[\{ label: t\("library\.actionSelect"\)[^\]]*\]\}(?:=>|[^>])*title=\{t\("library\.moreActions"\)\}/);
   assert.doesNotMatch(s, /<button\b(?:=>|[^>])*>Select…<\/button>/);
   assert.doesNotMatch(s, /aria-label=\{`Search/);
 });
@@ -329,7 +329,7 @@ test("profile tabs are flush with the title, and your own profile has the Librar
   const swipe = src("components/SwipeTabs");
   assert.doesNotMatch(swipe, /\$\{tabClass\(i === index\)\} gap-1\.5 px-1/);
   const own = src("components/OwnShelfView");
-  assert.match(own, /\{ value: "library", label: "Library" \}/);
+  assert.match(own, /\{ value: "library", label: "library\.shelfTabLibrary" \}/);
   for (const f of ["components/OwnShelfView", "pages/CommunityProfilePage"]) {
     const s = src(f);
     assert.match(s, /<ProfileLibraryPanel\b/, f);

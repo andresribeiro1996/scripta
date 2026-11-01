@@ -6,7 +6,7 @@ import { forgetResolvedCover, peekResolvedCover, resolveCover, subscribeResolved
 import { normalizeImageId, normalizeIsbn, statusLabel } from "../lib/covers";
 import { DEFAULT_LIBRARY_STYLE, cardFontFamilyCss, resolveBorderColor, type LibraryStyleSettings } from "../lib/libraryStyle";
 import { bookKey } from "../lib/merge";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
 const BookIcon = () => (
   <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="1.5">
@@ -223,6 +223,7 @@ export function BookCard({
   onToggleSelect?: (book: Record<string, unknown>) => void;
 }) {
   const locale = useLocale();
+  const t = useT();
   const label = statusLabel(book.ReadStatus, locale);
   const highlights = Array.isArray(book.highlights) ? book.highlights.length : 0;
   const [hasCover, setHasCover] = useState(false);
@@ -318,7 +319,7 @@ export function BookCard({
       }}
       className={`book-card ${hasCover ? "book-card--covered" : ""} group relative cursor-pointer overflow-hidden bg-(--color-border) transition-transform ${style.cardShadow ? "shadow-sm" : ""} ${style.cardHoverEffect && !selectable ? "hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-md" : ""} ${dragEnabled ? "select-none" : ""} ${isDragging ? "touch-none opacity-60" : ""}`}
     >
-      <CoverImage book={book} onHasCoverChange={setHasCover} alt={showOverlayText ? "" : String(book.Title ?? "Book cover")} />
+      <CoverImage book={book} onHasCoverChange={setHasCover} alt={showOverlayText ? "" : String(book.Title ?? t("library.bookCover"))} />
 
       {selectable && (
         <>
@@ -337,7 +338,7 @@ export function BookCard({
             checked={selected}
             onChange={() => onToggleSelect?.(book)}
             onClick={(e) => e.stopPropagation()}
-            aria-label={`Select ${String(book.Title ?? "this book")}`}
+            aria-label={t("library.selectBook", { title: String(book.Title ?? t("library.thisBook")) })}
             className="absolute top-0 left-0 h-11 w-11 cursor-pointer appearance-none bg-transparent"
           />
         </>
@@ -351,10 +352,10 @@ export function BookCard({
                 e.stopPropagation();
                 onOpenStyle(book);
               }}
-              title={book._style ? "Edit this book's custom style" : "Give this book its own style"}
+              title={book._style ? t("library.styleEditTitle") : t("library.styleGiveTitle")}
               className="flex min-h-11 min-w-11 items-start justify-center px-1.5"
             >
-              <span className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold backdrop-blur-xs ${book._style ? "bg-(--color-accent) text-(--color-on-accent)" : "bg-[rgba(10,8,6,0.72)] text-white"}`}>Style</span>
+              <span className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold backdrop-blur-xs ${book._style ? "bg-(--color-accent) text-(--color-on-accent)" : "bg-[rgba(10,8,6,0.72)] text-white"}`}>{t("library.styleButton")}</span>
             </button>
           )}
           {onOpenCoverPicker && (
@@ -363,10 +364,10 @@ export function BookCard({
                 e.stopPropagation();
                 onOpenCoverPicker(book);
               }}
-              title={book._coverImageId ? "Change this book's custom cover" : "Set a custom cover from your gallery"}
+              title={book._coverImageId ? t("library.coverChangeTitle") : t("library.coverSetTitle")}
               className="flex min-h-11 min-w-11 items-start justify-center px-1.5"
             >
-              <span className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold backdrop-blur-xs ${book._coverImageId ? "bg-(--color-accent) text-(--color-on-accent)" : "bg-[rgba(10,8,6,0.72)] text-white"}`}>Cover</span>
+              <span className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold backdrop-blur-xs ${book._coverImageId ? "bg-(--color-accent) text-(--color-on-accent)" : "bg-[rgba(10,8,6,0.72)] text-white"}`}>{t("library.coverButton")}</span>
             </button>
           )}
         </div>
@@ -432,13 +433,13 @@ export function BookCard({
             className="book-card-title mb-0.5 text-[1.15em] leading-tight [text-shadow:0_1px_3px_rgba(0,0,0,0.4)]"
             style={{ color: overlayTextColor, fontWeight: style.cardBold ? 700 : undefined, fontStyle: style.cardItalic ? "italic" : undefined }}
           >
-            {String(book.Title ?? "Untitled")}
+            {String(book.Title ?? t("library.untitled"))}
           </h3>
           <div
             className="book-card-author mb-1 text-[0.9em]"
             style={{ color: overlayTextColor, opacity: 0.82, fontWeight: style.cardBold ? 700 : undefined, fontStyle: style.cardItalic ? "italic" : undefined }}
           >
-            {String(book.Attribution ?? "Unknown author")}
+            {String(book.Attribution ?? t("library.unknownAuthor"))}
           </div>
           <div
             className="book-card-status text-[0.8em] font-medium"

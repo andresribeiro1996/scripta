@@ -8,10 +8,11 @@ import { CoverImage } from "./BookCard";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
 import { Sheet } from "./Sheet";
 import { useToast } from "./Toaster";
-import { getLocale, useLocale } from "../i18n";
+import { getLocale, useLocale, useT } from "../i18n";
 
 export function DuplicatesSheet({ groups, library, onClose }: { groups: string[][]; library: LibraryDocument; onClose: () => void }) {
   const locale = useLocale();
+  const t = useT();
   const { updateLibrary } = useLibrary();
   const saver = useLibrarySaver();
   const queryClient = useQueryClient();
@@ -36,12 +37,12 @@ export function DuplicatesSheet({ groups, library, onClose }: { groups: string[]
   const merge = (group: string[]) =>
     run(async () => {
       await saver.merge((expectedUpdatedAt, signal) => mergeLibraryBooks(group[0]!, group.slice(1), expectedUpdatedAt ?? library.updatedAt, signal));
-    }, "Couldn't merge these books.");
+    }, t("library.duplicatesMergeFailed"));
 
-  const keepApart = (group: string[]) => run(() => updateLibrary((data) => markDistinct(data, group)), "Couldn't save that.");
+  const keepApart = (group: string[]) => run(() => updateLibrary((data) => markDistinct(data, group)), t("library.duplicatesSaveFailed"));
 
   return (
-    <Sheet title="Possible duplicates" onClose={onClose}>
+    <Sheet title={t("library.duplicatesTitle")} onClose={onClose}>
       <ul className="flex flex-col gap-4 px-3 pb-4">
         {groups.map((group) => (
           <li key={group.join("|")} className="flex flex-col gap-3 rounded-lg border border-(--color-border) p-3">
@@ -54,7 +55,7 @@ export function DuplicatesSheet({ groups, library, onClose }: { groups: string[]
                     <CoverImage book={book} />
                   </div>
                   <div className="min-w-0 text-sm">
-                    <p className="truncate font-semibold">{String(book.Title ?? "Untitled")}</p>
+                    <p className="truncate font-semibold">{String(book.Title ?? t("library.untitled"))}</p>
                     <p className="truncate text-(--color-text-dim)">{String(book.Attribution ?? "")}</p>
                     <p className="text-xs text-(--color-text-dim)">{[book.ISBN ? `ISBN ${String(book.ISBN)}` : null, statusLabel(book.ReadStatus, locale)].filter(Boolean).join(" · ")}</p>
                   </div>
@@ -63,10 +64,10 @@ export function DuplicatesSheet({ groups, library, onClose }: { groups: string[]
             })}
             <div className="flex gap-2">
               <button type="button" disabled={busy} onClick={() => void merge(group)} className={`${BUTTON_PRIMARY} flex-1`}>
-                Merge
+                {t("library.duplicatesMerge")}
               </button>
               <button type="button" disabled={busy} onClick={() => void keepApart(group)} className={`${BUTTON_SECONDARY} flex-1`}>
-                Not the same
+                {t("library.duplicatesNotSame")}
               </button>
             </div>
           </li>

@@ -4,16 +4,19 @@ import { fetchSharedLibrary } from "../api/sharedLibrary";
 import { Page } from "../components/page/Page";
 import { PublicLibraryGrid } from "../components/PublicLibraryGrid";
 import { resolveLibraryStyle } from "../lib/libraryStyle";
+import { useT } from "../i18n";
 
 function InfoScreen({ message }: { message: string }) {
+  const t = useT();
   return (
-    <Page width="wide" title="Library">
+    <Page width="wide" title={t("shell.areaLibrary")}>
       <p className="text-sm text-(--color-text-dim)">{message}</p>
     </Page>
   );
 }
 
 export function SharedLibraryPage() {
+  const t = useT();
   const { token } = useParams<{ token: string }>();
 
   const { data, isLoading, isError } = useQuery({
@@ -28,14 +31,14 @@ export function SharedLibraryPage() {
   const style = resolveLibraryStyle(data?.data.style);
 
   if (!token || isError) {
-    return <InfoScreen message="This link is invalid or no longer active." />;
+    return <InfoScreen message={t("library.sharedInvalid")} />;
   }
   if (isLoading || !data) {
-    return <InfoScreen message="Loading…" />;
+    return <InfoScreen message={t("library.loadingEllipsis")} />;
   }
 
   return (
-    <Page width="wide" title={data.data.name || "Library"} maxWidth={style.contentMaxWidth}>
+    <Page width="wide" title={data.data.name || t("shell.areaLibrary")} maxWidth={style.contentMaxWidth}>
       <PublicLibraryGrid library={data.data} />
     </Page>
   );

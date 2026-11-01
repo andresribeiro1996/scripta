@@ -106,8 +106,8 @@ test("Delete account names quizzes and comments", () => {
 });
 
 test("destructive buttons are danger buttons", () => {
-  assert.match(src("pages/LibraryPage"), /className=\{BUTTON_DANGER\}\s*>\s*Delete selected/);
-  assert.match(src("pages/GroupsPage"), /className=\{BUTTON_DANGER\}\s*>\s*Delete selected/);
+  assert.match(src("pages/LibraryPage"), /className=\{BUTTON_DANGER\}\s*>\s*\{t\("library\.deleteSelected"\)\}/);
+  assert.match(src("pages/GroupsPage"), /className=\{BUTTON_DANGER\}\s*>\s*\{t\("library\.deleteSelected"\)\}/);
   assert.match(src("pages/QuizEditorPage"), /className=\{BUTTON_DANGER_OUTLINE\}\s*>\s*Delete\s*</);
 });
 
@@ -125,8 +125,8 @@ test("the new series / collection field: danger frame on error, Add and Cancel b
   const s = src("pages/GroupsPage");
   assert.match(s, /draftError \? "border-\(--color-danger\)" : "border-\(--color-accent\)"/);
   assert.match(s, /aria-invalid=\{draftError \? true : undefined\}/);
-  assert.match(s, /<button type="button" onMouseDown=\{\(e\) => e\.preventDefault\(\)\} onClick=\{\(\) => void handleCommitDraft\(true\)\} className=\{BUTTON_PRIMARY\}>\s*Add\s*</);
-  assert.match(s, /onClick=\{cancelDraft\} className=\{BUTTON_SECONDARY\}>\s*Cancel\s*</);
+  assert.match(s, /<button type="button" onMouseDown=\{\(e\) => e\.preventDefault\(\)\} onClick=\{\(\) => void handleCommitDraft\(true\)\} className=\{BUTTON_PRIMARY\}>\s*\{t\("library\.groupAdd"\)\}\s*</);
+  assert.match(s, /onClick=\{cancelDraft\} className=\{BUTTON_SECONDARY\}>\s*\{t\("shell\.cancel"\)\}\s*</);
   assert.match(s, /contains\(e\.relatedTarget\)/);
   assert.doesNotMatch(s, /Press Enter to add it/);
 });

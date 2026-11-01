@@ -27,18 +27,19 @@ import { orderLibraryBooks } from "../lib/libraryOrder";
 import { buildMuralPreset, shelfPresetSummary } from "../lib/muralPresets";
 import type { Mural } from "../lib/murals";
 import { useResolvedTheme } from "../lib/theme";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
 const OWN_SHELF_TABS = [
-  { value: "mural", label: "Mural" },
-  { value: "activity", label: "Activity" },
-  { value: "library", label: "Library" }
+  { value: "mural", label: "library.shelfTabMural" },
+  { value: "activity", label: "library.shelfTabActivity" },
+  { value: "library", label: "library.shelfTabLibrary" }
 ] as const;
 
 type OwnShelfTab = (typeof OWN_SHELF_TABS)[number]["value"];
 
 export function OwnShelfView({ username }: { username: string }) {
   const locale = useLocale();
+  const t = useT();
   const { session } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -71,7 +72,7 @@ export function OwnShelfView({ username }: { username: string }) {
       await queryClient.invalidateQueries({ queryKey: ["community", "activity", username] });
       return true;
     } catch {
-      setError("Something went wrong. Try again.");
+      setError(t("library.shelfActionFailed"));
       return false;
     } finally {
       setBusy(false);
@@ -84,7 +85,7 @@ export function OwnShelfView({ username }: { username: string }) {
   }
 
   async function shelfTargetId() {
-    const id = own.data?.muralId ?? pendingShelf.current ?? (await murals.create("My shelf", viewerTheme)).id;
+    const id = own.data?.muralId ?? pendingShelf.current ?? (await murals.create(t("shell.myShelf"), viewerTheme)).id;
     pendingShelf.current = id;
     return id;
   }
@@ -121,7 +122,7 @@ export function OwnShelfView({ username }: { username: string }) {
   if (own.isPending || murals.isLoading) {
     return (
       <Page title={`@${username}`} back={backTo("profile")}>
-        <SkeletonCardGrid count={2} label="Loading your shelf" tileClassName="min-h-[120px]" />
+        <SkeletonCardGrid count={2} label={t("library.shelfLoading")} tileClassName="min-h-[120px]" />
       </Page>
     );
   }
@@ -130,8 +131,8 @@ export function OwnShelfView({ username }: { username: string }) {
     return (
       <Page title={`@${username}`} back={backTo("profile")}>
         <EmptyState
-          title="Shelf unavailable."
-          body="Couldn't load your shelf."
+          title={t("library.shelfUnavailable")}
+          body={t("library.shelfLoadFailed")}
           action={
             <button
               onClick={() => {
@@ -140,7 +141,7 @@ export function OwnShelfView({ username }: { username: string }) {
               }}
               className={BUTTON_SECONDARY}
             >
-              Retry
+              {t("library.retry")}
             </button>
           }
         />
@@ -166,7 +167,7 @@ export function OwnShelfView({ username }: { username: string }) {
               ownData.published ? "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)" : "border-(--color-border) text-(--color-text-dim)"
             }`}
           >
-            {ownData.published ? "Published" : "Private"}
+            {ownData.published ? t("library.published") : t("library.private")}
           </span>
           {!ownData.published && (
             <button
@@ -174,7 +175,7 @@ export function OwnShelfView({ username }: { username: string }) {
               disabled={busy}
               className={BUTTON_PRIMARY}
             >
-              Publish…
+              {t("library.publish")}
             </button>
           )}
           {publishing && <PublishDialog username={username} onAnswer={publish} onCancel={() => setPublishing(false)} />}
@@ -191,7 +192,7 @@ export function OwnShelfView({ username }: { username: string }) {
       </div>
       <div className="mt-6">
         {error && <p className="mb-4 text-sm text-(--color-danger)">{error}</p>}
-        <SwipeTabs tabs={OWN_SHELF_TABS} value={tab} onChange={setTab} label="Shelf sections">
+        <SwipeTabs tabs={OWN_SHELF_TABS.map((entry) => ({ value: entry.value, label: t(entry.label) }))} value={tab} onChange={setTab} label={t("library.shelfSections")}>
           {(panel) => {
             if (panel === "activity") return <ProfileActivity activity={activity} />;
             if (panel === "library") return <ProfileLibraryPanel library={library?.data} isLoading={libraryQuery.isPending} error={libraryQuery.error} onRetry={() => void libraryQuery.refetch()} onOpenBook={(book) => navigate(bookHref(bookKey(book), library?.works))} />;
@@ -200,29 +201,29 @@ export function OwnShelfView({ username }: { username: string }) {
                 {shelfMural && muralHasBlocks ? (
                   <MuralCanvas mural={shelfMural} editMode={false} groups={groups} books={books} images={images} profile={profile} />
                 ) : libraryQuery.isPending ? (
-                  <SkeletonCardGrid count={2} label="Loading your library" tileClassName="min-h-[120px]" />
+                  <SkeletonCardGrid count={2} label={t("library.libraryLoadingOwn")} tileClassName="min-h-[120px]" />
                 ) : libraryQuery.isError ? (
                   <EmptyState
-                    title="Library unavailable."
-                    body="Couldn't load your library."
+                    title={t("library.libraryUnavailable")}
+                    body={t("library.libraryLoadFailedOwn")}
                     action={
                       <button onClick={() => void libraryQuery.refetch()} className={BUTTON_SECONDARY}>
-                        Retry
+                        {t("library.retry")}
                       </button>
                     }
                   />
                 ) : books.length === 0 ? (
                   <EmptyState
                     icon={MuralsIcon}
-                    title="Start your library"
-                    body="Import your existing collection, or add your first book manually."
+                    title={t("library.startLibraryTitle")}
+                    body={t("library.startLibraryBody")}
                     action={
                       <div className="flex flex-wrap justify-center gap-2">
                         <Link to="/dashboard/library?action=import" className={BUTTON_SECONDARY}>
-                          Import library
+                          {t("library.importHeading")}
                         </Link>
                         <Link to="/dashboard/library?action=add" className={BUTTON_SECONDARY}>
-                          Add a book
+                          {t("library.addBook")}
                         </Link>
                       </div>
                     }
@@ -232,10 +233,10 @@ export function OwnShelfView({ username }: { username: string }) {
                     <p className="text-sm text-(--color-text-dim)">{shelfPresetSummary(books, ownData.published, locale)}</p>
                     <div className="flex flex-wrap gap-2">
                       <button onClick={() => void keepShelf()} disabled={busy} className={BUTTON_SECONDARY}>
-                        Keep this shelf
+                        {t("library.keepShelf")}
                       </button>
                       <button onClick={() => void startBlank()} disabled={busy} className={BUTTON_SECONDARY}>
-                        Start blank
+                        {t("library.startBlank")}
                       </button>
                     </div>
                     <MuralCanvas mural={previewMural} editMode={false} groups={groups} books={books} images={images} profile={profile} hideProfileName />
@@ -251,38 +252,39 @@ export function OwnShelfView({ username }: { username: string }) {
 }
 
 function PublishDialog({ username, onAnswer, onCancel }: { username: string; onAnswer: (shareReading: boolean) => void; onCancel: () => void }) {
+  const t = useT();
   return (
     <Sheet
-      title="Publish your shelf?"
+      title={t("library.publishTitle")}
       onClose={onCancel}
       footer={
         <div className="flex flex-wrap justify-end gap-2">
           <button onClick={onCancel} className={BUTTON_SECONDARY}>
-            Cancel
+            {t("shell.cancel")}
           </button>
           <button onClick={() => onAnswer(false)} className={BUTTON_SECONDARY}>
-            Don't share my reading
+            {t("library.publishNoReading")}
           </button>
           <button onClick={() => onAnswer(true)} className={BUTTON_PRIMARY}>
-            Share my reading
+            {t("library.publishShareReading")}
           </button>
         </div>
       }
     >
       <div className="px-3 pb-2">
-        <p className="text-xs text-(--color-text-dim)">{`It becomes a public page at /u/${username} with your library, and readers can find and follow you.`}</p>
-        <p className="mt-3 text-sm">Share what you add and finish on your page and with followers?</p>
+        <p className="text-xs text-(--color-text-dim)">{t("library.publishBody", { username })}</p>
+        <p className="mt-3 text-sm">{t("library.publishQuestion")}</p>
       </div>
     </Sheet>
   );
 }
 
-const FEED_SETTING_ROWS: Array<{ key: FeedCategory; label: string }> = [
-  { key: "publications", label: "Publications" },
-  { key: "reading", label: "Reading activity" },
-  { key: "votes", label: "Votes" },
-  { key: "follows", label: "Follows" }
-];
+const FEED_SETTING_ROWS = [
+  { key: "publications", label: "library.feedPublications" },
+  { key: "reading", label: "library.feedReading" },
+  { key: "votes", label: "library.feedVotes" },
+  { key: "follows", label: "library.feedFollows" }
+] as const satisfies ReadonlyArray<{ key: FeedCategory; label: string }>;
 
 function OwnerControls({
   busy,
@@ -301,6 +303,7 @@ function OwnerControls({
   onUnpublish: () => void;
   onSaveSettings: (settings: FeedSettings) => void;
 }) {
+  const t = useT();
   const { data: murals } = useMurals();
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -318,29 +321,29 @@ function OwnerControls({
         }}
         className={BUTTON_SECONDARY}
       >
-        Manage profile
+        {t("library.manageProfile")}
       </button>
       {open && (
         <Sheet
-          title="Manage profile"
+          title={t("library.manageProfile")}
           onClose={() => setOpen(false)}
           footer={
             <>
               <button onClick={() => setOpen(false)} className={BUTTON_SECONDARY}>
-                Cancel
+                {t("shell.cancel")}
               </button>
               <button onClick={() => onSaveSettings(next)} disabled={busy} className={BUTTON_PRIMARY}>
-                {busy ? "Saving…" : "Save feed settings"}
+                {busy ? t("shell.saving") : t("library.saveFeedSettings")}
               </button>
             </>
           }
         >
-          <p className={sectionLabel}>Shelf mural</p>
+          <p className={sectionLabel}>{t("library.shelfMural")}</p>
           <div className="flex items-center gap-2 px-3">
             <select
               value={muralId}
               onChange={(e) => setMuralId(e.target.value)}
-              aria-label="Shelf mural"
+              aria-label={t("library.shelfMural")}
               className={`${FIELD_CLASS} min-w-0 flex-1`}
             >
               {(murals ?? []).map((mural) => (
@@ -354,10 +357,10 @@ function OwnerControls({
               disabled={busy || !muralId || muralId === currentMuralId}
               className={BUTTON_SECONDARY}
             >
-              {busy ? "Working…" : "Switch"}
+              {busy ? t("shell.working") : t("library.switch")}
             </button>
           </div>
-          <p className={sectionLabel}>What other readers see</p>
+          <p className={sectionLabel}>{t("library.whatOthersSee")}</p>
           {FEED_SETTING_ROWS.map(({ key, label }) => (
             <button
               key={key}
@@ -367,7 +370,7 @@ function OwnerControls({
                 next[key] ? "" : "text-(--color-text-dim)"
               }`}
             >
-              {label}
+              {t(label)}
               {next[key] && (
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20 6 9 17l-5-5" />
@@ -379,19 +382,19 @@ function OwnerControls({
             <div className="mt-4 border-t border-(--color-border) p-3">
               {confirming ? (
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm text-(--color-text-dim)">Hide your profile from the community?</span>
+                  <span className="text-sm text-(--color-text-dim)">{t("library.hideProfileQuestion")}</span>
                   <span className="flex shrink-0 items-center gap-2">
                     <button onClick={() => setConfirming(false)} className="min-h-11 px-2 text-sm text-(--color-text-dim) hover:text-(--color-text)">
-                      Cancel
+                      {t("shell.cancel")}
                     </button>
                     <button onClick={onUnpublish} disabled={busy} className={BUTTON_DANGER}>
-                      Unpublish
+                      {t("library.unpublish")}
                     </button>
                   </span>
                 </div>
               ) : (
                 <button onClick={() => setConfirming(true)} className="min-h-11 text-sm font-semibold text-(--color-danger)">
-                  Unpublish profile
+                  {t("library.unpublishProfile")}
                 </button>
               )}
             </div>
