@@ -1,20 +1,22 @@
+import type { Locale } from "@scripta/shared/i18n";
 import { activityRow, contentDetail, contentKindLabel, contentStats, contentStatus, contentTarget, feedHeading, feedTarget, gameActionLabel, TIER_LADDER, type ActivityItem } from "@scripta/shared/community";
-import { getLocale } from "../../i18n";
+import type { MobileMessages } from "../../i18n";
+
+type MessageKey = Extract<keyof MobileMessages, string>;
 
 export const FAN_SIZE = 3;
 
 export { contentDetail, contentKindLabel, contentStats, contentStatus, contentTarget, feedHeading, feedTarget, gameActionLabel, TIER_LADDER };
 
 export const DISCOVER_FILTERS = [
-  { value: "all", label: "All" },
-  { value: "tierlist", label: "Tier lists" },
-  { value: "tournament", label: "Tournaments" },
-  { value: "quiz", label: "Quizzes" },
-] as const;
+  { value: "all", labelKey: "book.scopeAll" },
+  { value: "tierlist", labelKey: "book.tierLists" },
+  { value: "tournament", labelKey: "book.tournaments" },
+  { value: "quiz", labelKey: "community.filterQuizzes" },
+] as const satisfies readonly { value: string; labelKey: MessageKey }[];
 
 export type DiscoverFilter = (typeof DISCOVER_FILTERS)[number]["value"];
 
-export function renderableActivity(items: ActivityItem[]): ActivityItem[] {
-  const locale = getLocale();
+export function renderableActivity(items: ActivityItem[], locale: Locale): ActivityItem[] {
   return items.filter((item) => activityRow(item, locale) !== null);
 }

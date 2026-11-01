@@ -18,9 +18,14 @@ import { AuthorAvatar } from "./AuthorAvatar";
 import { fetchProfile, fetchProfileLibrary, followUser, unfollowUser, type CommunityProfileView } from "./api";
 import { contentDetail, contentKindLabel, contentTarget } from "./communityHome";
 import { ReaderGlyph } from "./ReaderGlyph";
-import { getLocale, useLocale } from "../../i18n";
+import { useLocale, useT, type MobileMessages } from "../../i18n";
+import type { Locale } from "@scripta/shared/i18n";
+
+type MessageKey = Extract<keyof MobileMessages, string>;
 
 export function ProfileScreen({ username }: { username: string }) {
+  const locale = useLocale();
+  const t = useT();
   const { colors, id: viewerTheme } = useTheme();
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -55,7 +60,7 @@ export function ProfileScreen({ username }: { username: string }) {
       await action();
       await queryClient.invalidateQueries({ queryKey: ["community", "profile", username] });
     } catch (reason) {
-      setError(followFailureMessage(reason, "Something went wrong. Try again."));
+      setError(followFailureMessage(reason, t("community.somethingWentWrongRetry")));
     } finally {
       setBusy(false);
     }
@@ -76,7 +81,7 @@ export function ProfileScreen({ username }: { username: string }) {
     return (
       <Centered>
         <Stack.Screen options={{ headerShown: true, title: username }} />
-        <EmptyState title="This profile is private" body="Only published profiles are visible in the community." />
+        <EmptyState title={t("community.profilePrivate")} body={t("community.profilePrivateBody")} />
       </Centered>
     );
   }
@@ -88,7 +93,7 @@ export function ProfileScreen({ username }: { username: string }) {
         <View style={styles.privateAvatar}>
           <AuthorAvatar username={view!.profile.user.username} avatarUrl={view!.profile.user.avatarUrl} size={72} />
         </View>
-        <EmptyState title="This profile is private" />
+        <EmptyState title={t("community.profilePrivate")} />
       </Centered>
     );
   }
@@ -122,8 +127,8 @@ export function ProfileScreen({ username }: { username: string }) {
       />
       {error ? <Toast visible message={error} tone="error" /> : null}
       <SwipeableTabs
-        accessibilityLabel="Profile sections"
-        options={PROFILE_TABS}
+        accessibilityLabel={t("community.profileSections")}
+        options={PROFILE_TABS.map((tab) => ({ value: tab.value, label: t(tab.labelKey) }))}
         value={tab}
         onChange={setTab}
         renderPage={(value) => {
@@ -131,12 +136,12 @@ export function ProfileScreen({ username }: { username: string }) {
           if (value === "daily") return <DailyChapterProfileSection userId={profileUser.userId} own={false} />;
           if (value === "library") {
             if (library.isPending) return <View style={styles.page}><Skeleton height={180} /></View>;
-            if (library.isError) return <View style={styles.page}><ErrorState body="Couldn't load this library." actionLabel="Retry" onAction={() => void library.refetch()} /></View>;
+            if (library.isError) return <View style={styles.page}><ErrorState body={t("community.profileLibraryLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void library.refetch()} /></View>;
             return <PublicLibraryGrid library={library.data.data} topInset={spacing.lg} />;
           }
           return (
             <FlatList
-              data={publishedRows(view!)}
+              data={publishedRows(view!, locale)}
               keyExtractor={(row) => `${row.kind}:${row.id}`}
               contentContainerStyle={styles.list}
               refreshing={profile.isRefetching}
@@ -159,22 +164,22 @@ export function ProfileScreen({ username }: { username: string }) {
                   )}
                   {view!.profile.user.userId !== user?.id ? (
                     <Button
-                      label={view!.profile.viewerFollows === true ? "Following" : "Follow"}
+                      label={view!.profile.viewerFollows === true ? t("book.following") : t("book.follow")}
                       variant={view!.profile.viewerFollows === true ? "secondary" : "primary"}
                       loading={busy}
                       onPress={() => void toggleFollow()}
                     />
                   ) : null}
                   <Text {...dynamicType} style={[typography.caption, styles.eyebrow, { color: colors.textDim }]}>
-                    Published
+                    {t("community.published")}
                   </Text>
                 </View>
               }
-              ListEmptyComponent={<EmptyState title="Nothing published yet" body="Tier lists, tournaments and quizzes show up here." />}
+              ListEmptyComponent={<EmptyState title={t("community.nothingPublishedTitle")} body={t("community.nothingPublishedProfileBody")} />}
               renderItem={({ item }) => (
                 <Pressable
                   accessibilityRole="link"
-                  accessibilityLabel={`Open ${item.name}`}
+                  accessibilityLabel={t("community.openTitle", { title: item.name })}
                   onPress={() => router.push(item.target as never)}
                   style={({ pressed }) => [styles.card, { backgroundColor: pressed ? colors.surfacePressed : colors.surface, borderColor: colors.border }]}
                 >
@@ -201,18 +206,17 @@ export function ProfileScreen({ username }: { username: string }) {
 }
 
 const PROFILE_TABS = [
-  { value: "mural", label: "Mural" },
-  { value: "activity", label: "Activity" },
-  { value: "library", label: "Library" },
-  { value: "daily", label: "Daily" },
-] as const;
+  { value: "mural", labelKey: "community.tabMural" },
+  { value: "activity", labelKey: "community.activity" },
+  { value: "library", labelKey: "shell.tabLibrary" },
+  { value: "daily", labelKey: "community.tabDaily" },
+] as const satisfies readonly { value: string; labelKey: MessageKey }[];
 
 type ProfileTab = (typeof PROFILE_TABS)[number]["value"];
 
 type PublishedRow = { kind: "tierlist" | "tournament" | "quiz"; id: string; name: string; detail: string; target: string; label: string };
 
-function publishedRows(view: CommunityProfileView): PublishedRow[] {
-  const locale = getLocale();
+function publishedRows(view: CommunityProfileView, locale: Locale): PublishedRow[] {
   const rows: PublishedRow[] = [];
   for (const item of view.published.tierlists) {
     rows.push({ kind: "tierlist", id: item.id, name: item.name, detail: contentDetail(item, locale), target: contentTarget(item), label: contentKindLabel(item, locale) });
@@ -270,6 +274,7 @@ export function MuralPicker({
   onClose: () => void;
   onPick: (muralId: string) => void;
 }) {
+  const t = useT();
   const { colors, id: theme } = useTheme();
   const murals = useMurals();
   const [selected, setSelected] = useState<string | null>(null);
@@ -288,11 +293,11 @@ export function MuralPicker({
     setCreating(true);
     setCreateError(null);
     try {
-      const mural = await murals.create("Untitled mural", theme);
+      const mural = await murals.create(t("community.untitledMural"), theme);
       onClose();
       router.push(`/murals/${mural.id}` as never);
     } catch (reason) {
-      setCreateError(reason instanceof Error ? reason.message : "Couldn't create the mural. Try again.");
+      setCreateError(reason instanceof Error ? reason.message : t("community.muralCreateFailed"));
     } finally {
       working.current = false;
       setCreating(false);
@@ -308,7 +313,7 @@ export function MuralPicker({
         {murals.isPending ? (
           <Skeleton height={120} />
         ) : noMurals ? (
-          <EmptyState title="No murals yet" actionLabel={creating ? "Creating…" : "Create a mural"} onAction={() => void createMural()} />
+          <EmptyState title={t("community.noMuralsTitle")} actionLabel={creating ? t("community.creating") : t("community.createMural")} onAction={() => void createMural()} />
         ) : (
           <FlatList
             data={items}

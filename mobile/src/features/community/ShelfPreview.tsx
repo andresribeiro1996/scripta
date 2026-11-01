@@ -5,6 +5,7 @@ import { Button, dynamicType, spacing, typography, useTheme } from "../../ui";
 import type { GalleryImage } from "../gallery/api";
 import { MuralCanvas } from "../murals";
 import type { Tierlist } from "../tierlists/api";
+import { useT } from "../../i18n";
 
 export function ShelfPreview({ mural, summary, busy, books, groups, images, tierlists, profile, onKeep, onBlank }: {
   mural: Mural;
@@ -18,13 +19,14 @@ export function ShelfPreview({ mural, summary, busy, books, groups, images, tier
   onKeep: () => void;
   onBlank: () => void;
 }) {
+  const t = useT();
   const { colors } = useTheme();
   return (
     <ScrollView contentContainerStyle={styles.scroll}>
       <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{summary}</Text>
       <View style={styles.actions}>
-        <Button label="Keep this shelf" loading={busy} disabled={busy} onPress={onKeep} />
-        <Button label="Start blank" variant="secondary" disabled={busy} onPress={onBlank} />
+        <Button label={t("community.keepShelf")} loading={busy} disabled={busy} onPress={onKeep} />
+        <Button label={t("community.startBlank")} variant="secondary" disabled={busy} onPress={onBlank} />
       </View>
       <MuralCanvas mural={mural} books={books} groups={groups} images={images} tierlists={tierlists} profile={profile} />
     </ScrollView>

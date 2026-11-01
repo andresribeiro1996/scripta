@@ -3,6 +3,7 @@ import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { CIRCLE_DIGEST_KINDS, PERSONAL_DIGEST_KINDS } from "@scripta/shared";
 import { ApiError } from "../../core/api";
 import { fetchDashboard, followUser } from "../community/api";
+import { useT } from "../../i18n";
 
 export const DASHBOARD_QUERY_KEY = ["community", "dashboard"] as const;
 
@@ -35,6 +36,7 @@ export function useSkipEmptyPages({ hasNextPage, isFetchingNextPage, isFetchNext
 }
 
 export function useFollowBack(refetch: () => Promise<unknown>) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [followingId, setFollowingId] = useState<string | null>(null);
   const [followError, setFollowError] = useState<string | null>(null);
@@ -48,7 +50,7 @@ export function useFollowBack(refetch: () => Promise<unknown>) {
       await queryClient.invalidateQueries({ queryKey: ["community", "people"] });
       await refetch();
     } catch (reason) {
-      setFollowError(reason instanceof ApiError ? reason.message : "Couldn't follow them. Try again.");
+      setFollowError(reason instanceof ApiError ? reason.message : t("community.followFailed"));
     } finally {
       setFollowingId(null);
     }

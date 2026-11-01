@@ -110,5 +110,5 @@ test("content targets route by kind", () => {
 test("activity drops items whose type this build cannot draw", () => {
   const known: ActivityItem = { id: "a1", type: "quiz_published", payload: { name: "Dune trivia" }, createdAt: "2026-09-10T00:00:00.000Z" };
   const future = { id: "a2", type: "hologram_published", payload: {}, createdAt: "2026-09-10T00:00:00.000Z" } as unknown as ActivityItem;
-  assert.deepEqual(renderableActivity([future, known]), [known]);
+  assert.deepEqual(renderableActivity([future, known], "en"), [known]);
 });

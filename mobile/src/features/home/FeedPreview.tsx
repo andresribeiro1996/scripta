@@ -12,10 +12,11 @@ import { MuralThumbnail } from "../murals/MuralCanvas";
 import { muralPreviewOf } from "../public/adapters";
 import { themes } from "@scripta/shared/themes";
 import { feedRowModel } from "@scripta/shared/community";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export function FeedPreview({ item }: { item: DigestItem }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   if (item.kind === "mural") return <MuralPreview item={item} />;
   if (item.kind === "reading" || item.kind === "completion") {
@@ -23,7 +24,7 @@ export function FeedPreview({ item }: { item: DigestItem }) {
     const width = item.kind === "completion" ? 80 : 60;
     return <View style={item.kind === "completion" ? styles.winner : undefined}><BookCover cover={book.coverUrl} title={book.title} width={width} height={width * 1.5} /></View>;
   }
-  if (item.kind === "vote" && item.ranking?.length) return <View style={styles.ranking} accessibilityLabel={`Ranking preview by ${item.actor.username}`}>
+  if (item.kind === "vote" && item.ranking?.length) return <View style={styles.ranking} accessibilityLabel={t("community.rankingPreview", { username: item.actor.username })}>
     {item.ranking.map((tier, index) => <View key={index} style={styles.tier}>
       <View style={[styles.tierLabel, { backgroundColor: tier.color }]}><Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: (contrastRatio("#000000", tier.color) ?? 0) > (contrastRatio("#ffffff", tier.color) ?? 0) ? "#000000" : "#ffffff" }]}>{tier.label}</Text></View>
       {tier.books.map((book, index) => <BookCover key={index} cover={book.coverUrl} title={book.title} width={28} height={42} />)}
@@ -37,7 +38,7 @@ export function FeedPreview({ item }: { item: DigestItem }) {
     {quiz ? <View style={[styles.quizBadge, { backgroundColor: colors.surface }]}><Text display {...dynamicType} style={[typography.title, { color: colors.text }]}>?</Text></View> : null}
   </View>;
   return <View style={[styles.covers, { backgroundColor: colors.surface }]}>
-    {covers.length ? covers.map((cover, index) => <BookCover key={`${cover}:${index}`} cover={cover} title="Book" width={54} height={81} />) : <Icon name={feedRowModel(item, locale).icon} size={32} color={colors.accent} />}
+    {covers.length ? covers.map((cover, index) => <BookCover key={`${cover}:${index}`} cover={cover} title={t("shell.book")} width={54} height={81} />) : <Icon name={feedRowModel(item, locale).icon} size={32} color={colors.accent} />}
   </View>;
 }
 

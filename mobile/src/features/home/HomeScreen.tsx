@@ -15,10 +15,11 @@ import { useDailyHistory } from "../dailyChapter/use-daily-history";
 import { RecapHomeCard } from "../topShelf/RecapHomeCard";
 import { AwardHomeCard, RECENT_AWARDS_QUERY_KEY } from "../awards/AwardHomeCard";
 import { ENGAGEMENT_QUERY_KEY, SAVED_STATE_QUERY_KEY, useHomeActions } from "./useHomeActions";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export function HomeScreen() {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -31,7 +32,7 @@ export function HomeScreen() {
   const activity = useActivityFeed();
   const hasChapters = Boolean(useDailyHistory().data?.results.length);
   const activityBadge = newCountLabel(activity.data?.pages[0]?.personalNewCount ?? 0);
-  const sections = [{ title: "Your reading circle", data: items }];
+  const sections = [{ title: t("community.yourReadingCircle"), data: items }];
   useSkipEmptyPages(dashboard, items.length);
 
   useFocusEffect(useCallback(() => {
@@ -49,28 +50,28 @@ export function HomeScreen() {
     finally { setPulling(false); }
   }
   const findReaders = () => router.push("/people" as never);
-  const error = actions.error ?? (dashboard.isRefetchError && !dashboard.isRefetching ? "Couldn't refresh activity." : null);
-  const empty = dashboard.isPending || (dashboard.hasNextPage && !dashboard.isError && !items.length) ? <Skeleton height={80} /> : dashboard.isError && !dashboard.data ? <ErrorState body="Couldn't load activity." actionLabel="Retry" onAction={() => void dashboard.refetch()} /> : dashboard.hasNextPage ? null : <EmptyState title="Your circle starts here" body="Follow readers to see their books, games and murals." secondaryActionLabel="Find people" onSecondaryAction={findReaders} />;
+  const error = actions.error ?? (dashboard.isRefetchError && !dashboard.isRefetching ? t("community.refreshActivityFailed") : null);
+  const empty = dashboard.isPending || (dashboard.hasNextPage && !dashboard.isError && !items.length) ? <Skeleton height={80} /> : dashboard.isError && !dashboard.data ? <ErrorState body={t("community.activityLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void dashboard.refetch()} /> : dashboard.hasNextPage ? null : <EmptyState title={t("community.circleStartsTitle")} body={t("community.circleStartsBody")} secondaryActionLabel={t("community.findPeople")} onSecondaryAction={findReaders} />;
   const noLibrary = actions.library.data === null || actions.library.data?.data.books.length === 0;
   return <Screen top={false}>
-    <Stack.Screen options={{ title: "Home", headerShown: true, headerLeft: () => <View style={styles.mark}><BrandMark size={24} /></View>, headerRight: () => <HeaderActions>{hasChapters ? <IconButton name="stats" accessibilityLabel="Open your Daily Chapter stats" onPress={() => router.push("/daily-chapters" as never)} /> : null}<IconButton name="bell" accessibilityLabel="Open activity" badge={activityBadge} onPress={() => router.push("/activity" as never)} /><IconButton name="bookmark" accessibilityLabel="Open saved games and murals" onPress={() => setSavedOpen(true)} /></HeaderActions> }} />
+    <Stack.Screen options={{ title: t("shell.tabHome"), headerShown: true, headerLeft: () => <View style={styles.mark}><BrandMark size={24} /></View>, headerRight: () => <HeaderActions>{hasChapters ? <IconButton name="stats" accessibilityLabel={t("community.openDailyStats")} onPress={() => router.push("/daily-chapters" as never)} /> : null}<IconButton name="bell" accessibilityLabel={t("community.openActivity")} badge={activityBadge} onPress={() => router.push("/activity" as never)} /><IconButton name="bookmark" accessibilityLabel={t("community.openSaved")} onPress={() => setSavedOpen(true)} /></HeaderActions> }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     <SectionList sections={sections} keyExtractor={(item) => `${item.kind}:${item.id}`} stickySectionHeadersEnabled={false} maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 10 }} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.list}
       ListHeaderComponent={<>
         <DailyChapterCard />
         <RecapHomeCard />
         <AwardHomeCard />
-        {noLibrary ? <View style={styles.onboarding}><EmptyState title="Start your library" body="Bring your books into your reading world." actionLabel="Import library" onAction={() => router.push("/import" as never)} secondaryActionLabel="Add a book" onSecondaryAction={() => router.push("/add-book" as never)} /></View> : null}
+        {noLibrary ? <View style={styles.onboarding}><EmptyState title={t("library.startTitle")} body={t("community.startLibraryBody")} actionLabel={t("shell.importLibrary")} onAction={() => router.push("/import" as never)} secondaryActionLabel={t("shell.addBook")} onSecondaryAction={() => router.push("/add-book" as never)} /></View> : null}
       </>}
       renderSectionHeader={({ section }) => <View style={styles.sectionHeader}>
         <Text accessibilityRole="header" {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{section.title}</Text>
-        <Pressable accessibilityRole="link" onPress={findReaders} style={styles.sectionAction}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>Find people →</Text></Pressable>
+        <Pressable accessibilityRole="link" onPress={findReaders} style={styles.sectionAction}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>{t("community.findPeopleArrow")}</Text></Pressable>
       </View>}
       renderItem={({ item }) => <FeedRow item={item} actions={actions} onOpen={() => router.push(digestRoute(item) as never)} onComments={() => setComments(item)} />}
       renderSectionFooter={({ section }) => !section.data.length ? <View style={styles.onboarding}>{empty}</View> : null}
-      ListFooterComponent={dashboard.isFetchingNextPage && items.length ? <View style={styles.onboarding}><Skeleton height={80} /></View> : dashboard.isFetchNextPageError ? <View style={styles.onboarding}><ErrorState body="Couldn't load more." actionLabel="Retry" onAction={() => void dashboard.fetchNextPage()} /></View> : undefined}
+      ListFooterComponent={dashboard.isFetchingNextPage && items.length ? <View style={styles.onboarding}><Skeleton height={80} /></View> : dashboard.isFetchNextPageError ? <View style={styles.onboarding}><ErrorState body={t("book.loadMoreFailed")} actionLabel={t("shell.retry")} onAction={() => void dashboard.fetchNextPage()} /></View> : undefined}
       onEndReached={() => { if (dashboard.hasNextPage && !dashboard.isFetchingNextPage && !dashboard.isFetchNextPageError) void dashboard.fetchNextPage(); }} onEndReachedThreshold={0.4} refreshControl={<RefreshControl refreshing={pulling} onRefresh={() => void onRefresh()} />} />
-    {comments ? <CommentsSheet key={comments.id} id={comments.id} title={feedRowModel(comments, locale).title || "Activity"} onClose={() => setComments(null)} /> : null}
+    {comments ? <CommentsSheet key={comments.id} id={comments.id} title={feedRowModel(comments, locale).title || t("community.activity")} onClose={() => setComments(null)} /> : null}
     {savedOpen ? <SavedContentSheet actions={actions} onClose={() => setSavedOpen(false)} /> : null}
   </Screen>;
 }

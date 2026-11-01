@@ -7,6 +7,7 @@ import { clearDashboardCounts, isNewDigestItem, type DashboardFeedPage } from "@
 import { isPersonalItem, shouldMarkFeedSeen } from "@scripta/shared/community";
 import { EmptyState, ErrorState, Screen, Skeleton, Toast, spacing } from "../../ui";
 import { markDashboardSeen } from "../community/api";
+import { useT } from "../../i18n";
 import { ActivityRow } from "./ActivityRow";
 import { ACTIVITY_QUERY_KEY, useActivityFeed, useFollowBack, useSkipEmptyPages } from "./FeedRow";
 import { digestRoute } from "./feedRowModel";
@@ -14,6 +15,7 @@ import { digestRoute } from "./feedRowModel";
 const ACTIVITY_VIEWABILITY = { itemVisiblePercentThreshold: 50 };
 
 export function ActivityScreen() {
+  const t = useT();
   const router = useRouter();
   const queryClient = useQueryClient();
   const focused = useIsFocused();
@@ -45,15 +47,15 @@ export function ActivityScreen() {
     markSeen.current();
   }).current;
 
-  const error = followError ?? (feed.isRefetchError && !feed.isRefetching ? "Couldn't refresh activity." : null);
-  const empty = feed.isPending || (feed.hasNextPage && !feed.isError) ? <Skeleton height={64} /> : feed.isError && !feed.data ? <ErrorState body="Couldn't load activity." actionLabel="Retry" onAction={() => void feed.refetch()} /> : <EmptyState title="Nothing new yet" body="New followers and plays of your games show up here." />;
+  const error = followError ?? (feed.isRefetchError && !feed.isRefetching ? t("community.refreshActivityFailed") : null);
+  const empty = feed.isPending || (feed.hasNextPage && !feed.isError) ? <Skeleton height={64} /> : feed.isError && !feed.data ? <ErrorState body={t("community.activityLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void feed.refetch()} /> : <EmptyState title={t("community.nothingNewTitle")} body={t("community.nothingNewBody")} />;
   return <Screen top={false}>
-    <Stack.Screen options={{ title: "Activity", headerShown: true }} />
+    <Stack.Screen options={{ title: t("community.activity"), headerShown: true }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     <FlatList data={items} keyExtractor={(item) => `${item.kind}:${item.id}`} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.list}
       renderItem={({ item }) => <ActivityRow item={item} isNew={isNewDigestItem(item, seenAt)} following={item.kind === "follow" && followingId === item.actor.userId} onOpen={() => router.push(digestRoute(item) as never)} onFollowBack={() => { if (item.kind === "follow") void followBack(item.actor.userId); }} />}
       ListEmptyComponent={<View style={styles.state}>{empty}</View>}
-      ListFooterComponent={feed.isFetchingNextPage && items.length ? <View style={styles.state}><Skeleton height={64} /></View> : feed.isFetchNextPageError ? <View style={styles.state}><ErrorState body="Couldn't load more." actionLabel="Retry" onAction={() => void feed.fetchNextPage()} /></View> : undefined}
+      ListFooterComponent={feed.isFetchingNextPage && items.length ? <View style={styles.state}><Skeleton height={64} /></View> : feed.isFetchNextPageError ? <View style={styles.state}><ErrorState body={t("book.loadMoreFailed")} actionLabel={t("shell.retry")} onAction={() => void feed.fetchNextPage()} /></View> : undefined}
       onEndReached={() => { if (feed.hasNextPage && !feed.isFetchingNextPage && !feed.isFetchNextPageError) void feed.fetchNextPage(); }} onEndReachedThreshold={0.4}
       onViewableItemsChanged={onViewableItemsChanged} viewabilityConfig={ACTIVITY_VIEWABILITY} />
   </Screen>;

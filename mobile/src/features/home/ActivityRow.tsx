@@ -3,10 +3,11 @@ import { Text } from "../../ui/Text";
 import { Button, Icon, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { AuthorAvatar } from "../community/AuthorAvatar";
 import { activityRowModel, activitySentence, relativeTime, type PersonalItem } from "@scripta/shared/community";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export function ActivityRow({ item, isNew, following, onOpen, onFollowBack }: { item: PersonalItem; isNew: boolean; following: boolean; onOpen: () => void; onFollowBack: () => void }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const stacked = useWindowDimensions().fontScale > 1;
   const row = activityRowModel(item, locale);
@@ -20,8 +21,8 @@ export function ActivityRow({ item, isNew, following, onOpen, onFollowBack }: { 
         <View style={styles.stamp}>{isNew ? <View style={[styles.newDot, { backgroundColor: colors.accent }]} /> : null}<Text {...dynamicType} numberOfLines={1} style={[typography.caption, { color: colors.textDim }]}>{time}</Text></View>
       </View>
     </Pressable>
-    {row.action.kind === "followBack" ? <Button variant="secondary" label="Follow back" numberOfLines={1} accessibilityLabel={`Follow ${row.lead} back`} loading={following} onPress={onFollowBack} />
-      : row.action.kind === "following" ? <Text {...dynamicType} numberOfLines={1} style={[typography.caption, { color: colors.textDim }]}>Following</Text>
+    {row.action.kind === "followBack" ? <Button variant="secondary" label={t("community.followBack")} numberOfLines={1} accessibilityLabel={t("community.followBackLabel", { name: row.lead })} loading={following} onPress={onFollowBack} />
+      : row.action.kind === "following" ? <Text {...dynamicType} numberOfLines={1} style={[typography.caption, { color: colors.textDim }]}>{t("book.following")}</Text>
       : <Pressable accessibilityRole="link" onPress={onOpen} style={({ pressed }) => [styles.link, { opacity: pressed ? 0.6 : 1 }]}><Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.strong, { color: colors.accent }]}>{row.action.label} →</Text></Pressable>}
   </View>;
 }

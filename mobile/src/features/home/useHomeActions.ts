@@ -7,7 +7,7 @@ import { addBookToLibrary } from "../library/api/client";
 import { LIBRARY_QUERY_KEY, useLibrary } from "../library/hooks/useLibrary";
 import { publicContentUrl } from "../sharing/links";
 import { feedRowModel, feedShareTarget, hasActivityThread, type ActivityEngagement } from "@scripta/shared/community";
-import { getLocale, useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export const ENGAGEMENT_QUERY_KEY = ["community", "engagement"] as const;
 export const SAVED_STATE_QUERY_KEY = ["community", "saved-state"] as const;
@@ -17,6 +17,7 @@ function batches<T>(values: T[]) { return Array.from({ length: Math.ceil(values.
 
 export function useHomeActions(items: DigestItem[]) {
   const locale = useLocale();
+  const t = useT();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const library = useLibrary();
@@ -56,7 +57,7 @@ export function useHomeActions(items: DigestItem[]) {
   return {
     library, engagement, savedKeys,
     savedReady: savedQueries.every((query) => query.isSuccess),
-    error: error ? saveFailureMessage(error, "Couldn't complete that action.", getLocale()) : engagementQueries.some((query) => query.isError) ? "Couldn't load reactions. Pull to refresh." : savedQueries.some((query) => query.isError) ? "Couldn't load saved items. Pull to refresh." : null,
+    error: error ? saveFailureMessage(error, t("community.actionFailed"), locale) : engagementQueries.some((query) => query.isError) ? t("community.reactionsLoadFailed") : savedQueries.some((query) => query.isError) ? t("community.savedRefreshFailed") : null,
     liking: like.isPending, saving: save.isPending, wanting: want.isPending,
     toggleLike: (item: DigestItem) => { clearErrors(); like.mutate({ id: item.id, liked: !engagement[item.id]?.liked }); },
     toggleSaved: (item: DigestItem, saved: boolean) => { clearErrors(); save.mutate({ item, saved: !saved }); },
