@@ -11,7 +11,7 @@ import { bookCsvToLibraryJson, decodeLibraryImport } from "@scripta/shared";
 import { goodreadsCsvToLibraryJson, looksLikeGoodreadsCsv } from "./goodreads";
 import { isSqliteBytes, parseSqliteFile } from "./sqlite";
 import { looksLikeStorygraphCsv, storygraphCsvToLibraryJson } from "./storygraph";
-import { getLocale } from "../i18n";
+import { getLocale, t } from "../i18n";
 
 export async function parseImportedFile(file: File): Promise<LibraryData> {
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -25,7 +25,7 @@ export async function parseImportedFile(file: File): Promise<LibraryData> {
   const parsedJson = tryParseJson(text);
   if (parsedJson) {
     if (!Array.isArray((parsedJson as { books?: unknown }).books)) {
-      throw new Error('That JSON doesn\'t look like a kobo-export library file (missing a "books" array).');
+      throw new Error(t("addBook.importNotLibraryJson"));
     }
     return parsedJson as LibraryData;
   }
@@ -41,9 +41,7 @@ export async function parseImportedFile(file: File): Promise<LibraryData> {
   const books = bookCsvToLibraryJson(text, getLocale());
   if (books) return books;
 
-  throw new Error(
-    "Didn't recognize that file — choose Kobo SQLite, library JSON, Goodreads, StoryGraph, Calibre, LibraryThing TSV, BookWyrm CSV, or a book CSV with Title and Author columns."
-  );
+  throw new Error(t("addBook.importNotRecognized"));
 }
 
 function tryParseJson(text: string): unknown {

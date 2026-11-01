@@ -9,6 +9,7 @@ import { FoundCovers } from "./FoundCovers";
 import { BUTTON_SECONDARY } from "./page/buttonClasses";
 import { Sheet } from "./Sheet";
 import { CloseIcon } from "./Toolbar";
+import { useT } from "../i18n";
 
 /** "Cover" button's modal (BookCard.tsx, everywhere a card renders;
  *  MuralsListPage.tsx's mural cards too) — assign one of the account's
@@ -32,7 +33,7 @@ export function CoverPickerModal({
   lookup,
   coverUrl,
   isAdmin,
-  removeCoverLabel = "Remove custom cover",
+  removeCoverLabel,
   onSelect,
   onPickFound,
   onRemoveCover,
@@ -49,6 +50,7 @@ export function CoverPickerModal({
   onRemoveCover: () => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const { images, isLoading, upload } = useGalleryImages();
   const deleteImage = useDeleteGalleryImage();
   const confirm = useConfirm();
@@ -69,7 +71,7 @@ export function CoverPickerModal({
       onSelect(image);
       onClose();
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Couldn't upload that image.");
+      setUploadError(err instanceof Error ? err.message : t("library.galleryUploadFailed"));
     } finally {
       setUploading(false);
     }
@@ -78,8 +80,8 @@ export function CoverPickerModal({
   async function handleDeleteImage(id: string) {
     if (
       !(await confirm({
-        title: "Delete this image from your gallery?",
-        body: "Any book using it as a cover will fall back to its normal cover."
+        title: t("library.galleryDeleteTitle"),
+        body: t("addBook.galleryInUseBody")
       }))
     ) {
       return;
@@ -93,9 +95,9 @@ export function CoverPickerModal({
   }
 
   return (
-    <Sheet title={`Cover for "${title}"`} onClose={onClose} style={{ maxWidth: "42rem" }}>
+    <Sheet title={t("addBook.coverFor", { title })} onClose={onClose} style={{ maxWidth: "42rem" }}>
       <div className="sticky top-0 z-10 bg-(--color-surface) pb-2">
-        <p className="mx-2 text-xs text-(--color-text-dim)">Pick one of your uploaded images, or upload a new one.</p>
+        <p className="mx-2 text-xs text-(--color-text-dim)">{t("addBook.pickOrUpload")}</p>
 
         <div
           className={`m-2 mb-0 flex items-center justify-between gap-3 rounded-lg border-2 border-dashed px-4 py-3 text-sm transition-colors ${
@@ -113,9 +115,9 @@ export function CoverPickerModal({
             if (file) void handleUpload(file);
           }}
         >
-          <span className="text-(--color-text-dim)">Drag an image here, or</span>
+          <span className="text-(--color-text-dim)">{t("addBook.dragImageHere")}</span>
           <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className={BUTTON_SECONDARY}>
-            {uploading ? "Uploading…" : "Upload new image…"}
+            {uploading ? t("shell.uploading") : t("addBook.uploadNewImage")}
           </button>
           <input
             ref={fileInputRef}
@@ -140,7 +142,7 @@ export function CoverPickerModal({
               }}
               className="min-h-11 text-xs text-(--color-danger) transition-opacity hover:opacity-80"
             >
-              {removeCoverLabel}
+              {removeCoverLabel ?? t("addBook.removeCustomCover")}
             </button>
           </div>
         )}
@@ -150,12 +152,12 @@ export function CoverPickerModal({
         {lookup && onPickFound && (lookup.isbn || lookup.title) && (
           <>
             <FoundCovers key={coverQueryKey(lookup)} lookup={lookup} coverUrl={coverUrl} isAdmin={isAdmin} onPick={onPickFound} />
-            <h3 className="mb-2 text-sm font-semibold">Your gallery</h3>
+            <h3 className="mb-2 text-sm font-semibold">{t("addBook.yourGallery")}</h3>
           </>
         )}
-        {isLoading && <p className="text-sm text-(--color-text-dim)">Loading your gallery…</p>}
+        {isLoading && <p className="text-sm text-(--color-text-dim)">{t("addBook.loadingGallery")}</p>}
         {!isLoading && images.length === 0 && (
-          <p className="text-sm text-(--color-text-dim)">No images in your gallery yet — upload one above.</p>
+          <p className="text-sm text-(--color-text-dim)">{t("addBook.galleryEmpty")}</p>
         )}
         {images.length > 0 && (
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
@@ -167,7 +169,7 @@ export function CoverPickerModal({
                 key={image.id}
                 role="button"
                 tabIndex={0}
-                aria-label="Use this image"
+                aria-label={t("addBook.useThisImage")}
                 onClick={() => {
                   onSelect(image);
                   onClose();
@@ -189,7 +191,7 @@ export function CoverPickerModal({
                     e.stopPropagation();
                     void handleDeleteImage(image.id);
                   }}
-                  title="Delete from gallery"
+                  title={t("library.galleryDeleteImage")}
                   className="absolute top-0 right-0 flex h-11 w-11 items-center justify-center text-xs font-bold text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
                 >
                   <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] backdrop-blur-xs">

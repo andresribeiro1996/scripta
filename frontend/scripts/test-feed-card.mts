@@ -209,8 +209,8 @@ test("comments: a failed refresh with comments shown says so and offers Retry", 
 
 test("feed actions surface a failed engagement or saved-state load, once, on Home", () => {
   const hook = readFileSync(new URL("../src/hooks/useFeedActions.ts", import.meta.url), "utf8");
-  assert.match(hook, /Couldn't load reactions\./);
-  assert.match(hook, /Couldn't load saved items\./);
+  assert.match(hook, /t\("addBook\.reactionsLoadFailed"\)/);
+  assert.match(hook, /t\("library\.savedLoadFailed"\)/);
   assert.match(hook, /retryLoad/);
   const home = readFileSync(new URL("../src/pages/HomePage.tsx", import.meta.url), "utf8");
   assert.match(home, /actions\.loadError/);

@@ -1,18 +1,19 @@
 import { finishFeelings, type FinishRating } from "@scripta/shared";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
 export function FeelingChips({
   value,
   onChange,
-  label = "How did it land?"
+  label
 }: {
   value: number | null;
   onChange: (rating: FinishRating) => void;
   label?: string;
 }) {
   const locale = useLocale();
+  const t = useT();
   return (
-    <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-2">
+    <div role="radiogroup" aria-label={label ?? t("addBook.howDidItLand")} className="flex flex-wrap gap-2">
       {finishFeelings(locale).map(({ rating, label: feelingLabel }) => {
         const selected = value === rating;
         return (

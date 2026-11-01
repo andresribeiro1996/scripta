@@ -33,10 +33,10 @@ test("every search box is the shared SearchField", () => {
 test("every share surface uses one link row with a secondary Copy and Stop sharing is a danger button", () => {
   for (const f of ["components/ShareModal", "pages/QuizEditorPage", "pages/TierListEditorPage"]) assert.match(src(f), /<ShareLinkRow\b/, f);
   const row = src("components/ShareLinkRow");
-  assert.match(row, /<input readOnly aria-label="Share link"/);
+  assert.match(row, /<input readOnly aria-label=\{t\("addBook\.shareLinkLabel"\)\}/);
   assert.match(row, /BUTTON_SECONDARY/);
   assert.doesNotMatch(src("pages/QuizEditorPage"), /Copy challenge link/);
-  assert.match(src("components/ShareModal"), /<button(?=(?:=>|[^>])*className=\{BUTTON_DANGER_OUTLINE\})(?:=>|[^>])*>\s*\{unsharing \? "Stopping…" : "Stop sharing"\}/);
+  assert.match(src("components/ShareModal"), /<button(?=(?:=>|[^>])*className=\{BUTTON_DANGER_OUTLINE\})(?:=>|[^>])*>\s*\{unsharing \? t\("addBook\.shareStopping"\) : t\("addBook\.shareStop"\)\}/);
 });
 
 test("the 404 and the failed Google sign-in reuse EmptyState", () => {

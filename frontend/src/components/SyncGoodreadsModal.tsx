@@ -11,6 +11,7 @@
 import { useRef, useState } from "react";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
 import { Sheet } from "./Sheet";
+import { useT } from "../i18n";
 
 export function SyncGoodreadsModal({
   onFile,
@@ -21,6 +22,7 @@ export function SyncGoodreadsModal({
   onFile: (file: File) => Promise<void>;
   onClose: () => void;
 }) {
+  const t = useT();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,40 +34,47 @@ export function SyncGoodreadsModal({
       await onFile(file);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't sync that file.");
+      setError(err instanceof Error ? err.message : t("addBook.syncFailed"));
       setBusy(false);
     }
   }
 
   return (
     <Sheet
-      title="Sync with Goodreads"
+      title={t("addBook.syncTitle")}
       onClose={onClose}
       footer={
         <>
           <button onClick={onClose} disabled={busy} className={BUTTON_SECONDARY}>
-            Cancel
+            {t("shell.cancel")}
           </button>
           <button onClick={() => fileInputRef.current?.click()} disabled={busy} className={BUTTON_PRIMARY}>
-            {busy ? "Syncing…" : "Choose your Goodreads CSV…"}
+            {busy ? t("addBook.syncing") : t("addBook.syncChooseCsv")}
           </button>
         </>
       }
     >
       <div className="px-2 pb-2">
         <p className="mb-3 text-sm text-(--color-text-dim)">
-          Goodreads has no API, so syncing runs off your library export — grab it like this:
+          {t("addBook.syncIntro")}
         </p>
         <ol className="mb-4 list-decimal space-y-1 pl-5 text-sm">
-          <li>
-            On goodreads.com, open <span className="font-semibold">My Books</span>
-          </li>
-          <li>
-            In the left sidebar under Tools, click <span className="font-semibold">Import and Export</span>
-          </li>
-          <li>
-            Click <span className="font-semibold">Export Library</span> — the download appears when it's ready (they also email you a link)
-          </li>
+          {(
+            [
+              ["addBook.syncStepOne", "My Books"],
+              ["addBook.syncStepTwo", "Import and Export"],
+              ["addBook.syncStepThree", "Export Library"]
+            ] as const
+          ).map(([key, goodreadsLabel]) => {
+            const [before, after] = t(key).split("{name}");
+            return (
+              <li key={key}>
+                {before}
+                <span className="font-semibold">{goodreadsLabel}</span>
+                {after}
+              </li>
+            );
+          })}
         </ol>
 
         <input
@@ -82,8 +91,7 @@ export function SyncGoodreadsModal({
         {error && <p className="mb-2 text-xs text-(--color-danger)">{error}</p>}
 
         <p className="border-t border-(--color-border) pt-3 text-xs text-(--color-text-dim)">
-          Books you already have are matched and updated in place — shelves, ratings, read dates — never duplicated. Re-sync any time by
-          exporting again.
+          {t("addBook.syncNote")}
         </p>
       </div>
     </Sheet>

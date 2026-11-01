@@ -14,19 +14,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { IScannerControls } from "@zxing/browser";
-import { seriesLabel } from "@scripta/shared";
+import { seriesLabel, statusLabel } from "@scripta/shared";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "./page/buttonClasses";
 import { Sheet } from "./Sheet";
 import { SearchField } from "./Toolbar";
 import { normalizeIsbn } from "../lib/covers";
 import { bookSearchApi, buildManualBook, searchInsideOutside, searchResultByline, type BookSearchResult } from "../lib/bookSearch";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
-const STATUS_OPTIONS = [
-  { value: 2, label: "Finished" },
-  { value: 1, label: "Reading" },
-  { value: 0, label: "To read" }
-];
+const STATUS_VALUES = [2, 1, 0];
 
 function ResultSummary({ result }: { result: BookSearchResult }) {
   const locale = useLocale();
@@ -55,6 +51,8 @@ export function AddBookModal({
   onAdd: (book: Record<string, unknown>) => Promise<void>;
   onClose: () => void;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<BookSearchResult[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -117,7 +115,7 @@ export function AddBookModal({
     } catch (err) {
       if (run !== searchRunRef.current) return;
       setSearching(false);
-      setSearchError(err instanceof Error ? err.message : "Search failed — try again.");
+      setSearchError(err instanceof Error ? err.message : t("addBook.searchFailed"));
     }
   }
 
@@ -150,7 +148,7 @@ export function AddBookModal({
               void runSearch(text);
             }
           } else if (err && err.name !== "NotFoundException" && !detectedRef.current) {
-            setScanError(err.message || "The camera stream failed.");
+            setScanError(err.message || t("addBook.cameraStreamFailed"));
           }
         });
         if (cancelled) controls.stop();
@@ -160,8 +158,8 @@ export function AddBookModal({
           // device — typing the ISBN by hand is right there.
           setScanError(
             err instanceof Error && /permission|notallowed|notfound/i.test(err.name + err.message)
-              ? "Couldn't access the camera — check the permission, or type the ISBN instead."
-              : "Couldn't start the camera — type the ISBN instead."
+              ? t("addBook.cameraNoAccess")
+              : t("addBook.cameraNoStart")
           );
           setScanning(false);
         }
@@ -198,7 +196,7 @@ export function AddBookModal({
       );
       onClose();
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Couldn't add that book.");
+      setSaveError(err instanceof Error ? err.message : t("addBook.addFailed"));
       setSaving(false);
     }
   }
@@ -207,16 +205,16 @@ export function AddBookModal({
   const missingAuthor = author.trim() === "";
   const missing =
     missingTitle && missingAuthor
-      ? "Title and author are required."
+      ? t("addBook.missingTitleAndAuthor")
       : missingTitle
-        ? "Title is required."
+        ? t("addBook.missingTitle")
         : missingAuthor
-          ? "Author is required."
+          ? t("addBook.missingAuthor")
           : null;
 
   return (
     <Sheet
-      title="Add a book"
+      title={t("addBook.title")}
       onClose={onClose}
       footer={
         <>
@@ -232,7 +230,7 @@ export function AddBookModal({
             )
           )}
           <button onClick={onClose} className={BUTTON_SECONDARY}>
-            Cancel
+            {t("shell.cancel")}
           </button>
           <button
             onClick={() => void handleSave()}
@@ -240,7 +238,7 @@ export function AddBookModal({
             aria-describedby={missing ? "add-book-missing" : undefined}
             className={BUTTON_PRIMARY}
           >
-            {saving ? "Adding…" : "Add book"}
+            {saving ? t("addBook.adding") : t("addBook.addBook")}
           </button>
         </>
       }
@@ -253,9 +251,9 @@ export function AddBookModal({
           }}
           className="flex gap-2"
         >
-          <SearchField fill className="flex-1" value={query} onChange={setQuery} placeholder="ISBN, title, or author" label="Search for a book" />
+          <SearchField fill className="flex-1" value={query} onChange={setQuery} placeholder={t("addBook.searchPlaceholder")} label={t("addBook.searchLabel")} />
           <button type="submit" disabled={searching || query.trim() === ""} className={`${BUTTON_SECONDARY} shrink-0`}>
-            {searching ? "Searching…" : "Search"}
+            {searching ? t("addBook.searching") : t("library.search")}
           </button>
         </form>
         <button
@@ -267,9 +265,7 @@ export function AddBookModal({
             // actual reason beats zxing's opaque TypeError and the
             // generic "couldn't start" guess below.
             if (!navigator.mediaDevices?.getUserMedia) {
-              setScanError(
-                "The camera needs a secure connection — open the app over https:// (or localhost), not a plain http:// address."
-              );
+              setScanError(t("addBook.cameraNeedsHttps"));
               return;
             }
             setScanError(null);
@@ -277,7 +273,7 @@ export function AddBookModal({
           }}
           className="mt-1 inline-flex min-h-11 items-center text-xs text-(--color-text-dim) underline transition-colors hover:text-(--color-text)"
         >
-          {scanning ? "Stop scanning" : "Or scan the ISBN barcode with your camera"}
+          {scanning ? t("addBook.stopScanning") : t("addBook.scanBarcode")}
         </button>
         {searchError && <p className="mt-2 text-xs text-(--color-danger)">{searchError}</p>}
         {scanError && <p className="mt-2 text-xs text-(--color-danger)">{scanError}</p>}
@@ -285,7 +281,7 @@ export function AddBookModal({
         {scanning && (
           <div className="mt-3">
             <video ref={videoRef} className="aspect-video w-full rounded-lg bg-black" playsInline muted />
-            <p className="mt-1.5 text-xs text-(--color-text-dim)">Point at the barcode on the back cover.</p>
+            <p className="mt-1.5 text-xs text-(--color-text-dim)">{t("addBook.pointAtBarcode")}</p>
           </div>
         )}
 
@@ -293,7 +289,7 @@ export function AddBookModal({
           <div className="mt-3 flex items-center gap-3 rounded-lg border border-(--color-border) p-2.5">
             <ResultSummary result={picked} />
             <button type="button" onClick={() => setPicked(null)} className={`${BUTTON_SECONDARY} ml-auto shrink-0`}>
-              Change
+              {t("addBook.change")}
             </button>
           </div>
         )}
@@ -301,7 +297,7 @@ export function AddBookModal({
         {results !== null && !scanning && !picked && (
           <div className="mt-3 max-h-64 overflow-y-auto overscroll-contain rounded-lg border border-(--color-border)">
             {results.length === 0 && !outsidePending && (
-              <p className="p-3 text-xs text-(--color-text-dim)">No matches — fill the form in below by hand instead.</p>
+              <p className="p-3 text-xs text-(--color-text-dim)">{t("addBook.noMatches")}</p>
             )}
             {results.map((r, i) => (
               <button
@@ -312,14 +308,14 @@ export function AddBookModal({
                 <ResultSummary result={r} />
               </button>
             ))}
-            {outsidePending && <p className="p-3 text-xs text-(--color-text-dim)">Searching Open Library…</p>}
-            {outsideFailed && <p className="p-3 text-xs text-(--color-text-dim)">Couldn't reach Open Library</p>}
+            {outsidePending && <p className="p-3 text-xs text-(--color-text-dim)">{t("addBook.searchingOpenLibrary")}</p>}
+            {outsideFailed && <p className="p-3 text-xs text-(--color-text-dim)">{t("addBook.openLibraryUnreachable")}</p>}
           </div>
         )}
 
         <div className="mt-4 space-y-3 border-t border-(--color-border) pt-4">
           <label className="block">
-            <span className="mb-1 block text-sm font-semibold">Title</span>
+            <span className="mb-1 block text-sm font-semibold">{t("addBook.fieldTitle")}</span>
             <input
               required
               value={title}
@@ -328,7 +324,7 @@ export function AddBookModal({
             />
           </label>
           <label className="block">
-            <span className="mb-1 block text-sm font-semibold">Author</span>
+            <span className="mb-1 block text-sm font-semibold">{t("addBook.fieldAuthor")}</span>
             <input
               required
               value={author}
@@ -338,7 +334,7 @@ export function AddBookModal({
           </label>
           <div className="flex gap-3">
             <label className="min-w-0 flex-1">
-              <span className="mb-1 block text-sm font-semibold">ISBN</span>
+              <span className="mb-1 block text-sm font-semibold">{t("addBook.fieldIsbn")}</span>
               <input
                 value={isbn}
                 onChange={(e) => setIsbn(e.target.value)}
@@ -347,7 +343,7 @@ export function AddBookModal({
               />
             </label>
             <label className="w-32">
-              <span className="mb-1 block text-sm font-semibold">Rating</span>
+              <span className="mb-1 block text-sm font-semibold">{t("addBook.fieldRating")}</span>
               <select
                 value={rating ?? ""}
                 onChange={(e) => setRating(e.target.value === "" ? null : Number(e.target.value))}
@@ -364,21 +360,21 @@ export function AddBookModal({
           </div>
           <div className="flex gap-3">
             <label className="w-32">
-              <span className="mb-1 block text-sm font-semibold">Status</span>
+              <span className="mb-1 block text-sm font-semibold">{t("library.status")}</span>
               <select
                 value={readStatus}
                 onChange={(e) => setReadStatus(Number(e.target.value))}
                 className={`${FIELD_CLASS} w-full`}
               >
-                {STATUS_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
+                {STATUS_VALUES.map((value) => (
+                  <option key={value} value={value}>
+                    {statusLabel(value, locale)}
                   </option>
                 ))}
               </select>
             </label>
             <label className="min-w-0 flex-1">
-              <span className="mb-1 block text-sm font-semibold">Date read</span>
+              <span className="mb-1 block text-sm font-semibold">{t("addBook.fieldDateRead")}</span>
               <input
                 type="date"
                 value={dateRead}
