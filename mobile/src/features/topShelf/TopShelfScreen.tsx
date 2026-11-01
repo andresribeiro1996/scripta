@@ -74,7 +74,7 @@ export function TopShelfScreen() {
                 if (!leader) return [];
                 return [
                   <Pressable key={board} accessibilityRole="button" accessibilityLabel={`${boardTitle(board, null, locale)}, ${leader.title}, ${valueLabel(board, leader.value, locale)}`} onPress={() => router.push(topShelfHref(board, period, genre))} style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-                    <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{boardTitle(board, null, locale)}</Text>
+                    <Text numberOfLines={2} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{boardTitle(board, null, locale)}</Text>
                     <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{leader.title}</Text>
                     <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.accent }]}>{valueLabel(board, leader.value, locale)}</Text>
                   </Pressable>,

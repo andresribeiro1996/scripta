@@ -320,7 +320,7 @@ export function AddBookForm({
             <Icon name="search" size={20} color={colors.accent} />
             <View style={styles.cardHeaderText}>
               <Text style={[typography.body, { color: colors.text, fontWeight: "600" }]}>{t("addBook.searchCard")}</Text>
-              <Text numberOfLines={1} style={[typography.caption, { color: colors.accent }]}>
+              <Text numberOfLines={2} style={[typography.caption, { color: colors.accent }]}>
                 {filledFrom ? t("addBook.filledFrom", { title: filledFrom }) : t("addBook.autoFill")}
               </Text>
             </View>

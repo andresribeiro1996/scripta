@@ -74,7 +74,7 @@ export const sharing: CatalogOf<typeof en> = {
   "sharing.publicLinkFailed": "Não foi possível criar uma ligação pública.",
   "sharing.periodMonth": "Este mês",
   "sharing.periodAll": "Sempre",
-  "sharing.allGenres": "Todos os géneros",
+  "sharing.allGenres": "Todos",
   "sharing.period": "Período",
   "sharing.genre": "Género",
   "sharing.nothingHereMonth": "Ainda nada por aqui este mês — os jogos contam quando 5 pessoas votam.",
