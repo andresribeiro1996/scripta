@@ -22,7 +22,7 @@
 // localStorage ballot id for an anonymous voter). Editing one loads it back
 // onto the board, so a returning voter adjusts their ranking instead of
 // rebuilding it from an empty board.
-import { ballotBoard, blankBoard, characterBooks, itemNoun } from "@scripta/shared";
+import { ballotBoard, blankBoard, characterBooks } from "@scripta/shared";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useOutletContext, useParams } from "react-router-dom";
 import type { PublicBookData } from "../api/sharedMurals";
@@ -40,7 +40,7 @@ import { useTierlistVoting } from "../hooks/useTierlistVoting";
 import { backTo } from "../lib/areas";
 import { toPrivateBook } from "../lib/sharedMural";
 import { toPlacements } from "../lib/tierlistResults";
-import { useLocale, useT } from "../i18n";
+import { useT } from "../i18n";
 
 function InfoScreen({ message, back }: { message: string; back?: { to: string; label: string } }) {
   const t = useT();
@@ -61,7 +61,6 @@ function HideBottomNav() {
 }
 
 export function VoteTierlistPage() {
-  const locale = useLocale();
   const t = useT();
   const { code } = useParams<{ code: string }>();
   const location = useLocation();
@@ -236,7 +235,7 @@ export function VoteTierlistPage() {
       {header}
       {board.ranksWorstFirst ? <p className="mb-2 text-xs text-(--color-text-dim)">{t("tierlists.topTierWorst")}</p> : null}
       <p className="mb-4 text-sm text-(--color-text-dim)">
-        {membersOnlyBlocked ? t("tierlists.membersOnlyNote") : t("tierlists.dragToRank", { noun: itemNoun(subject, 2, locale) })}
+        {membersOnlyBlocked ? t("tierlists.membersOnlyNote") : t(subject ? "tierlists.dragToRankCharacters" : "tierlists.dragToRankBooks")}
       </p>
       {submitError && <p className="mb-4 text-sm text-(--color-danger)">{submitError}</p>}
       <HideBottomNav />

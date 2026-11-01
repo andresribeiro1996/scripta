@@ -1,4 +1,4 @@
-import { ballotBoard, workIdOf, booksByWork, characterBooks, itemNoun } from "@scripta/shared";
+import { ballotBoard, workIdOf, booksByWork, characterBooks } from "@scripta/shared";
 import { useEffect, useState } from "react";
 import { useOutletContext, useParams } from "react-router-dom";
 import type { TierlistData } from "../api/tierlists";
@@ -17,10 +17,9 @@ import { useLibrary } from "../hooks/useLibrary";
 import { useTierlists } from "../hooks/useTierlists";
 import { useTierlistResults, useTierlistVoting } from "../hooks/useTierlistVoting";
 import { useWorkBooks } from "../hooks/useWorkBooks";
-import { useLocale, useT } from "../i18n";
+import { useT } from "../i18n";
 
 export function TierListEditorPage() {
-  const locale = useLocale();
   const t = useT();
   const { id } = useParams<{ id: string }>();
   const { data: library } = useLibrary();
@@ -352,7 +351,7 @@ export function TierListEditorPage() {
           )}
           {resolvedPool.length > 0 && (
             <p className="mt-1 text-xs text-(--color-text-dim)">
-              {t("tierlists.stillUnranked", { count: resolvedPool.length, noun: itemNoun(subject, resolvedPool.length, locale) })}
+              {t(subject ? "tierlists.stillUnrankedCharacters" : "tierlists.stillUnrankedBooks", { count: resolvedPool.length })}
             </p>
           )}
         </div>

@@ -82,11 +82,22 @@ test("the board's structure controls and pool speak Portuguese", () => {
   assert.match(html, /\+ Adicionar nível/);
   assert.match(html, /Conjunto — 0 livros/);
   assert.match(html, /O conjunto está vazio/);
-  assert.match(html, /Arraste para aqui um item do conjunto \(livro\)/);
+  assert.match(html, /Arraste para aqui um livro do conjunto\./);
+  assert.match(html, /O conjunto está vazio — todos os livros estão classificados\./);
   assert.match(html, />Adicionar livros</);
   const english = renderToString(createElement(TierBoard, props));
   assert.match(english, /Pool — 0 books/);
   assert.match(english, /Drag a book here from the pool\./);
+  assert.match(english, /Pool is empty — every book is ranked\. Drag one back here to unrank it\./);
+  const characters = { ...props, books: [{ Title: "Paul", _workId: "w1", _character: true }] };
+  assert.match(inPortuguese(() => renderToString(createElement(TierBoard, characters))), /Arraste para aqui uma personagem do conjunto\./);
+  const one = { ...props, data: { tiers, pool: ["w1"] } };
+  assert.match(renderToString(createElement(TierBoard, one)), /Pool — 1 book</);
+  assert.match(inPortuguese(() => renderToString(createElement(TierBoard, one))), /Conjunto — 1 livro</);
+  const characterOne = { ...characters, data: { tiers, pool: ["w1"] } };
+  assert.match(inPortuguese(() => renderToString(createElement(TierBoard, characterOne))), /Conjunto — 1 personagem</);
+  assert.match(renderToString(createElement(TierBoard, characterOne)), /Pool — 1 character</);
+  assert.match(inPortuguese(() => renderToString(createElement(TierBoard, { ...characters, data: { tiers, pool: [] } }))), /todas as personagens estão classificadas\./);
 });
 
 test("the colour picker and add-books sheet translate", () => {
@@ -104,7 +115,11 @@ test("the results view counts votes and ballots in Portuguese", () => {
   assert.match(html, /2 votos/);
   assert.match(html, /2 votos · 100% de concordância/);
   assert.match(html, /aria-label="Sobre Dune"/);
-  assert.match(html, /Ninguém classificou aqui/);
+  assert.match(html, /Ninguém classificou aqui nenhum livro\./);
+  assert.match(rendered(() => createElement(TierlistResultsView, props)), /Nobody ranked a book here\./);
+  const characters = { ...props, books: [{ Title: "Paul", _workId: "w1", _character: true }] };
+  assert.match(inPortuguese(() => rendered(() => createElement(TierlistResultsView, characters))), /Ninguém classificou aqui nenhuma personagem\./);
+  assert.match(rendered(() => createElement(TierlistResultsView, characters)), /Nobody ranked a character here\./);
   assert.match(rendered(() => createElement(TierlistResultsView, { ...props, ballotCount: 1 })), /1 ballot</);
 });
 
@@ -113,6 +128,10 @@ test("the voting page translates each of its states", () => {
   const open = inPortuguese(() => rendered(voteRoutes, prepare(board()), "/vote/abc"));
   assert.match(open, />Enviar voto</);
   assert.match(open, /Arraste livros para os níveis/);
+  assert.match(rendered(voteRoutes, prepare(board()), "/vote/abc"), /Drag books into tiers to rank them, then submit your ballot\./);
+  const subject = { kind: "characters" as const, scope: { kind: "work" as const, label: "Dune", coverUrl: null }, characters: [{ id: "w1", name: "Paul" }] };
+  assert.match(inPortuguese(() => rendered(voteRoutes, prepare(board({ subject })), "/vote/abc")), /Arraste personagens para os níveis/);
+  assert.match(rendered(voteRoutes, prepare(board({ subject })), "/vote/abc"), /Drag characters into tiers/);
   assert.match(open, />Livros</);
   assert.match(rendered(voteRoutes, prepare(board()), "/vote/abc"), />Submit ballot</);
   const members = inPortuguese(() => rendered(voteRoutes, prepare(board({ access: "members", ranksWorstFirst: true })), "/vote/abc"));
@@ -137,6 +156,13 @@ test("the editor page translates the owner's controls and the locked poll panel"
   assert.match(own, />Abrir para votação</);
   assert.match(own, /title="Mudar o nome desta tabela de níveis"/);
   assert.match(own, /Ainda sem níveis — toque em Editar para adicionar um\./);
+  const unranked = (list: Tierlist) => rendered(editorRoutes, prepare(list), "/tl/tl1");
+  assert.match(inPortuguese(() => unranked(tierlist())), /1 livro ainda por classificar — toque em Editar para o colocar\./);
+  assert.match(unranked(tierlist()), /1 book still unranked — tap Edit to place them\./);
+  const subject = { kind: "characters" as const, scope: { kind: "work" as const, label: "Dune", coverUrl: null }, characters: [{ id: "w1", name: "Paul" }, { id: "w2", name: "Chani" }] };
+  const castList = tierlist({ subject, data: { tiers, pool: ["w1", "w2"] } });
+  assert.match(inPortuguese(() => unranked(castList)), /2 personagens ainda por classificar — toque em Editar para as colocar\./);
+  assert.match(unranked(castList), /2 characters still unranked — tap Edit to place them\./);
   const missing = inPortuguese(() => rendered(editorRoutes, prepare(tierlist()), "/tl/nope"));
   assert.match(missing, /Nenhuma tabela de níveis com esse identificador\./);
   const published = inPortuguese(() => rendered(editorRoutes, prepare(tierlist({ voteCode: "abc" }), board()), "/tl/tl1"));
