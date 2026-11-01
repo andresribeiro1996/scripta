@@ -25,7 +25,7 @@ import { useMuralFolders } from "../hooks/useMuralFolders";
 import { useMurals } from "../hooks/useMurals";
 import { buildTree, collectSubtreeIds, folderPath } from "../lib/muralFolders";
 import type { Mural, MuralFolder } from "../lib/murals";
-import { useLocale } from "../i18n";
+import { useLocale, useT, type WebMessages } from "../i18n";
 
 // Field + direction combined into one option each, rather than two
 // separate selects (field, then direction) — four clearly-labeled
@@ -34,11 +34,11 @@ import { useLocale } from "../i18n";
 // actually pull its weight here.
 type SortBy = "updatedDesc" | "updatedAsc" | "createdDesc" | "createdAsc";
 
-const SORT_OPTIONS: Array<{ value: SortBy; label: string }> = [
-  { value: "updatedDesc", label: "Recently updated" },
-  { value: "updatedAsc", label: "Oldest updated" },
-  { value: "createdDesc", label: "Recently created" },
-  { value: "createdAsc", label: "Oldest created" }
+const SORT_OPTIONS: Array<{ value: SortBy; label: keyof WebMessages }> = [
+  { value: "updatedDesc", label: "murals.sortUpdatedDesc" },
+  { value: "updatedAsc", label: "murals.sortUpdatedAsc" },
+  { value: "createdDesc", label: "murals.sortCreatedDesc" },
+  { value: "createdAsc", label: "murals.sortCreatedAsc" }
 ];
 
 /** /dashboard/murals — the list of the account's murals (configurable,
@@ -50,6 +50,8 @@ const SORT_OPTIONS: Array<{ value: SortBy; label: string }> = [
  *  freeform canvas needs real room. */
 export function MuralsListPage() {
   const locale = useLocale();
+  const t = useT();
+  const sortOptions = SORT_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }));
   const ownProfile = useQuery({ queryKey: ["community", "own-profile"], queryFn: fetchOwnProfile });
   const { data: muralsData, isLoading, rename, remove, move: moveMural, setCover, clearCover, share, unshare } = useMurals();
   const showSkeleton = useDelayedShow(isLoading);
@@ -128,12 +130,12 @@ export function MuralsListPage() {
   }
 
   async function handleDelete(mural: Mural) {
-    if (!(await confirm({ title: `Delete "${mural.name}"?`, body: "This can't be undone." }))) return;
+    if (!(await confirm({ title: t("murals.deleteTitle", { name: mural.name }), body: t("library.cannotUndo") }))) return;
     await remove(mural.id);
   }
 
   async function handleDeleteFolder(folder: MuralFolder) {
-    if (!(await confirm({ title: `Delete "${folder.name}"?`, body: "Murals and subfolders inside it move up one level. Nothing is deleted." }))) return;
+    if (!(await confirm({ title: t("murals.deleteTitle", { name: folder.name }), body: t("murals.deleteFolderBody") }))) return;
     await removeFolder(folder.id);
     if (selectedFolderId === folder.id) setSelectedFolderId(folder.parentId);
   }
@@ -154,14 +156,14 @@ export function MuralsListPage() {
   return (
     <Page
       width="wide"
-      title="Murals"
+      title={t("shell.areaMurals")}
       actions={
         <>
           <button onClick={() => setPresetsOpen(true)} className={BUTTON_SECONDARY}>
-            Start from a preset
+            {t("murals.startFromPreset")}
           </button>
           <button onClick={handleCreate} className={BUTTON_PRIMARY}>
-            New mural
+            {t("murals.newMural")}
           </button>
         </>
       }
@@ -173,7 +175,7 @@ export function MuralsListPage() {
             folders={folders}
             selectedFolderId={selectedFolderId}
             onSelect={setSelectedFolderId}
-            onCreateFolder={(parentId) => void createFolder("New folder", parentId)}
+            onCreateFolder={(parentId) => void createFolder(t("murals.newFolder"), parentId)}
             onRenameFolder={(folder, name) => void renameFolder(folder.id, name)}
             onMoveFolder={(folder) => setMovingFolderId(folder.id)}
             onDeleteFolder={(folder) => void handleDeleteFolder(folder)}
@@ -183,7 +185,7 @@ export function MuralsListPage() {
         <div className="min-w-0">
           <nav className="mb-3 hidden items-center gap-1 text-xs text-(--color-text-dim) md:flex">
             <button onClick={() => setSelectedFolderId(null)} className="inline-flex min-h-11 items-center hover:text-(--color-text)">
-              All murals
+              {t("murals.allMurals")}
             </button>
             {folderPath(folders, selectedFolderId).map((f, i, path) => (
               <span key={f.id} className="flex min-w-0 items-center gap-1">
@@ -199,27 +201,27 @@ export function MuralsListPage() {
             ))}
           </nav>
 
-          {showSkeleton && <SkeletonCardGrid label="Loading murals" />}
+          {showSkeleton && <SkeletonCardGrid label={t("murals.loading")} />}
 
           {!isLoading && murals.length === 0 && (
             <EmptyState
               icon={MuralsIcon}
-              title="No murals yet."
-              body={'A mural is a freeform dashboard you build yourself \u2014 a "Top 5 Books This Year" shelf, a favorite quote, a photo, whatever you want on the wall. Use New mural above to start.'}
+              title={t("murals.emptyTitle")}
+              body={t("murals.emptyBody")}
             />
           )}
 
           {!isLoading && murals.length > 0 && (
             <ToolbarRow>
               <div className="flex items-center gap-2">
-                <SearchField className="flex-1 sm:flex-initial" value={search} onChange={setSearch} placeholder="Search" label="Search murals by name" />
+                <SearchField className="flex-1 sm:flex-initial" value={search} onChange={setSearch} placeholder={t("library.search")} label={t("murals.searchLabel")} />
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as SortBy)}
-                  aria-label="Sort murals"
+                  aria-label={t("murals.sort")}
                   className={`${FIELD_CLASS} hidden sm:block`}
                 >
-                  {SORT_OPTIONS.map((opt) => (
+                  {sortOptions.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>
@@ -227,14 +229,14 @@ export function MuralsListPage() {
                 </select>
                 <button
                   onClick={() => setSheet("sort")}
-                  aria-label={`Sort murals (${SORT_OPTIONS.find((o) => o.value === sortBy)?.label})`}
+                  aria-label={t("murals.sortCurrent", { sort: sortOptions.find((o) => o.value === sortBy)?.label ?? "" })}
                   className={`${toolbarIconClass(sortBy !== SORT_OPTIONS[0].value)} sm:hidden`}
                 >
                   <SortIcon />
                 </button>
                 <button
                   onClick={() => setSheet("folder")}
-                  aria-label={`Folder (${selectedFolderId ? folderPath(folders, selectedFolderId).map((f) => f.name).join(" / ") : "All murals"})`}
+                  aria-label={t("murals.folderCurrent", { path: selectedFolderId ? folderPath(folders, selectedFolderId).map((f) => f.name).join(" / ") : t("murals.allMurals") })}
                   className={`${toolbarIconClass(selectedFolderId !== null)} md:hidden`}
                 >
                   <FolderIcon />
@@ -245,8 +247,8 @@ export function MuralsListPage() {
 
           {sheet === "sort" && (
             <OptionSheet
-              title="Sort murals"
-              options={SORT_OPTIONS}
+              title={t("murals.sort")}
+              options={sortOptions}
               value={sortBy}
               onSelect={(v) => setSortBy(v as SortBy)}
               onClose={() => setSheet(null)}
@@ -254,13 +256,13 @@ export function MuralsListPage() {
           )}
           {sheet === "folder" && (
             <OptionSheet
-              title="Folder"
+              title={t("murals.folder")}
               // "" stands in for "no folder selected" — OptionSheet keys
               // on a string, and `null` isn't one. Mapped back on the way
               // out, the same substitution the <select> this replaced
               // already made with its empty-string <option>.
               options={[
-                { value: "", label: "All murals" },
+                { value: "", label: t("murals.allMurals") },
                 ...buildTree(folders).map(({ folder }) => ({
                   value: folder.id,
                   label: folderPath(folders, folder.id).map((p) => p.name).join(" / ")
@@ -273,11 +275,11 @@ export function MuralsListPage() {
           )}
 
           {!isLoading && murals.length > 0 && filteredMurals.length === 0 && (
-            <p className="text-sm text-(--color-text-dim)">No murals match this filter.</p>
+            <p className="text-sm text-(--color-text-dim)">{t("murals.noMatch")}</p>
           )}
 
           {!isLoading && needle === "" && murals.length > 0 && filteredMurals.length === 0 && selectedFolderId !== null && (
-            <p className="text-sm text-(--color-text-dim)">No murals in this folder.</p>
+            <p className="text-sm text-(--color-text-dim)">{t("murals.noneInFolder")}</p>
           )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -318,30 +320,30 @@ export function MuralsListPage() {
                           {mural.name}
                         </span>
                         {ownProfile.data?.muralId === mural.id && (
-                          <span className="shrink-0 rounded-full bg-(--color-accent-soft) px-1.5 py-0.5 text-[10px] font-semibold text-(--color-accent)">My shelf</span>
+                          <span className="shrink-0 rounded-full bg-(--color-accent-soft) px-1.5 py-0.5 text-[10px] font-semibold text-(--color-accent)">{t("shell.myShelf")}</span>
                         )}
                       </span>
                     )}
                     <OptionsMenu
-                      title="Mural settings"
+                      title={t("murals.settings")}
                       triggerClassName="-m-2.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
                       items={[
                         {
-                          label: "Rename",
+                          label: t("library.groupRename"),
                           onClick: () => {
                             setEditingId(mural.id);
                             setEditingName(mural.name);
                           }
                         },
-                        { label: mural.coverImageUrl ? "Change cover" : "Add cover", onClick: () => setCoverMuralId(mural.id) },
-                        { label: "Move to…", onClick: () => setMovingMuralId(mural.id) },
-                        { label: "Share", onClick: () => setSharingMuralId(mural.id) },
-                        { label: "Delete", onClick: () => handleDelete(mural), danger: true }
+                        { label: mural.coverImageUrl ? t("book.changeCover") : t("murals.addCover"), onClick: () => setCoverMuralId(mural.id) },
+                        { label: t("murals.moveTo"), onClick: () => setMovingMuralId(mural.id) },
+                        { label: t("library.actionShare"), onClick: () => setSharingMuralId(mural.id) },
+                        { label: t("shell.delete"), onClick: () => handleDelete(mural), danger: true }
                       ]}
                     />
                   </div>
                   <p className="text-xs text-(--color-text-dim)">
-                    {mural.blocks.length} block{mural.blocks.length === 1 ? "" : "s"} · Updated {formatDate(mural.updatedAt, locale)}
+                    {t("murals.cardMeta", { count: mural.blocks.length, date: formatDate(mural.updatedAt, locale) })}
                   </p>
                 </div>
               </div>
@@ -380,7 +382,7 @@ export function MuralsListPage() {
         <CoverPickerModal
           title={coverMural.name}
           currentImageId={coverMural.coverImageId ?? null}
-          removeCoverLabel="Remove cover"
+          removeCoverLabel={t("murals.removeCover")}
           onSelect={(image) => void handleSaveMuralCover(coverMural.id, image)}
           onRemoveCover={() => void handleRemoveMuralCover(coverMural.id)}
           onClose={() => setCoverMuralId(null)}

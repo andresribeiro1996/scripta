@@ -378,7 +378,7 @@ console.log("\n18. Murals page — preset and new mural in the header, a folder 
   const tree = read("components/murals/MuralFolderTree");
   const editor = read("pages/MuralEditorPage");
   check("the murals search shrinks in the tablet toolbar", /<SearchField className="flex-1 sm:flex-initial"/.test(list));
-  check("preset and New mural sit in the header actions, preset first", /actions=\{[\s\S]*?Start from a preset[\s\S]*?New mural/.test(list));
+  check("preset and New mural sit in the header actions, preset first", /actions=\{[\s\S]*?murals\.startFromPreset[\s\S]*?murals\.newMural/.test(list));
   check("the full-width preset bar is gone", !/mb-4 flex min-h-11 w-full/.test(list));
   check("a 220px folder column at lg", /lg:grid-cols-\[220px_minmax\(0,1fr\)\]/.test(list));
   check("tiles are panels", /\$\{PANEL\} /.test(list));

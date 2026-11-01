@@ -66,7 +66,7 @@ test("signed-out viewers never trigger the authenticated book details request", 
 });
 
 test("the shared mural names its owner", () => {
-  assert.match(src("pages/SharedMuralPage.tsx"), /subtitle=\{data\.profile \? `by @\$\{data\.profile\.username\}` : undefined\}/);
+  assert.match(src("pages/SharedMuralPage.tsx"), /subtitle=\{data\.profile \? t\("murals\.sharedBy", \{ username: data\.profile\.username \}\) : undefined\}/);
 });
 
 test("save status announces saving and saved, and is blank when idle", () => {

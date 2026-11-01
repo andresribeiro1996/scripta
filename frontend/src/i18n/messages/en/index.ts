@@ -5,10 +5,11 @@ import { book } from "./book";
 import { community } from "./community";
 import { errors } from "./errors";
 import { library } from "./library";
+import { murals } from "./murals";
 import { quizzes } from "./quizzes";
 import { settings } from "./settings";
 import { shell } from "./shell";
 import { tierlists } from "./tierlists";
 
-export const en = { ...addBook, ...arena, ...book, ...community, ...errors, ...library, ...quizzes, ...settings, ...shell, ...tierlists } satisfies Messages;
+export const en = { ...addBook, ...arena, ...book, ...community, ...errors, ...library, ...murals, ...quizzes, ...settings, ...shell, ...tierlists } satisfies Messages;
 export type WebMessages = typeof en;
