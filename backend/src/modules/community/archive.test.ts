@@ -97,7 +97,7 @@ test("a profile's activity pages through recent events and then history with no 
     const ids: string[] = [];
     let cursor: string | null | undefined;
     for (let pages = 0; cursor !== null && pages < 30; pages++) {
-      const page = service.getActivity(user, user, cursor ?? undefined, limit);
+      const page = service.getActivity(user, user, cursor ?? undefined, limit, "en");
       ids.push(...page.items.map((item) => item.id));
       cursor = page.nextCursor;
       afterPage();

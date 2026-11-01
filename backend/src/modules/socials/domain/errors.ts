@@ -1,8 +1,11 @@
 // Domain errors for the socials module — mirrors modules/auth/domain/errors.ts's shape.
 
-export class SocialsNotConfiguredError extends Error {
-  constructor(message = "Socials storage is not configured on this server (SOCIALS_ENCRYPTION_KEY is unset).") {
-    super(message);
+import type { Vars } from "@scripta/shared/i18n";
+import { LocalizedError, type BackendKey } from "../../../i18n/index.js";
+
+export class SocialsNotConfiguredError extends LocalizedError {
+  constructor(key: BackendKey = "socials.notConfigured", vars?: Vars) {
+    super(key, vars);
     this.name = "SocialsNotConfiguredError";
   }
 }
@@ -14,9 +17,9 @@ export class SocialProviderNotConfiguredError extends Error {
   }
 }
 
-export class BlueskyAuthError extends Error {
-  constructor(message: string) {
-    super(message);
+export class BlueskyAuthError extends LocalizedError {
+  constructor(key: BackendKey, vars?: Vars) {
+    super(key, vars);
     this.name = "BlueskyAuthError";
   }
 }
@@ -24,9 +27,9 @@ export class BlueskyAuthError extends Error {
 /** Thrown by postToSocial when the caller has no stored connection for
  *  that provider yet — the client's fix is to connect it in Settings, so
  *  routes.ts maps this to 409, not 500. */
-export class SocialNotConnectedError extends Error {
+export class SocialNotConnectedError extends LocalizedError {
   constructor(provider: string) {
-    super(`${provider} isn't connected — connect it in Settings first.`);
+    super("socials.notConnected", { provider });
     this.name = "SocialNotConnectedError";
   }
 }
@@ -35,9 +38,10 @@ export class SocialNotConnectedError extends Error {
  *  post (bad/expired token, malformed request, platform-side error) —
  *  the remote platform failed, not this server, so routes.ts maps this
  *  to 502, not 500. */
-export class SocialPostRejectedError extends Error {
+export class SocialPostRejectedError extends LocalizedError {
   constructor(provider: string, detail?: string) {
-    super(`${provider} rejected this post${detail ? ` (${detail})` : ""} — try reconnecting ${provider} in Settings.`);
+    if (detail) super("socials.postRejectedDetail", { provider, detail });
+    else super("socials.postRejected", { provider });
     this.name = "SocialPostRejectedError";
   }
 }

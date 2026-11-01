@@ -2,88 +2,91 @@
 // maps each to an HTTP status — same convention as
 // modules/gallery/domain/errors.ts.
 
-export class ArenaError extends Error {}
+import { LocalizedError } from "../../../i18n/index.js";
+
+export class ArenaError extends LocalizedError {}
 
 export class TournamentNotFoundError extends ArenaError {
   constructor() {
-    super("No tournament with that id, or you don't own it.");
+    super("arena.tournamentNotFound");
   }
 }
 
 export class TournamentAlreadyStartedError extends ArenaError {
   constructor() {
-    super("This tournament has already started or completed.");
+    super("arena.alreadyStarted");
   }
 }
 
 export class InvalidBracketSizeError extends ArenaError {
   constructor() {
-    super("Bracket size must be a power of two, at least 2 (e.g. 4, 8, 16, 32).");
+    super("arena.invalidBracketSize");
   }
 }
 
 export class IncompleteSeedError extends ArenaError {
   constructor(expected: number, actual: number) {
-    super(`This bracket needs ${expected} seeded books before it can start (currently ${actual}).`);
+    super("arena.incompleteSeed", { expected, actual });
   }
 }
 
 export class NotEnoughBooksError extends ArenaError {
   constructor(expected: number, actual: number) {
-    super(`Random-fill needs at least ${expected} candidate books (got ${actual}).`);
+    super("arena.notEnoughBooks", { expected, actual });
   }
 }
 
 export class DuplicateSlotError extends ArenaError {
   constructor() {
-    super("Each bracket slot can only be assigned once.");
+    super("arena.duplicateSlot");
   }
 }
 
 export class InvalidSlotIndexError extends ArenaError {
   constructor(bracketSize: number) {
-    super(`Slot index must be between 0 and ${bracketSize - 1}.`);
+    super("arena.invalidSlotIndex", { max: bracketSize - 1 });
   }
 }
 
 export class DuplicateBookError extends ArenaError {
   constructor(title?: string) {
-    super(title ? `${title} is already here as another edition.` : "The same book can't fill two bracket slots.");
+    if (title) super("arena.duplicateEdition", { title });
+    else super("arena.duplicateBook");
   }
 }
 
 export class DuelNotFoundError extends ArenaError {
   constructor() {
-    super("No such duel.");
+    super("arena.duelNotFound");
   }
 }
 
 export class DuelNotVotableError extends ArenaError {
   constructor() {
-    super("This duel isn't open for voting right now.");
+    super("arena.duelNotVotable");
   }
 }
 
 export class InvalidBookError extends ArenaError {
   constructor() {
-    super("That book isn't one of this duel's two books.");
+    super("arena.invalidBook");
   }
 }
 
 export class AlreadyVotedError extends ArenaError {
   constructor() {
-    super("You've already voted on this duel.");
+    super("arena.alreadyVoted");
   }
 }
 
 export class DuelNotTiedError extends ArenaError {
   constructor() {
-    super("This duel isn't waiting on a tie-break.");
+    super("arena.duelNotTied");
   }
 }
 
 export class InvalidCharacterSelectionError extends ArenaError {
-  constructor(message: string) {
-    super(message);
+  constructor(key: "arena.characterBracketMin" | "arena.characterCountMin" | "arena.characterDuplicate" | "arena.noCast" | "arena.characterNotInCast") {
+    super(key);
   }
 }

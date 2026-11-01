@@ -625,3 +625,32 @@ test("discover allows 60 requests a minute per account and 30 per anonymous addr
   assert.equal((await app.inject({ method: "GET", url: "/community/discover" })).statusCode, 429);
   await app.close();
 });
+
+test("community errors and route messages come back in Portuguese for a Portuguese request", async () => {
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
+  await app.register(
+    buildCommunityRoutes(
+      fakeService({
+        follow: () => {
+          throw new FollowLimitError();
+        }
+      })
+    )
+  );
+  const headers = { authorization: "Bearer x", "accept-language": "pt-PT" };
+  const limit = await app.inject({ method: "POST", url: "/community/follows", headers, payload: { userId: "alice" } });
+  assert.equal(limit.statusCode, 409);
+  assert.deepEqual(limit.json(), { error: `Pode seguir até ${(1000).toLocaleString("pt-PT")} leitores.` });
+  const malformed = await app.inject({ method: "POST", url: "/community/follows", headers, payload: {} });
+  assert.equal(malformed.statusCode, 400);
+  assert.deepEqual(malformed.json(), { error: "Esperado {userId}." });
+  await app.close();
+
+  const hidden = Fastify();
+  await hidden.register(buildPublicCommunityRoutes(fakeService()));
+  const missing = await hidden.inject({ method: "GET", url: "/community/profiles/ghost", headers: { "accept-language": "pt-PT" } });
+  assert.equal(missing.statusCode, 404);
+  assert.deepEqual(missing.json(), { error: "Não existe nenhum perfil publicado nesse endereço." });
+  await hidden.close();
+});

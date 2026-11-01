@@ -291,14 +291,14 @@ export function createArenaService(
 
   function createCharacterTournament(row: TournamentRow, characters: { workId: string; characterIds: string[] }): Tournament {
     const { characterIds } = characters;
-    if (row.bracket_size < MIN_CHARACTER_BRACKET) throw new InvalidCharacterSelectionError("A character tournament needs a bracket of at least 4.");
-    if (characterIds.length < row.bracket_size) throw new InvalidCharacterSelectionError("Choose at least as many characters as the bracket holds.");
+    if (row.bracket_size < MIN_CHARACTER_BRACKET) throw new InvalidCharacterSelectionError("arena.characterBracketMin");
+    if (characterIds.length < row.bracket_size) throw new InvalidCharacterSelectionError("arena.characterCountMin");
     const wanted = new Set(characterIds);
-    if (wanted.size !== characterIds.length) throw new InvalidCharacterSelectionError("Each character can only be chosen once.");
+    if (wanted.size !== characterIds.length) throw new InvalidCharacterSelectionError("arena.characterDuplicate");
     const cast = works.castOf(characters.workId);
-    if (!cast) throw new InvalidCharacterSelectionError("No cast for that book.");
+    if (!cast) throw new InvalidCharacterSelectionError("arena.noCast");
     const selected = cast.characters.filter((character) => wanted.has(character.id));
-    if (selected.length !== wanted.size) throw new InvalidCharacterSelectionError("A chosen character is not in this cast.");
+    if (selected.length !== wanted.size) throw new InvalidCharacterSelectionError("arena.characterNotInCast");
 
     const { kind, key, label, coverUrl } = cast.scope;
     const subject: CharacterSubject = { kind: "characters", scope: { kind, key, label, coverUrl }, characters: selected.map(({ id, name }) => ({ id, name })) };

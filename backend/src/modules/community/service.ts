@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { Locale } from "@scripta/shared/i18n";
 import { normalizeWords, type IdentityKey, type ReaderProfile } from "@scripta/shared";
 import { categoryFor, contentDetail, contentTarget, decodeCursor, encodeCursor, parseRankingPreview, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityProfileView, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, OwnProfile, Page, PersonResult, PublishProfileInput, PublishedContent, RankingTierPreview, SavedContentRef, SharedBook, SuggestedReader } from "@scripta/shared/community";
@@ -118,7 +119,7 @@ export interface CommunityService {
   getDiscover(type: DiscoverType, q: string, limit: number, offset: number, viewerId?: string): { items: DiscoverItem[]; nextOffset: number | null };
   searchPeople(viewerId: string, q: string, limit: number): PersonResult[];
   suggestPeople(viewerId: string, limit: number, previews?: boolean): SuggestedReader[];
-  getActivity(username: string, viewerId: string | undefined, cursor: string | undefined, limit: number): Page<ActivityItem>;
+  getActivity(username: string, viewerId: string | undefined, cursor: string | undefined, limit: number, locale: Locale): Page<ActivityItem>;
   getLibrary(username: string, viewerId?: string): { data: Record<string, unknown> | null };
   getFeedSettings(userId: string): FeedSettings;
   updateFeedSettings(userId: string, settings: FeedSettings): void;
@@ -534,7 +535,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     getLibrary(username, viewerId) {
       return { data: deps.resolveLibrary(contentOwner(username, viewerId)) };
     },
-    getActivity(username, viewerId, cursor, limit) {
+    getActivity(username, viewerId, cursor, limit, locale) {
       const userId = contentOwner(username, viewerId);
       const keyset = cursor ? decodeCursor(cursor) : undefined;
       if (cursor && !keyset) throw new InvalidCursorError();
@@ -548,7 +549,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
           const card = deps.games[kind].get(event.ref_id);
           if (!card || card.ownerUserId !== event.user_id) return undefined;
           const content = feedContent(card.content);
-          return { id: event.id, type: event.type, payload: { ...parseEventPayload(event.payload), name: content.name, href: contentTarget(content), detail: contentDetail(content, "en"), covers: content.covers }, createdAt: event.created_at };
+          return { id: event.id, type: event.type, payload: { ...parseEventPayload(event.payload), name: content.name, href: contentTarget(content), detail: contentDetail(content, locale), covers: content.covers }, createdAt: event.created_at };
         }
         const payload = parseEventPayload(event.payload);
         if (payload !== undefined && event.type === "voted_on") {
