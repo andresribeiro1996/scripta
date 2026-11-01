@@ -129,8 +129,8 @@ export function buildArenaRoutes(service: ArenaService) {
         service.setSlotsManual(params.data.id, request.user.id, body.data.slots);
         return reply.code(204).send();
       } catch (err) {
-        if (err instanceof UnknownWorkError) return reply.code(400).send({ error: err.message });
-        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });
+        if (err instanceof UnknownWorkError) return reply.code(400).send({ error: t(localeOf(request), err.key, err.vars) });
+        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: t(localeOf(request), err.key, err.vars) });
         if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: t(localeOf(request), err.key, err.vars) });
         throw err;
       }
@@ -145,8 +145,8 @@ export function buildArenaRoutes(service: ArenaService) {
         service.randomFill(params.data.id, request.user.id, body.data.pool);
         return reply.code(204).send();
       } catch (err) {
-        if (err instanceof UnknownWorkError) return reply.code(400).send({ error: err.message });
-        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });
+        if (err instanceof UnknownWorkError) return reply.code(400).send({ error: t(localeOf(request), err.key, err.vars) });
+        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: t(localeOf(request), err.key, err.vars) });
         if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: t(localeOf(request), err.key, err.vars) });
         throw err;
       }
@@ -211,7 +211,7 @@ export function buildArenaRoutes(service: ArenaService) {
         service.tiebreak(params.data.id, request.user.id, params.data.duelId, body.data.winnerWorkId);
         return reply.code(204).send();
       } catch (err) {
-        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });
+        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: t(localeOf(request), err.key, err.vars) });
         if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: t(localeOf(request), err.key, err.vars) });
         throw err;
       }
@@ -239,7 +239,7 @@ export function buildVoteRoute(service: ArenaService) {
         service.vote(params.data.id, params.data.duelId, body.data.voterToken, body.data.workId, user?.id ?? null);
         return reply.code(204).send();
       } catch (err) {
-        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });
+        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: t(localeOf(request), err.key, err.vars) });
         if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: t(localeOf(request), err.key, err.vars) });
         throw err;
       }

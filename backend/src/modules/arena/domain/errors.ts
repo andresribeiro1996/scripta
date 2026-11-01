@@ -50,7 +50,7 @@ export class InvalidSlotIndexError extends ArenaError {
 
 export class DuplicateBookError extends ArenaError {
   constructor(title?: string) {
-    if (title) super("arena.duplicateEdition", { title });
+    if (title) super("works.duplicateEdition", { title });
     else super("arena.duplicateBook");
   }
 }

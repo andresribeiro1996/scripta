@@ -1,6 +1,7 @@
 import type { CoverChoice, GenreReview, GenreReviewAction, SynopsisDecision, SynopsisReview, TranslationReview, TranslationReviewAction } from "@scripta/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { localeOf, t } from "../../i18n/index.js";
 import { authGuard } from "../auth/index.js";
 import { MAX_UPLOAD_BYTES, type BooksService, type CoverFileSize } from "./booksService.js";
 import { BookNotFoundError, CoverOfferExpiredError, FileTooLargeError, InvalidImageError, SourceUnavailableError, UnusableCoverError, WorkMergeError } from "./domain/errors.js";
@@ -54,7 +55,7 @@ export function buildResolveRoutes(service: BooksService) {
     app.get("/covers/resolve", { preHandler: authGuard }, async (request, reply) => {
       const parsed = lookupSchema.safeParse(request.query);
       if (!parsed.success || !isLookable(parsed.data)) {
-        return reply.code(400).send({ error: "Send an isbn or a title (author optional)." });
+        return reply.code(400).send({ error: t(localeOf(request), "books.sendLookup") });
       }
       return reply.send(service.resolveCover(parsed.data, true));
     });
@@ -62,7 +63,7 @@ export function buildResolveRoutes(service: BooksService) {
     app.post("/covers/resolve/batch", { preHandler: authGuard }, async (request, reply) => {
       const parsed = batchSchema.safeParse(request.body);
       if (!parsed.success || !parsed.data.every(isLookable)) {
-        return reply.code(400).send({ error: `Send up to ${MAX_BATCH} lookups, each with an isbn or a title (author optional).` });
+        return reply.code(400).send({ error: t(localeOf(request), "books.sendBatch", { max: MAX_BATCH }) });
       }
       return reply.send({ results: parsed.data.map((lookup) => service.resolveCover(lookup)) });
     });
@@ -74,13 +75,13 @@ export function buildCoverPickerRoutes(service: BooksService) {
     app.get("/covers/candidates", { preHandler: authGuard }, async (request, reply) => {
       const parsed = candidatesSchema.safeParse(request.query);
       if (!parsed.success || !isLookable(parsed.data)) {
-        return reply.code(400).send({ error: "Send an isbn or a title (author optional), and from as quick or apple." });
+        return reply.code(400).send({ error: t(localeOf(request), "books.sendCandidates") });
       }
       const { from, ...lookup } = parsed.data;
       try {
         return reply.send(await service.listCoverCandidates(request.user.id, lookup, from));
       } catch (error) {
-        if (error instanceof BookNotFoundError) return reply.code(404).send(NOT_FOUND);
+        if (error instanceof BookNotFoundError) return reply.code(404).send({ error: t(localeOf(request), error.key, error.vars) });
         throw error;
       }
     });
@@ -88,7 +89,7 @@ export function buildCoverPickerRoutes(service: BooksService) {
     app.post("/covers/pick", { preHandler: authGuard }, async (request, reply) => {
       const parsed = pickSchema.safeParse(request.body);
       if (!parsed.success || !isLookable(parsed.data)) {
-        return reply.code(400).send({ error: "Send an isbn or a title (author optional), and exactly one of coverImageId and url." });
+        return reply.code(400).send({ error: t(localeOf(request), "books.sendPick") });
       }
       const { coverImageId, url, everyone = false, ...lookup } = parsed.data;
       if (everyone && !service.isAdmin(request.user.id)) return reply.code(403).send(FORBIDDEN);
@@ -96,10 +97,10 @@ export function buildCoverPickerRoutes(service: BooksService) {
       try {
         return reply.send(await service.pickCover(request.user.id, lookup, choice, everyone));
       } catch (error) {
-        if (error instanceof BookNotFoundError) return reply.code(404).send(NOT_FOUND);
-        if (error instanceof CoverOfferExpiredError) return reply.code(409).send({ error: error.message });
-        if (error instanceof UnusableCoverError) return reply.code(422).send({ error: error.message });
-        if (error instanceof SourceUnavailableError) return reply.code(502).send({ error: "Couldn't download that cover. Try again." });
+        if (error instanceof BookNotFoundError) return reply.code(404).send({ error: t(localeOf(request), error.key, error.vars) });
+        if (error instanceof CoverOfferExpiredError) return reply.code(409).send({ error: t(localeOf(request), error.key, error.vars) });
+        if (error instanceof UnusableCoverError) return reply.code(422).send({ error: t(localeOf(request), error.key, error.vars) });
+        if (error instanceof SourceUnavailableError) return reply.code(502).send({ error: t(localeOf(request), "books.coverDownloadFailed") });
         throw error;
       }
     });
@@ -110,7 +111,7 @@ export function buildCoverFileRoutes(publicUrlFor: (id: string, size: CoverFileS
   return async function coverFileRoutes(app: FastifyInstance) {
     app.get("/covers/cached/:id/:size", async (request, reply) => {
       const parsed = fileParamsSchema.safeParse(request.params);
-      if (!parsed.success) return reply.code(400).send({ error: "Invalid cover id." });
+      if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "books.invalidCoverId") });
       return reply.redirect(publicUrlFor(parsed.data.id, parsed.data.size), 301);
     });
   };
@@ -120,28 +121,28 @@ export function buildCatalogRoutes(service: BooksService) {
   return async function catalogRoutes(app: FastifyInstance) {
     app.get("/books/details", { preHandler: authGuard }, async (request, reply) => {
       const parsed = lookupSchema.safeParse(request.query);
-      if (!parsed.success) return reply.code(400).send({ error: "Invalid query." });
+      if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "books.invalidQuery") });
       try {
         return reply.send({ metadata: await service.getDetails(parsed.data) });
       } catch (error) {
-        if (error instanceof SourceUnavailableError) return reply.code(502).send({ error: "Book information is unavailable." });
+        if (error instanceof SourceUnavailableError) return reply.code(502).send({ error: t(localeOf(request), "books.detailsUnavailable") });
         throw error;
       }
     });
 
     app.get("/books/search", { preHandler: authGuard }, async (request, reply) => {
       const parsed = catalogSearchSchema.safeParse(request.query);
-      if (!parsed.success) return reply.code(400).send({ error: "Send a search query as q." });
+      if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "books.sendSearchQuery") });
       return reply.send({ results: service.search(parsed.data.q, { byWork: parsed.data.by === "work" }) });
     });
 
     app.get("/books/search/external", { preHandler: authGuard }, async (request, reply) => {
       const parsed = searchSchema.safeParse(request.query);
-      if (!parsed.success) return reply.code(400).send({ error: "Send a search query as q." });
+      if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "books.sendSearchQuery") });
       try {
         return reply.send({ results: await service.searchExternal(parsed.data.q) });
       } catch (error) {
-        if (error instanceof SourceUnavailableError) return reply.code(502).send({ error: "Search is unavailable right now — try again." });
+        if (error instanceof SourceUnavailableError) return reply.code(502).send({ error: t(localeOf(request), "books.searchUnavailable") });
         throw error;
       }
     });

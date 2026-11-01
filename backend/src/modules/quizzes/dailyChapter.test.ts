@@ -509,3 +509,10 @@ test("a question needs three plays before it can be the most missed", () => {
   assert.equal(facts?.players, 2);
   assert.equal(facts?.mostMissed, null);
 });
+
+test("the player-facing sign-in error follows the request language", async () => {
+  const { service } = setup();
+  const request = (language?: string) => call(service, { method: "POST", url: "/daily-chapter/history", payload: { guestId: randomUUID() }, headers: { authorization: "Basic x", ...(language ? { "accept-language": language } : {}) } });
+  assert.deepEqual((await request("pt-PT")).body, { error: "Inicie sessão novamente para carregar o seu histórico diário." });
+  assert.deepEqual((await request()).body, { error: "Sign in again to load your daily history." });
+});

@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z, ZodError } from "zod";
+import { localeOf, t } from "../../i18n/index.js";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
 import { DailyChapterError } from "./domain/dailyChapter.js";
 import { dailyGuestKey, type DailyChapterService } from "./dailyChapterService.js";
@@ -9,14 +10,14 @@ const playerIdSchema = z.string().min(1).max(100);
 
 function signedIn(request: FastifyRequest) {
   const user = getOptionalAuthenticatedUser(request);
-  if (request.headers.authorization && !user) throw new DailyChapterError(401, "Sign in again to load your daily history.");
+  if (request.headers.authorization && !user) throw new DailyChapterError(401, t(localeOf(request), "quizzes.dailySignInAgain"));
   return user;
 }
 
 function player(request: FastifyRequest, guestId?: string): string {
   const user = signedIn(request);
   if (user) return user.id;
-  if (!guestId) throw new DailyChapterError(400, "A device identity is required to save your result.");
+  if (!guestId) throw new DailyChapterError(400, t(localeOf(request), "quizzes.dailyDeviceIdentity"));
   return dailyGuestKey(guestId);
 }
 

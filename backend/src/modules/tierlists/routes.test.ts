@@ -694,3 +694,17 @@ test("a Portuguese ballot that does not match the board gets a Portuguese error"
   const closed = await call(service, { method: "GET", url: "/tierlists/voting/nope", headers: { "accept-language": "pt-PT" } });
   assert.deepEqual(closed.body, { error: "Não existe nenhuma tabela de níveis nessa ligação." } as never);
 });
+
+test("a Portuguese create naming two editions of one work answers in Portuguese", async () => {
+  const [old, kept] = [titleWork("Pt First Edition"), titleWork("Pt Second Edition")];
+  mergeInto(old, kept);
+  const { app } = await ownerApp();
+  const portuguese = { ...headers("t-pt2"), "accept-language": "pt-PT" };
+  const dupes = await app.inject({ method: "POST", url: "/tierlists", headers: portuguese, payload: { name: "X", data: { tiers: [tier([])], pool: [kept, old] } } });
+  assert.equal(dupes.statusCode, 409);
+  assert.match(dupes.json().error, / já está aqui como outra edição\.$/);
+  const unknown = await app.inject({ method: "POST", url: "/tierlists", headers: portuguese, payload: { name: "X", data: { tiers: [tier([])], pool: ["not-a-work"] } } });
+  assert.equal(unknown.statusCode, 400);
+  assert.equal(unknown.json().error, "Esse livro não está no catálogo.");
+  await app.close();
+});

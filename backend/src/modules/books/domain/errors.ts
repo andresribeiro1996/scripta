@@ -1,3 +1,5 @@
+import { LocalizedError } from "../../../i18n/index.js";
+
 export interface SourceErrorOptions {
   status?: number;
   retryAt?: number;
@@ -34,23 +36,23 @@ export class UnusableAnswerError extends SourceUnavailableError {
   }
 }
 
-export class BookNotFoundError extends Error {
+export class BookNotFoundError extends LocalizedError {
   constructor() {
-    super("No such book.");
+    super("books.noSuchBook");
     this.name = "BookNotFoundError";
   }
 }
 
-export class CoverOfferExpiredError extends Error {
+export class CoverOfferExpiredError extends LocalizedError {
   constructor() {
-    super("That cover offer expired. Reopen the picker.");
+    super("books.coverOfferExpired");
     this.name = "CoverOfferExpiredError";
   }
 }
 
-export class UnusableCoverError extends Error {
+export class UnusableCoverError extends LocalizedError {
   constructor() {
-    super("That image can't be used as a cover.");
+    super("books.unusableCover");
     this.name = "UnusableCoverError";
   }
 }

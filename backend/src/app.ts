@@ -57,7 +57,7 @@ const genReqId = () => randomUUID();
 export function handleError(error: FastifyError, request: FastifyRequest, reply: FastifyReply) {
   if (error instanceof WorkResolutionError) {
     request.log.error(error);
-    return reply.code(503).send({ error: error.message });
+    return reply.code(503).send({ error: t(localeOf(request), error.key, error.vars) });
   }
   const locale = localeOf(request);
   const statusCode = typeof error.statusCode === "number" && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 500;
@@ -177,7 +177,7 @@ export function buildApp() {
     worksShareAnArena: (aIds: string[], bIds: string[]) => getArenaPublicApi().worksShareATournament(aIds, bIds),
     alert: emailEnabled && env.ALERT_EMAIL
       ? (subject: string, text: string) => {
-          const mail = renderEmail({ heading: subject, paragraphs: [text] }, env.FRONTEND_URL);
+          const mail = renderEmail({ heading: subject, paragraphs: [text] }, env.FRONTEND_URL, "en");
           return sendAccountEmail(env.ALERT_EMAIL, subject, mail.text, mail.html);
         }
       : undefined

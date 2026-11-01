@@ -29,7 +29,7 @@ const DARK_STYLES = `@media (prefers-color-scheme: dark) {
   .em-mark-dark { display: block !important; }
 }`;
 
-export function renderEmail({ heading, paragraphs, button, footnote }: EmailContent, siteUrl: string, locale: Locale = "en"): { text: string; html: string } {
+export function renderEmail({ heading, paragraphs, button, footnote }: EmailContent, siteUrl: string, locale: Locale): { text: string; html: string } {
   const host = new URL(siteUrl).host;
   const markUrl = (file: string) => escapeHtml(new URL(`/email/${file}`, siteUrl).href);
   const text = [heading, ...paragraphs, ...(button ? [button.url] : []), ...(footnote ? [footnote] : []), `Atmyshelf · ${host}`].join("\n\n");

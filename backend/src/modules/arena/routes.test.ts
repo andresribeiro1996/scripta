@@ -260,3 +260,17 @@ test("arena errors and route messages come back in Portuguese for a Portuguese r
   assert.deepEqual(missing.json(), { error: "Esse torneio não existe." });
   await app.close();
 });
+
+test("work errors on slots come back in Portuguese for a Portuguese request", async () => {
+  const [old, target] = [work("Pt Edition One"), work("Pt Edition Two")];
+  openBooksDb().prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(target, old);
+  const { app, headers, seed } = await worksArena("a4");
+  const portuguese = { ...headers, "accept-language": "pt-PT" };
+  const unknown = await seed([{ workId: "not-a-work", title: "X" }, { workId: target, title: "Pt Edition Two" }], portuguese);
+  assert.equal(unknown.statusCode, 400);
+  assert.equal(unknown.json().error, "Esse livro não está no catálogo.");
+  const duplicate = await seed([{ workId: target, title: "Pt Edition Two" }, { workId: old, title: "Pt Edition One" }], portuguese);
+  assert.equal(duplicate.statusCode, 409);
+  assert.equal(duplicate.json().error, "Pt Edition One já está aqui como outra edição.");
+  await app.close();
+});

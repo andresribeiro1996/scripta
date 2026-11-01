@@ -133,7 +133,7 @@ export function buildMuralRoutes(service: MuralsService, resolveWorks: typeof re
           return reply.code(409).send({ error: t(localeOf(request), err.key, err.vars), current: service.getMural(request.user.id, params.data.id) });
         }
         if (err instanceof InvalidFolderReferenceError || err instanceof MuralNameTooLongError) return reply.code(400).send({ error: t(localeOf(request), err.key, err.vars) });
-        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });
+        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: t(localeOf(request), err.key, err.vars) });
         throw err;
       }
     });

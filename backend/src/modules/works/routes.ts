@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { localeOf, t } from "../../i18n/index.js";
 import { getOptionalAuthenticatedUser } from "../auth/index.js";
 import type { WorksService } from "./service.js";
 import type { BookStatsService } from "./stats.js";
@@ -12,7 +13,7 @@ export function buildWorkRoutes(service: WorksService) {
       getOptionalAuthenticatedUser(request);
       reply.header("Cache-Control", "no-store");
       const parsed = charactersSchema.safeParse(request.body);
-      if (!parsed.success) return reply.code(400).send({ error: "Expected {workIds} with at most 500 ids." });
+      if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "works.expectedWorkIds") });
       return reply.send({ characters: service.characters(parsed.data.workIds) });
     });
 
@@ -21,7 +22,7 @@ export function buildWorkRoutes(service: WorksService) {
       getOptionalAuthenticatedUser(request);
       const cast = service.cast(id);
       reply.header("Cache-Control", "no-store");
-      if (!cast) return reply.code(404).send({ error: "No book with that id." });
+      if (!cast) return reply.code(404).send({ error: t(localeOf(request), "works.noBookWithId") });
       return reply.send(cast);
     });
 
@@ -30,7 +31,7 @@ export function buildWorkRoutes(service: WorksService) {
       const viewer = getOptionalAuthenticatedUser(request);
       const page = service.getPage(id, viewer?.id ?? null);
       reply.header("Cache-Control", "no-store");
-      if (!page) return reply.code(404).send({ error: "No book with that id." });
+      if (!page) return reply.code(404).send({ error: t(localeOf(request), "works.noBookWithId") });
       return reply.send(page);
     });
 
@@ -48,7 +49,7 @@ export function buildWorkStatsRoutes(stats: BookStatsService) {
       getOptionalAuthenticatedUser(request);
       const result = stats.getStats(id);
       reply.header("Cache-Control", "no-store");
-      if (!result) return reply.code(404).send({ error: "No book with that id." });
+      if (!result) return reply.code(404).send({ error: t(localeOf(request), "works.noBookWithId") });
       return reply.send(result);
     });
   };

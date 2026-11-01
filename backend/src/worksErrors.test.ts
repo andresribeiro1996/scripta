@@ -44,3 +44,16 @@ test("the app caches the preflight and answers a catalog outage with 503", async
   assert.equal(down.statusCode, 503);
   assert.match(down.json().error, /catalog/i);
 });
+
+test("the app answers a catalog outage in the request's language", async (t) => {
+  const app = buildApp();
+  t.after(() => app.close());
+  app.get("/catalog-down", async () => {
+    throw new WorkResolutionError(new Error("down"));
+  });
+  const down = await app.inject({ url: "/catalog-down", headers: { "accept-language": "pt-PT" } });
+  assert.equal(down.statusCode, 503);
+  assert.equal(down.json().error, "O catálogo de livros não está disponível. Tente novamente dentro de momentos.");
+  const english = await app.inject({ url: "/catalog-down" });
+  assert.equal(english.json().error, "The book catalog is unavailable. Try again in a moment.");
+});

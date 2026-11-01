@@ -15,7 +15,7 @@ import { z } from "zod";
 import { localeOf, t, validationMessage } from "../../i18n/index.js";
 import { sendWorksError } from "../../worksErrors.js";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
-import { firstKeyPerWork, knownWorkIds, UnknownWorkError } from "../library/index.js";
+import { duplicateWorkMessage, firstKeyPerWork, knownWorkIds, UnknownWorkError } from "../library/index.js";
 import { boardWorks } from "./domain/boardKeys.js";
 import type { Tierlist } from "./domain/types.js";
 import type { BallotOutcome, TierlistsService, TierlistWriteOutcome, Voter } from "./service.js";
@@ -73,7 +73,7 @@ function viewOf(subject: unknown, pool: string[]) {
 
 function sendWriteFailure(request: FastifyRequest, reply: FastifyReply, outcome: Exclude<TierlistWriteOutcome, { ok: true }>) {
   const locale = localeOf(request);
-  if (outcome.reason === "duplicate-work") return reply.code(409).send({ error: t(locale, "tierlists.duplicateEdition", { title: outcome.title ?? t(locale, "tierlists.thatBook") }) });
+  if (outcome.reason === "duplicate-work") return reply.code(409).send({ error: duplicateWorkMessage(locale, { workId: null, title: outcome.title }) });
   return reply.code(outcome.reason === "not-found" ? 404 : 400).send({ error: t(locale, outcome.error) });
 }
 
@@ -97,7 +97,7 @@ export function buildTierlistRoutes(service: TierlistsService) {
         if (!outcome.ok) return sendWriteFailure(request, reply, outcome);
         return reply.code(201).send({ ...outcome.tierlist, data: outcome.data } satisfies WireTierlist);
       } catch (err) {
-        return sendWorksError(reply, err);
+        return sendWorksError(request, reply, err);
       }
     });
 
@@ -125,7 +125,7 @@ export function buildTierlistRoutes(service: TierlistsService) {
         if (!outcome.ok) return sendWriteFailure(request, reply, outcome);
         return reply.send({ ...outcome.tierlist, data: outcome.data } satisfies WireTierlist);
       } catch (err) {
-        return sendWorksError(reply, err);
+        return sendWorksError(request, reply, err);
       }
     });
 
@@ -156,7 +156,7 @@ export function buildTierlistRoutes(service: TierlistsService) {
         const { tierlist, known } = opened;
         return reply.code(201).send({ tierlist: { ...tierlist, data: tierlist.subject ? (tierlist.data as TierlistData) : canonicalBoard(tierlist.data, known) } satisfies WireTierlist, voteCode: tierlist.voteCode });
       } catch (err) {
-        return sendWorksError(reply, err);
+        return sendWorksError(request, reply, err);
       }
     });
 
@@ -179,7 +179,7 @@ export function buildTierlistRoutes(service: TierlistsService) {
         }
         return reply.send({ tierlist: { ...tierlist, data } satisfies WireTierlist });
       } catch (err) {
-        return sendWorksError(reply, err);
+        return sendWorksError(request, reply, err);
       }
     });
 
@@ -310,7 +310,7 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
         return sendBallotOutcome(request, reply, service, params.data.code, outcome, () => view);
       } catch (err) {
         if (err instanceof UnknownWorkError) return reply.code(400).send({ error: t(localeOf(request), "tierlists.placementsMismatch") });
-        return sendWorksError(reply, err);
+        return sendWorksError(request, reply, err);
       }
     };
 
