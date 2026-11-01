@@ -215,7 +215,7 @@ export const ptPT: CatalogOf<typeof en> = {
   "library.overSizeLimit": "A biblioteca ficaria acima do limite de tamanho.",
   "library.noGroup": "Esse grupo não está na sua biblioteca.",
   "library.noBook": "Esse livro não está na sua biblioteca.",
-  "library.signatureNotFinished": "O livro da assinatura tem de ser um livro lido da sua biblioteca.",
+  "library.signatureNotFinished": "O livro emblemático tem de ser um livro lido da sua biblioteca.",
   "library.highlightNotKobo": "O destaque tem de ser um dos seus destaques do Kobo.",
   "library.tooLarge": "A sua biblioteca tem mais de {mb} MB, o máximo que o Atmyshelf consegue guardar. Remova alguns livros ou destaques e tente novamente.",
   "library.importOverLimit": "Esta importação tem mais de {mb} MB, o máximo que o Atmyshelf consegue guardar. Importe menos livros ou destaques.",
