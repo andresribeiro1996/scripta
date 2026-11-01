@@ -9,7 +9,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "../core/auth";
 import { createAccountLibrarySaver, LibrarySaverContext } from "../features/library/hooks/useLibrary";
-import { useT } from "../i18n";
+import { getLocale, subscribeLocale, useT } from "../i18n";
 import { installNativeLocale } from "../i18n/native";
 import { FONT_ASSETS } from "../ui/fontAssets";
 import { ThemeProvider, useTheme } from "../ui/theme";
@@ -28,6 +28,15 @@ function AccountRoutes() {
     account.current = { userId, queryClient, saver: createAccountLibrarySaver(queryClient) };
   }
   const { queryClient, saver } = account.current;
+  useEffect(() => {
+    let previous = getLocale();
+    return subscribeLocale(() => {
+      const next = getLocale();
+      if (next === previous) return;
+      previous = next;
+      void queryClient.invalidateQueries();
+    });
+  }, [queryClient]);
   return (
     <QueryClientProvider key={userId ?? "public"} client={queryClient}>
       <LibrarySaverContext.Provider value={saver}>
