@@ -842,6 +842,7 @@ Each task: apply the recipe, add the area's catalog pair under `mobile/src/i18n/
 - Modify: `mobile/src/i18n/messages/en/index.ts`
 - Modify: `mobile/src/i18n/messages/pt-PT/index.ts`
 - Modify: `mobile/src/features/library/`
+- Modify: `mobile/src/app/(app)/(library)/collections.tsx`
 - Test: `mobile/src/features/library/`
 
 Everything in `features/library/` except `components/AddBookForm.tsx` and `components/GenreChoices.tsx`, which are Task 22. Genres in `components/LibraryShareImage.tsx` use `genreLabel`.
