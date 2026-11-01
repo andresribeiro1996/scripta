@@ -71,7 +71,7 @@ export function MuralEditorPage() {
   // ceremony).
   const { data: tierlists } = useTierlists();
   const tierlistData = (tierlistId: string) => {
-    const tierlist = tierlists && bookTierlists(tierlists).find((t) => t.id === tierlistId);
+    const tierlist = tierlists && bookTierlists(tierlists).find((item) => item.id === tierlistId);
     return tierlist ? { name: tierlist.name, tiers: tierlist.data.tiers, pool: tierlist.data.pool } : undefined;
   };
   const books = useWorkBooks(library);

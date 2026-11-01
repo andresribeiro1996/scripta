@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
+import { getLocale, subscribeLocale } from "./i18n";
 import { App } from "./App.tsx";
 import { useAuth } from "./auth/AuthContext.tsx";
 import { ConfirmProvider } from "./components/ConfirmDialog.tsx";
@@ -13,6 +14,16 @@ export function AccountApp() {
     const client = new QueryClient();
     return { queryClient: client, saver: createWebLibrarySaver(client) };
   }, [userId]);
+  useEffect(() => {
+    let last = getLocale();
+    return subscribeLocale(() => {
+      const next = getLocale();
+      if (next !== last) {
+        last = next;
+        void queryClient.invalidateQueries();
+      }
+    });
+  }, [queryClient]);
   const current = useRef(saver);
   useEffect(() => {
     if (current.current !== saver) {

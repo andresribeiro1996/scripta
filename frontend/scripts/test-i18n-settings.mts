@@ -7,16 +7,7 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DEFAULT_LIBRARY_STYLE, extractPerCardStyle, DEFAULT_BLOCK_STYLE } from "@scripta/shared";
 
-registerHooks({
-  load: (url, context, next) => {
-    if (url.endsWith(".css")) return { format: "module", source: "", shortCircuit: true };
-    const loaded = next(url, context);
-    if (!url.endsWith("/lib/theme.ts")) return loaded;
-    const source = String(loaded.source).replace("()=>readFontPreference(slot))", '()=>readFontPreference(slot),()=>"theme")');
-    assert.notEqual(source, String(loaded.source));
-    return { ...loaded, source };
-  }
-});
+registerHooks({ load: (url, context, next) => (url.endsWith(".css") ? { format: "module", source: "", shortCircuit: true } : next(url, context)) });
 
 class MemoryStorage {
   private values = new Map<string, string>();

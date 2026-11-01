@@ -16,7 +16,10 @@ Object.defineProperty(globalThis, "localStorage", { value: new MemoryStorage(), 
 Object.defineProperty(globalThis, "sessionStorage", { value: new MemoryStorage(), configurable: true });
 Object.defineProperty(globalThis, "matchMedia", { value: () => ({ matches: false }), configurable: true });
 
-const { setLocalePreference } = await import("../src/i18n/index.ts");
+const { setLocalePreference, t } = await import("../src/i18n/index.ts");
+const { library: en } = await import("../src/i18n/messages/en/library.ts");
+const { library: ptPT } = await import("../src/i18n/messages/pt-PT/library.ts");
+const { bookMetadataOptions } = await import("../src/lib/bookMetadata.ts");
 const { PublicLibraryGrid } = await import("../src/components/PublicLibraryGrid.tsx");
 const { LibraryToolbar } = await import("../src/components/LibraryToolbar.tsx");
 const { BookCard } = await import("../src/components/BookCard.tsx");
@@ -78,6 +81,32 @@ test("the book summary shows the rating label and loading state in Portuguese", 
   assert.match(html, /A sua classificação/);
   assert.match(html, /Sobre este livro/);
   assert.match(html, /A carregar sinopse e classificação…/);
+});
+
+test("the book summary formats ratings with the picked locale", () => {
+  const book = { Title: "Dune", Rating: 4.5 };
+  const render = () => {
+    const client = new QueryClient();
+    client.setQueryData(bookMetadataOptions(book).queryKey, { rating: 4.2, ratingCount: 12345 } as never);
+    try {
+      return renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(MemoryRouter, null, createElement(BookSummary, { book }))));
+    } finally {
+      client.clear();
+    }
+  };
+  const english = render();
+  assert.match(english, /4\.5\/5/);
+  assert.match(english, /4\.2\/5/);
+  const portuguese = inPortuguese(render);
+  assert.match(portuguese, /4,5\/5/);
+  assert.match(portuguese, /4,2\/5/);
+  assert.ok(portuguese.includes((12345).toLocaleString("pt-PT")));
+});
+
+test("the SQLite schema error reads in Portuguese", () => {
+  assert.equal(en["library.importUnexpectedSchema"], "`content` table has none of the expected columns — unexpected schema.");
+  assert.notEqual(ptPT["library.importUnexpectedSchema"], en["library.importUnexpectedSchema"]);
+  assert.match(inPortuguese(() => t("library.importUnexpectedSchema")), /^A tabela `content` não tem/);
 });
 
 test("a shared library with no token explains the link in Portuguese", () => {

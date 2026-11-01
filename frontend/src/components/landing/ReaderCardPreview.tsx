@@ -1,12 +1,12 @@
-import { useState, type CSSProperties } from "react";
-import { READER_PLATES, plateName, blockEffects, blockTextColors, resolveBlockColor, resolveBlockStyle, type BlockStyle } from "@scripta/shared";
+import { useMemo, useState, type CSSProperties } from "react";
+import { READER_PLATES, plateName, renderPlate, sharedT, blockEffects, blockTextColors, resolveBlockColor, resolveBlockStyle, type BlockStyle } from "@scripta/shared";
 import { themes } from "@scripta/shared/themes";
 import { blockFinishImage, blockFontFamilyCss, resolveBorderColor } from "../../lib/libraryStyle";
 import { muralThemeStyle } from "../../lib/theme";
 import { SpotlightBlockView } from "../murals/blocks/BookBlocks";
 import { TextBlockView } from "../murals/blocks/MiscBlocks";
 import { TierRowShell } from "../tierlist/TierRowShell";
-import { BOOKS, coverSrc, readerCardSrc, type BookSlug } from "./books";
+import { BOOKS, coverSrc, type BookSlug } from "./books";
 import { useLocale, useT } from "../../i18n";
 
 const favourites: BookSlug[] = ["piranesi", "gilead", "stoner", "remains", "circe", "the-road"];
@@ -27,7 +27,10 @@ export function ReaderCardPreview() {
   const [flipped, setFlipped] = useState(false);
   const [plate] = useState(() => READER_PLATES[Math.floor(Math.random() * READER_PLATES.length)]);
   const [lookIndex, setLookIndex] = useState(() => Math.floor(Math.random() * looks.length));
-  const cardSources = readerCardSrc(plate);
+  const cardSources = useMemo(() => {
+    const render = (print: "paper" | "reversed") => `data:image/svg+xml,${encodeURIComponent(renderPlate({ identity: plate.key, state: "settled", locale, readerName: sharedT(locale)("shared.readerCard.exampleReader"), print, label: t("landing.cardAlt", { name: plateName(plate.key, locale) }) }))}`;
+    return { paper: render("paper"), reversed: render("reversed") };
+  }, [plate, locale, t]);
   const look = looks[lookIndex];
   const nocturne = look.name === "Nocturne";
   const { colors: palette, scheme } = themes[look.theme];

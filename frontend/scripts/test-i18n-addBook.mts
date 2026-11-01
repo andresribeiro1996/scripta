@@ -82,7 +82,7 @@ test("the add-to-library sheet asks a signed-out visitor to sign in in Portugues
 test("the feeling chips take their default label from the catalog", () => {
   const props = { value: null, onChange: () => undefined };
   assert.match(withClient(createElement(FeelingChips, props)), /aria-label="How did it land\?"/);
-  assert.match(inPortuguese(() => withClient(createElement(FeelingChips, props))), /aria-label="Como foi\?"/);
+  assert.match(inPortuguese(() => withClient(createElement(FeelingChips, props))), /aria-label="O que achou\?"/);
 });
 
 test("the Goodreads sync, cover picker, share modal and link row translate", () => {

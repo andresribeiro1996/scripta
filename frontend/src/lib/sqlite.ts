@@ -11,6 +11,7 @@
 import initSqlJs, { type Database } from "sql.js";
 import sqlWasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import type { LibraryData } from "../api/library";
+import { t } from "../i18n";
 
 // Mirrors exporter/export.py's BOOK_COLUMNS / BOOKMARK_COLUMNS.
 const BOOK_COLUMNS = [
@@ -71,7 +72,7 @@ function sqliteToLibraryJson(db: Database): LibraryData {
   const haveContentCols = tableColumns(db, "content");
   const bookCols = BOOK_COLUMNS.filter((c) => haveContentCols.includes(c));
   if (!bookCols.length) {
-    throw new Error("`content` table has none of the expected columns — unexpected schema.");
+    throw new Error(t("library.importUnexpectedSchema"));
   }
   const haveBookmarkCols = tableColumns(db, "Bookmark");
   const bookmarkCols = BOOKMARK_COLUMNS.filter((c) => haveBookmarkCols.includes(c));

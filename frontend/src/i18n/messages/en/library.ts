@@ -41,6 +41,7 @@ export const library = {
   "library.importReadingSqlite": "Reading SQLite database…",
   "library.importReadingFile": "Reading file…",
   "library.importFailed": "Couldn't import that file.",
+  "library.importUnexpectedSchema": "`content` table has none of the expected columns — unexpected schema.",
   "library.importing": "Importing…",
   "library.bookAdded": "Added \"{title}\".",
   "library.renameFailed": "Couldn't save the new name.",

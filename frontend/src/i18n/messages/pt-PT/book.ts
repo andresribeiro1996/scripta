@@ -89,7 +89,7 @@ export const book: CatalogOf<typeof en> = {
   "book.byAuthor": "de {author}",
   "book.possiblyGenre": "Possivelmente {genre}",
   "book.readingStatus": "Estado de leitura",
-  "book.howItLanded": "Como foi",
+  "book.howItLanded": "O que achou",
   "book.addThisEdition": "Adicionar esta edição",
   "book.addToLibrary": "Adicionar à biblioteca",
   "book.bookSections": "Secções do livro",

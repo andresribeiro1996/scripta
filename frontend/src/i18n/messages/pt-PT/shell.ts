@@ -110,7 +110,7 @@ export const shell: CatalogOf<typeof en> = {
   "shell.goToLibrary": "Ir para a sua biblioteca",
   "shell.backToScripta": "Voltar ao Scripta",
   "shell.privacyTitle": "Privacidade",
-  "shell.privacyUpdated": "Atualizado a {date}",
+  "shell.privacyUpdated": "Atualizado em {date}",
   "shell.privacyDate": "6 de outubro de 2026",
   "shell.signInAndEmail": "Início de sessão e email",
   "shell.loadingAccount": "A carregar a conta…",

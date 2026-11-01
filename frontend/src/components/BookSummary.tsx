@@ -18,7 +18,7 @@ export function BookSummary({ book }: { book: Record<string, unknown> }) {
                 <span aria-hidden="true" className="text-(--color-accent)">
                   ★{" "}
                 </span>
-                {personalRating}/5
+                {decimalText(personalRating, locale)}/5
               </p>
               <p className="mt-0.5 text-xs text-(--color-text-dim)">{t("library.yourRating")}</p>
             </div>
@@ -32,7 +32,7 @@ export function BookSummary({ book }: { book: Record<string, unknown> }) {
                 {decimalText(data.rating, locale, 1)}/5
               </p>
               <p className="mt-0.5 text-xs text-(--color-text-dim)">
-                {data.ratingCount > 0 ? t("library.ratingsFrom", { count: data.ratingCount, formatted: data.ratingCount.toLocaleString() }) : "Open Library"}
+                {data.ratingCount > 0 ? t("library.ratingsFrom", { count: data.ratingCount, formatted: data.ratingCount.toLocaleString(locale === "pt-PT" ? "pt-PT" : undefined) }) : "Open Library"}
               </p>
             </div>
           )}

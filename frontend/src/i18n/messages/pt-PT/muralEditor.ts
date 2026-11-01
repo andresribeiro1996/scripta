@@ -138,7 +138,7 @@ export const muralEditor: CatalogOf<typeof en> = {
   "muralEditor.fallbackReader": "leitor",
   "muralEditor.bookDetails": "Detalhes do livro",
   "muralEditor.bookPage": "Página do livro",
-  "muralEditor.unranked": "Sem classificação",
+  "muralEditor.unranked": "Por classificar",
   "muralEditor.noBooksHere": "Ainda não há livros aqui.",
   "muralEditor.noQuotesYet": "Ainda não foram adicionadas citações.",
   "muralEditor.tierlistUnavailable": "Esta tabela de níveis não está disponível.",

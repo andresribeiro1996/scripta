@@ -42,6 +42,7 @@ export const library: CatalogOf<typeof en> = {
   "library.importReadingSqlite": "A ler a base de dados SQLite…",
   "library.importReadingFile": "A ler o ficheiro…",
   "library.importFailed": "Não foi possível importar esse ficheiro.",
+  "library.importUnexpectedSchema": "A tabela `content` não tem nenhuma das colunas esperadas — esquema inesperado.",
   "library.importing": "A importar…",
   "library.bookAdded": "\"{title}\" adicionado.",
   "library.renameFailed": "Não foi possível guardar o novo nome.",

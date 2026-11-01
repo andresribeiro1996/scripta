@@ -23,6 +23,8 @@ const { setLocalePreference } = await import("../src/i18n/index.ts");
 const { AuthProvider } = await import("../src/auth/AuthContext.tsx");
 const { LandingPage } = await import("../src/pages/LandingPage.tsx");
 const { WaitlistForm } = await import("../src/components/landing/WaitlistForm.tsx");
+const { ReaderCardPreview } = await import("../src/components/landing/ReaderCardPreview.tsx");
+const shared = await import("@scripta/shared");
 
 const inPortuguese = <T extends unknown>(render: () => T): T => {
   setLocalePreference("pt-PT");
@@ -63,4 +65,17 @@ test("the waitlist form translates its field, placeholder and button", () => {
   assert.match(html, /placeholder="Endereço de email"/);
   assert.match(html, /aria-label="Avisar-me"/);
   assert.match(html, /title="Receber aviso no lançamento"/);
+});
+
+test("the reader card preview draws its plate in Portuguese, not from the English static files", () => {
+  const { plateName } = shared;
+  const decoded = (html: string) => [...html.matchAll(/src="(data:image\/svg\+xml,[^"]+)"/g)].map((match) => decodeURIComponent(match[1].replace(/&amp;/g, "&").slice("data:image/svg+xml,".length)));
+  const preview = () => renderToStaticMarkup(createElement(ReaderCardPreview));
+  const portuguese = inPortuguese(() => decoded(preview()).join("\n"));
+  assert.ok(portuguese.length > 0);
+  assert.doesNotMatch(portuguese, /EXAMPLE READER|Cartographer|Annotator|Lamplighter|Stargazer|Archivist|Correspondent|Wayfarer|Loyalist/);
+  assert.match(portuguese, /LEITOR DE EXEMPL/);
+  assert.ok(shared.READER_PLATES.some((plate) => portuguese.includes(plateName(plate.key, "pt-PT"))));
+  const english = decoded(preview()).join("\n");
+  assert.match(english, /EXAMPLE READER/);
 });
