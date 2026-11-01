@@ -130,8 +130,8 @@ test("expected-empty lookups are not requested when the board says nothing exist
 });
 
 test("both Discover pages and People say what they are", () => {
-  assert.equal([...src("pages/DiscoverPage.tsx").matchAll(/subtitle="Tier lists, tournaments and quizzes readers have published\."/g)].length, 2);
-  assert.match(src("pages/PeoplePage.tsx"), /subtitle="Find readers and follow them/);
+  assert.equal([...src("pages/DiscoverPage.tsx").matchAll(/subtitle=\{t\("community\.discoverSubtitle"\)\}/g)].length, 2);
+  assert.match(src("pages/PeoplePage.tsx"), /subtitle=\{t\("community\.peopleSubtitle"\)\}/);
 });
 
 test("a search box with text shows one 44px Clear control and an empty one shows none", () => {

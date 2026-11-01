@@ -23,7 +23,7 @@ test("every search box is the shared SearchField", () => {
     assert.match(src(f), /<SearchField /, f);
     assert.doesNotMatch(src(f), /<input[^>]*(?:type="search"|placeholder="Search)/, f);
   }
-  assert.match(src("pages/DiscoverPage"), /placeholder="Search games"/);
+  assert.match(src("pages/DiscoverPage"), /placeholder=\{t\("community\.searchGames"\)\}/);
   assert.doesNotMatch(src("pages/DiscoverPage"), /Search tier lists, tournaments and quizzes"/);
   const toolbar = src("components/Toolbar");
   assert.match(toolbar, /\$\{fill \? "" : "sm:w-85"\}/);

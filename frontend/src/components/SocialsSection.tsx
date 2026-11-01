@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, startSocialConnect, type SocialProvider, type SocialStatus } from "../api/socials";
 import { useSocials } from "../hooks/useSocials";
+import { useT } from "../i18n";
 import { useConfirm } from "./ConfirmDialog";
 import { ToggleSwitch } from "./ToggleSwitch";
 import { SocialIcon } from "./icons/SocialIcons";
@@ -9,16 +10,13 @@ import { SettingGroup, SettingRow } from "./page/Page";
 import { LIST_PANEL } from "./page/surfaceClasses";
 import { Sheet } from "./Sheet";
 
-const PROVIDER_META: Record<SocialProvider, { label: string; hint: string }> = {
-  x: { label: "X", hint: "Post and read on your behalf." },
-  instagram: { label: "Instagram", hint: "Post and read on your behalf." },
-  threads: { label: "Threads", hint: "Post and read on your behalf." },
-  tiktok: { label: "TikTok", hint: "Post and read on your behalf." },
-  bluesky: {
-    label: "Bluesky",
-    hint: "Sign in with an app password (Bluesky Settings → App Passwords), not your real password."
-  }
-};
+const PROVIDER_META = {
+  x: { label: "X", hint: "community.hintPostAndRead" },
+  instagram: { label: "Instagram", hint: "community.hintPostAndRead" },
+  threads: { label: "Threads", hint: "community.hintPostAndRead" },
+  tiktok: { label: "TikTok", hint: "community.hintPostAndRead" },
+  bluesky: { label: "Bluesky", hint: "community.hintBluesky" }
+} as const satisfies Record<SocialProvider, { label: string; hint: string }>;
 
 /** Settings → Socials — one row per platform, identified by its icon
  *  (SocialIcon, see icons/SocialIcons.tsx) rather than a text label, each
@@ -31,6 +29,7 @@ const PROVIDER_META: Record<SocialProvider, { label: string; hint: string }> = {
  *  away, which deserves the same "are you sure" every other destructive
  *  action in this app gets (see ConfirmDialog.tsx). */
 export function SocialsSection() {
+  const t = useT();
   const { data: socials, isLoading, connectBlueskyAccount, disconnect } = useSocials();
   const confirm = useConfirm();
   const [pendingProvider, setPendingProvider] = useState<SocialProvider | null>(null);
@@ -48,7 +47,7 @@ export function SocialsSection() {
     if (!provider || !status) return;
 
     if (status === "error") {
-      setError(params.get("social_message") ?? `Couldn't connect ${PROVIDER_META[provider as SocialProvider]?.label ?? provider}.`);
+      setError(params.get("social_message") ?? t("community.connectFailed", { label: PROVIDER_META[provider as SocialProvider]?.label ?? provider }));
     }
     window.history.replaceState(null, "", window.location.pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -66,7 +65,7 @@ export function SocialsSection() {
       // startSocialConnect navigates the browser away on success — this
       // line only runs if it threw before getting that far.
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't start that connection.");
+      setError(err instanceof ApiError ? err.message : t("community.startConnectFailed"));
       setPendingProvider(null);
     }
   }
@@ -74,9 +73,9 @@ export function SocialsSection() {
   async function handleDisable(status: SocialStatus) {
     const meta = PROVIDER_META[status.provider];
     const confirmed = await confirm({
-      title: `Disconnect ${meta.label}?`,
-      body: `Atmyshelf will delete the ${meta.label} access token it has stored. You'll need to reconnect and re-authorize to use it again.`,
-      confirmLabel: "Disconnect"
+      title: t("community.disconnectTitle", { label: meta.label }),
+      body: t("community.disconnectBody", { label: meta.label }),
+      confirmLabel: t("community.disconnect")
     });
     if (!confirmed) return;
 
@@ -85,7 +84,7 @@ export function SocialsSection() {
     try {
       await disconnect(status.provider);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't disconnect that platform.");
+      setError(err instanceof ApiError ? err.message : t("community.disconnectFailed"));
     } finally {
       setPendingProvider(null);
     }
@@ -94,11 +93,11 @@ export function SocialsSection() {
   return (
     <>
       <SettingGroup
-        title="Socials"
-        description="Connect social platforms so Atmyshelf can act on your behalf. Enabling one requires signing in and authorizing access; the key it gets is stored only to make that possible."
+        title={t("community.socials")}
+        description={t("community.socialsDescription")}
       >
         <div className={LIST_PANEL}>
-          {isLoading && <p className="px-4 py-3 text-sm text-(--color-text-dim)">Loading…</p>}
+          {isLoading && <p className="px-4 py-3 text-sm text-(--color-text-dim)">{t("library.loadingEllipsis")}</p>}
 
           {socials?.map((status) => {
             const meta = PROVIDER_META[status.provider];
@@ -114,16 +113,18 @@ export function SocialsSection() {
                 label={meta.label}
                 description={
                   !status.enabled
-                    ? "Not set up on this server yet."
+                    ? t("community.notSetUp")
                     : status.connected
-                      ? `Connected${status.handle ? ` as ${status.handle}` : ""}.`
-                      : meta.hint
+                      ? status.handle
+                        ? t("community.connectedAs", { handle: status.handle })
+                        : t("community.connected")
+                      : t(meta.hint)
                 }
               >
-                {busy && <span className="text-xs text-(--color-text-dim)">Working…</span>}
+                {busy && <span className="text-xs text-(--color-text-dim)">{t("shell.working")}</span>}
                 <span className={status.enabled ? "" : "opacity-50"}>
                   <ToggleSwitch
-                    label={`${status.connected ? "Disconnect" : "Connect"} ${meta.label}`}
+                    label={t(status.connected ? "community.disconnectProvider" : "community.connectProvider", { label: meta.label })}
                     checked={status.connected}
                     disabled={!status.enabled || busy}
                     onChange={(next) => (next ? void handleEnable(status.provider) : void handleDisable(status))}
@@ -149,6 +150,7 @@ function BlueskyConnectModal({
   onConnect: (handle: string, appPassword: string) => Promise<void>;
   onClose: () => void;
 }) {
+  const t = useT();
   const handleRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     handleRef.current?.focus();
@@ -166,7 +168,7 @@ function BlueskyConnectModal({
       await onConnect(handle.trim(), appPassword);
       onClose();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't connect that Bluesky account.");
+      setError(err instanceof ApiError ? err.message : t("community.blueskyFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -174,37 +176,36 @@ function BlueskyConnectModal({
 
   const missing =
     handle.trim() === "" && appPassword === ""
-      ? "Enter your handle and an app password."
+      ? t("community.enterHandleAndPassword")
       : handle.trim() === ""
-        ? "Enter your handle."
+        ? t("community.enterHandle")
         : appPassword === ""
-          ? "Enter an app password."
+          ? t("community.enterAppPassword")
           : null;
 
   return (
     <Sheet
-      title="Connect Bluesky"
+      title={t("community.connectBluesky")}
       onClose={onClose}
       footer={
         <>
           <button type="button" onClick={onClose} className={BUTTON_SECONDARY}>
-            Cancel
+            {t("shell.cancel")}
           </button>
           <button type="submit" form="bluesky-connect-form" disabled={submitting || missing !== null} className={BUTTON_PRIMARY}>
-            {submitting ? "Connecting…" : "Connect"}
+            {submitting ? t("community.connecting") : t("community.connect")}
           </button>
         </>
       }
     >
       <form id="bluesky-connect-form" onSubmit={(e) => void handleSubmit(e)} className="px-2 pb-2">
         <p className="mb-4 text-xs text-(--color-text-dim)">
-          Use an app password, not your real one — generate one from Bluesky at Settings → App Passwords. Atmyshelf never sees your actual
-          account password.
+          {t("community.blueskyIntro")}
         </p>
 
         <div className="mb-3">
           <label className="mb-1 block text-sm font-semibold" htmlFor="bluesky-handle">
-            Handle
+            {t("community.handle")}
           </label>
           <input
             id="bluesky-handle"
@@ -219,7 +220,7 @@ function BlueskyConnectModal({
 
         <div className="mb-3">
           <label className="mb-1 block text-sm font-semibold" htmlFor="bluesky-app-password">
-            App password
+            {t("community.appPassword")}
           </label>
           <input
             id="bluesky-app-password"

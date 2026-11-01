@@ -23,10 +23,11 @@ import { backTo } from "../lib/areas";
 import { ensureBookBlockHeights, profileOnlyMural, type Mural } from "../lib/murals";
 import { useResolvedTheme } from "../lib/theme";
 import { buildReconstructedBooks } from "../lib/sharedMural";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
 export function CommunityProfilePage() {
   const locale = useLocale();
+  const t = useT();
   const { username } = useParams<{ username: string }>();
   const { session } = useAuth();
   const queryClient = useQueryClient();
@@ -48,7 +49,7 @@ export function CommunityProfilePage() {
       await queryClient.invalidateQueries({ queryKey: ["community", "profile", username] });
       await invalidateAfterFollow(queryClient);
     } catch (error) {
-      setError(followFailureMessage(error, "Something went wrong. Try again."));
+      setError(followFailureMessage(error, t("library.shelfActionFailed")));
     } finally {
       setBusy(false);
     }
@@ -61,7 +62,7 @@ export function CommunityProfilePage() {
   if (!session || isLoading || (!view && !isNotFound && !error)) {
     return (
       <Page title={`@${username ?? ""}`} back={backTo("profile")}>
-        <SkeletonCardGrid count={2} label="Loading profile" tileClassName="min-h-[120px]" />
+        <SkeletonCardGrid count={2} label={t("community.loadingProfile")} tileClassName="min-h-[120px]" />
       </Page>
     );
   }
@@ -133,7 +134,7 @@ export function CommunityProfilePage() {
       />
       <div className="mt-6">
         {error && <p className="mb-4 text-sm text-(--color-danger)">{error}</p>}
-        <SwipeTabs tabs={PROFILE_TABS} value={tab} onChange={setTab} label="Profile sections">
+        <SwipeTabs tabs={PROFILE_TABS.map((entry) => ({ value: entry.value, label: t(entry.label) }))} value={tab} onChange={setTab} label={t("community.profileSections")}>
           {(panel) => {
             if (panel === "activity") return <ProfileActivity activity={activity} />;
             if (panel === "library") return <ProfileLibraryPanel library={library.library} isLoading={library.isLoading} error={library.error} onRetry={() => void library.refetch()} />;
@@ -156,9 +157,9 @@ export function CommunityProfilePage() {
                     <MuralCanvas mural={profileOnlyMural(viewerTheme)} editMode={false} books={[]} images={[]} profile={user} hideProfileName />
                   )}
                 </div>
-                <h2 className={`${SECTION_HEADING} mb-3`}>Published</h2>
+                <h2 className={`${SECTION_HEADING} mb-3`}>{t("community.published")}</h2>
                 {publishedRows.length === 0 ? (
-                  <EmptyState title="Nothing published yet." body="Tier lists, tournaments and quizzes show up here." />
+                  <EmptyState title={t("community.nothingPublished")} body={t("community.nothingPublishedProfileBody")} />
                 ) : (
                   <div className={LIST_PANEL}>
                     {publishedRows.map((row) => (
@@ -185,9 +186,9 @@ export function CommunityProfilePage() {
 }
 
 const PROFILE_TABS = [
-  { value: "mural", label: "Mural" },
-  { value: "activity", label: "Activity" },
-  { value: "library", label: "Library" }
+  { value: "mural", label: "library.shelfTabMural" },
+  { value: "activity", label: "library.shelfTabActivity" },
+  { value: "library", label: "library.shelfTabLibrary" }
 ] as const;
 
 type ProfileTab = (typeof PROFILE_TABS)[number]["value"];
@@ -208,7 +209,8 @@ function ProfileHeader({ user, action }: { user: CommunityAuthor; action?: React
 }
 
 function PrivateProfileState() {
-  return <EmptyState icon={CommunityIcon} title="This profile is private." body="Only published profiles are visible in the community." />;
+  const t = useT();
+  return <EmptyState icon={CommunityIcon} title={t("community.profilePrivate")} body={t("community.profilePrivateBody")} />;
 }
 
 function FollowControls({
@@ -220,13 +222,14 @@ function FollowControls({
   following: boolean;
   onToggle: (next: "follow" | "unfollow") => void;
 }) {
+  const t = useT();
   return (
     <button
       onClick={() => onToggle(following ? "unfollow" : "follow")}
       disabled={busy}
       className={following ? BUTTON_SECONDARY : BUTTON_PRIMARY}
     >
-      {busy ? "…" : following ? "Following" : "Follow"}
+      {busy ? "…" : following ? t("book.following") : t("book.follow")}
     </button>
   );
 }

@@ -132,7 +132,7 @@ test("the new series / collection field: danger frame on error, Add and Cancel b
 });
 
 test("section headings: Published, day groups, Your chapters use SECTION_HEADING; the Admin panels use PANEL_HEADING", () => {
-  assert.match(src("pages/CommunityProfilePage"), /<h2 className=\{`\$\{SECTION_HEADING\} mb-3`\}>Published<\/h2>/);
+  assert.match(src("pages/CommunityProfilePage"), /<h2 className=\{`\$\{SECTION_HEADING\} mb-3`\}>\{t\("community\.published"\)\}<\/h2>/);
   assert.match(src("pages/DailyChapterPage"), /<h2 id="daily-history" className=\{SECTION_HEADING\}>Your chapters<\/h2>/);
   const admin = src("pages/AdminDailyChapterPage");
   assert.equal(admin.match(/<h2 className=\{PANEL_HEADING\}>/g)?.length, 6);
