@@ -332,6 +332,9 @@ test("auth errors follow the request's language and English is unchanged", async
     const short = { email: "other@example.com", username: "other", password: "short" };
     assert.equal((await app.inject({ method: "POST", url: "/auth/signup", payload: short })).json().error, "Password must be at least 8 characters.");
     assert.equal((await app.inject({ method: "POST", url: "/auth/signup", headers: pt, payload: short })).json().error, "A palavra-passe deve ter pelo menos 8 caracteres.");
+    const badEmail = { email: "not-an-email", username: "other", password: "long enough" };
+    assert.equal((await app.inject({ method: "POST", url: "/auth/signup", payload: badEmail })).json().error, "Invalid email");
+    assert.equal((await app.inject({ method: "POST", url: "/auth/signup", headers: pt, payload: badEmail })).json().error, "Email inválido.");
     const taken = { email: "other@example.com", username: "reader", password: "long enough" };
     assert.equal((await app.inject({ method: "POST", url: "/auth/signup", headers: pt, payload: taken })).json().error, "O nome de utilizador \"reader\" já está a ser utilizado.");
     const expired = { token: "a".repeat(64), password: "new password" };

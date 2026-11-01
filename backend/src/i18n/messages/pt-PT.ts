@@ -19,6 +19,7 @@ export const ptPT: CatalogOf<typeof en> = {
   "auth.usernameChars": "O nome de utilizador só pode conter letras, números, sublinhados e pontos.",
   "auth.passwordMin": "A palavra-passe deve ter pelo menos 8 caracteres.",
   "auth.passwordMax": "Utilize no máximo 128 caracteres.",
+  "auth.signupInvalidEmail": "Email inválido.",
   "auth.invalidEmail": "Introduza um endereço de email válido.",
   "auth.emailUnavailable": "O envio de emails não está disponível. Tente novamente mais tarde.",
   "auth.resetInvalid": "Utilize uma ligação de redefinição válida e uma palavra-passe com 8 a 128 caracteres.",
@@ -268,5 +269,9 @@ export const ptPT: CatalogOf<typeof en> = {
   "quizzes.answersMismatch": "Essas respostas não correspondem a este quiz.",
   "quizzes.invalidPlay": "Jogada inválida.",
   "quizzes.dailySignInAgain": "Inicie sessão novamente para carregar o seu histórico diário.",
-  "quizzes.dailyDeviceIdentity": "É necessária uma identidade do dispositivo para guardar o seu resultado."
+  "quizzes.dailyDeviceIdentity": "É necessária uma identidade do dispositivo para guardar o seu resultado.",
+  "quizzes.dailyNoEdition": "Não existe nenhuma edição diária nessa ligação.",
+  "quizzes.dailyPlayFirst": "Jogue este capítulo para ver como se saíram os outros.",
+  "quizzes.dailyClosed": "Esta edição diária já fechou. Volte para o capítulo de hoje.",
+  "quizzes.dailyAnswerAll": "Responda a cada uma das cinco perguntas exatamente uma vez."
 };

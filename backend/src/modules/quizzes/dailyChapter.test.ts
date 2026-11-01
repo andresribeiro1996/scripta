@@ -516,3 +516,23 @@ test("the player-facing sign-in error follows the request language", async () =>
   assert.deepEqual((await request("pt-PT")).body, { error: "Inicie sessão novamente para carregar o seu histórico diário." });
   assert.deepEqual((await request()).body, { error: "Sign in again to load your daily history." });
 });
+
+test("player-facing daily errors follow the request language and editor errors stay English", async () => {
+  const { service, on } = setup();
+  const answers = seed(service, "edition-13", "2030-01-13");
+  on("2030-01-13T12:00:00Z");
+  service.publish("edition-13");
+  on("2030-01-14T12:00:00Z");
+  const play = (language?: string, id = "edition-13", payload: object = { answers }) => call(service, { method: "POST", url: "/daily-chapter/" + id + "/play", payload, headers: language ? { "accept-language": language } : {} }, "reader");
+  const closed = await play("pt-PT");
+  assert.equal(closed.status, 403);
+  assert.deepEqual(closed.body, { error: "Esta edição diária já fechou. Volte para o capítulo de hoje." });
+  assert.deepEqual((await play()).body, { error: "This daily edition has closed. Come back for today's chapter." });
+  assert.deepEqual((await play("pt-PT", "missing")).body, { error: "Não existe nenhuma edição diária nessa ligação." });
+  const people = await call(service, { method: "GET", url: "/daily-chapter/edition-13/people", headers: { "accept-language": "pt-PT" } }, "reader");
+  assert.deepEqual(people.body, { error: "Jogue este capítulo para ver como se saíram os outros." });
+  on("2030-01-13T12:00:00Z");
+  assert.deepEqual((await play("pt-PT", "edition-13", { answers: answers.slice(1) })).body, { error: "Pedido inválido." });
+  const admin = await call(service, { method: "GET", url: "/daily-chapter/admin", headers: { "accept-language": "pt-PT" } }, "reader");
+  assert.deepEqual(admin.body, { error: "Only the editor can manage daily editions." });
+});

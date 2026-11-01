@@ -52,7 +52,7 @@ export function buildSocialsRoutes(service: SocialsService) {
       if (!enabledByProvider[provider as SocialProvider]) {
         return reply.code(503).send({ error: t(localeOf(request), "socials.providerNotConfigured", { provider }) });
       }
-      const linkId = createLinkSession(request.user.id, provider);
+      const linkId = createLinkSession(request.user.id, provider, localeOf(request));
       reply.send({ linkId });
     });
 

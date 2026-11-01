@@ -1968,6 +1968,18 @@ test("getActivity filters categories by feed settings but not for the owner", ()
   assert.equal(owner.items.length, 3);
 });
 
+test("getActivity details a published game in the requested language", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice"));
+  tierlistRefs.set("t1", tierRef("t1", "alice"));
+  service.emitEvent("alice", "tierlist_published", "tierlist", "t1");
+  assert.equal(service.getActivity("alice", undefined, undefined, 20, "en").items[0]?.payload.detail, "5 books · 2 ballots");
+  assert.equal(service.getActivity("alice", undefined, undefined, 20, "pt-PT").items[0]?.payload.detail, "5 livros · 2 votos");
+});
+
 test("getActivity 404s on unknown username and unpublished profile", () => {
   const { repo, profiles } = createRepoFake();
   const { deps, usernames } = createDeps(repo);

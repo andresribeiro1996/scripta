@@ -36,7 +36,7 @@ const usernameSchema = z
   .regex(/^[a-zA-Z0-9_.]+$/, "auth.usernameChars");
 
 const signupSchema = z.object({
-  email: z.string().trim().email(),
+  email: z.string().trim().email("auth.signupInvalidEmail"),
   username: usernameSchema,
   password: z.string().min(8, "auth.passwordMin").max(128, "auth.passwordMax")
 });

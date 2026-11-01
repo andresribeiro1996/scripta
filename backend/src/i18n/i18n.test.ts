@@ -97,3 +97,15 @@ test("bad JSON returns a Portuguese error for pt-PT", async () => {
   assert.equal(bad.json().error, "Não foi possível concluir o pedido.");
   assert.deepEqual(boom.json(), { error: "Erro interno do servidor" });
 });
+
+test("a 429 keeps its English message because the clients parse it", async () => {
+  const app = Fastify();
+  app.setErrorHandler(handleError);
+  app.get("/limited", async () => {
+    throw Object.assign(new Error("Rate limit exceeded, retry in 5 minutes"), { statusCode: 429 });
+  });
+  const response = await app.inject({ method: "GET", url: "/limited", headers: { "accept-language": "pt-PT" } });
+  await app.close();
+  assert.equal(response.statusCode, 429);
+  assert.equal(response.json().message, "Rate limit exceeded, retry in 5 minutes");
+});

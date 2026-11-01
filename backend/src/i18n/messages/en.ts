@@ -18,6 +18,7 @@ export const en = {
   "auth.usernameChars": "Username can only contain letters, numbers, underscores, and periods.",
   "auth.passwordMin": "Password must be at least 8 characters.",
   "auth.passwordMax": "Use at most 128 characters.",
+  "auth.signupInvalidEmail": "Invalid email",
   "auth.invalidEmail": "Enter a valid email address.",
   "auth.emailUnavailable": "Email delivery is unavailable. Please try again later.",
   "auth.resetInvalid": "Use a valid reset link and a password between 8 and 128 characters.",
@@ -267,5 +268,9 @@ export const en = {
   "quizzes.answersMismatch": "Those answers don't match this quiz.",
   "quizzes.invalidPlay": "Invalid play.",
   "quizzes.dailySignInAgain": "Sign in again to load your daily history.",
-  "quizzes.dailyDeviceIdentity": "A device identity is required to save your result."
+  "quizzes.dailyDeviceIdentity": "A device identity is required to save your result.",
+  "quizzes.dailyNoEdition": "No daily edition at that link.",
+  "quizzes.dailyPlayFirst": "Play this chapter to see how others did.",
+  "quizzes.dailyClosed": "This daily edition has closed. Come back for today's chapter.",
+  "quizzes.dailyAnswerAll": "Answer each of the five questions exactly once."
 } satisfies Messages;
