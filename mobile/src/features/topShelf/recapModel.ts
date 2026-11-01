@@ -1,54 +1,58 @@
-import { plural, recapMonthName, type TopShelfBoard, type TopShelfRecapCard } from "@scripta/shared";
+import { recapMonthName, type TopShelfBoard, type TopShelfRecapCard } from "@scripta/shared";
 import { contentTarget } from "@scripta/shared/community";
+import { decimalText, type Locale } from "@scripta/shared/i18n";
 import { gameScoreLabel, valueLabel } from "./topShelfModel";
-import { getLocale } from "../../i18n";
+import { translatorFor, type MobileMessages } from "../../i18n";
 
-const RECORD_TITLES: Record<Exclude<TopShelfBoard, "champions">, [string, string]> = {
-  crowned: ["👑", "most crowned"],
-  tiered: ["📊", "most tiered"],
-  highestTier: ["⭐", "highest tier"],
-  quizzed: ["❓", "most quizzed"],
-  risingStar: ["🌱", "rising star"],
-};
+type MessageKey = Extract<keyof MobileMessages, string>;
 
-const VOTE_VERBS = { tierlist: "Rank it yourself", quiz: "Play it yourself", tournament: "Vote in the bracket" } as const;
+const RECORD_TITLES = {
+  crowned: "sharing.recapCrownedTitle",
+  tiered: "sharing.recapTieredTitle",
+  highestTier: "sharing.recapHighestTierTitle",
+  quizzed: "sharing.recapQuizzedTitle",
+  risingStar: "sharing.recapRisingStarTitle",
+} as const satisfies Record<Exclude<TopShelfBoard, "champions">, MessageKey>;
 
-export function recapTitle(card: TopShelfRecapCard, month: string): string {
-  const locale = getLocale();
+const VOTE_CTAS = {
+  tierlist: "sharing.recapCtaRank",
+  quiz: "sharing.recapCtaPlay",
+  tournament: "sharing.recapCtaVote",
+} as const satisfies Record<string, MessageKey>;
+
+export function recapTitle(card: TopShelfRecapCard, month: string, locale: Locale): string {
+  const t = translatorFor(locale);
   const name = recapMonthName(month, locale);
   switch (card.kind) {
-    case "summary": return `${name} on Atmyshelf`;
-    case "hottestGame": return `🔥 ${name}'s hottest game`;
-    case "dailyChapter": return `📖 ${name}'s Daily Chapter`;
-    case "book": {
-      if (card.board === "champions") return "Book of the month";
-      const [emoji, words] = RECORD_TITLES[card.board];
-      return `${emoji} ${name}'s ${words}`;
-    }
+    case "summary": return t("sharing.recapSummaryTitle", { month: name });
+    case "hottestGame": return t("sharing.recapHottestTitle", { month: name });
+    case "dailyChapter": return t("sharing.recapDailyTitle", { month: name });
+    case "book": return card.board === "champions" ? t("sharing.bookOfTheMonth") : t(RECORD_TITLES[card.board], { month: name });
   }
 }
 
-export function recapNumber(card: TopShelfRecapCard): string {
+export function recapNumber(card: TopShelfRecapCard, locale: Locale): string {
+  const t = translatorFor(locale);
   switch (card.kind) {
-    case "summary": return `${card.gamesPublished} games published\n${card.votesCast} votes cast\n${card.booksInPlay} books in play`;
-    case "hottestGame": return gameScoreLabel(card.game);
+    case "summary": return [t("sharing.recapSummaryGames", { count: card.gamesPublished }), t("sharing.recapSummaryVotes", { count: card.votesCast }), t("sharing.recapSummaryBooks", { count: card.booksInPlay })].join("\n");
+    case "hottestGame": return gameScoreLabel(card.game, locale);
     case "dailyChapter": return [
-      `${plural(card.players, "reader", "readers")} played`,
-      ...(card.hardest ? [`Hardest: ${card.hardest.title} · ${card.hardest.average}/5`] : []),
-      ...(card.mostMissed ? [`Most missed: ${card.mostMissed.title} · ${card.mostMissed.missedPercent}%`] : []),
-      ...(card.topPlayers.length ? [`Most perfect: ${card.topPlayers.map((p) => `@${p.username} (${p.perfect})`).join(", ")}`] : []),
+      t("sharing.recapDailyPlayed", { count: card.players }),
+      ...(card.hardest ? [t("sharing.recapHardest", { title: card.hardest.title, average: decimalText(card.hardest.average, locale) })] : []),
+      ...(card.mostMissed ? [t("sharing.recapMostMissed", { title: card.mostMissed.title, percent: card.mostMissed.missedPercent })] : []),
+      ...(card.topPlayers.length ? [t("sharing.recapMostPerfect", { players: card.topPlayers.map((p) => `@${p.username} (${p.perfect})`).join(", ") })] : []),
     ].join("\n");
-    case "book": return valueLabel(card.board, card.book.value);
+    case "book": return valueLabel(card.board, card.book.value, locale);
   }
 }
 
-export function recapCta(card: TopShelfRecapCard, currentMonth: string): string {
-  const locale = getLocale();
+export function recapCta(card: TopShelfRecapCard, currentMonth: string, locale: Locale): string {
+  const t = translatorFor(locale);
   switch (card.kind) {
-    case "summary": return "Join in on Atmyshelf";
-    case "dailyChapter": return "Play today's Daily Chapter";
-    case "hottestGame": return card.open ? "Play it yourself" : "See how it ended";
-    case "book": return card.game ? `${VOTE_VERBS[card.game.content.kind]} — it counts for ${recapMonthName(currentMonth, locale)}` : `See ${card.book.title} on Atmyshelf`;
+    case "summary": return t("sharing.recapCtaSummary");
+    case "dailyChapter": return t("sharing.recapCtaDaily");
+    case "hottestGame": return t(card.open ? "sharing.recapCtaPlayYourself" : "sharing.recapCtaSeeHowItEnded");
+    case "book": return card.game ? t(VOTE_CTAS[card.game.content.kind], { month: recapMonthName(currentMonth, locale) }) : t("sharing.recapCtaBook", { title: card.book.title });
   }
 }
 

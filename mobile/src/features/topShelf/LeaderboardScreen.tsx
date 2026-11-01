@@ -10,6 +10,7 @@ import { contentTarget } from "../community/communityHome";
 import { workPath } from "../works/workPath";
 import { fetchTopShelf } from "./api";
 import { TopShelfBar } from "./TopShelfBar";
+import { useLocale, useT } from "../../i18n";
 import { barFraction, boardTitle, gameScore, gameScoreLabel, isTopShelfView, valueLabel } from "./topShelfModel";
 
 const COVER = { width: 40, height: 60 } as const;
@@ -23,6 +24,8 @@ export function LeaderboardScreen({ view, period: initialPeriod, genre: initialG
 
 function Leaderboard({ view, initialPeriod, initialGenre }: { view: TopShelfView; initialPeriod: TopShelfPeriod; initialGenre: string | null }) {
   const { colors } = useTheme();
+  const t = useT();
+  const locale = useLocale();
   const segments = useSegments();
   const [period, setPeriod] = useState(initialPeriod);
   const [chosenGenre, setGenre] = useState(initialGenre);
@@ -47,7 +50,7 @@ function Leaderboard({ view, initialPeriod, initialGenre }: { view: TopShelfView
         cover: game.item.content.covers[0] ?? null,
         title: game.item.content.name,
         subtitle: game.item.author.username,
-        label: gameScoreLabel(game),
+        label: gameScoreLabel(game, locale),
         fraction: barFraction("champions", gameScore(game), leader),
         onPress: () => router.push(contentTarget(game.item.content) as never),
       }));
@@ -59,7 +62,7 @@ function Leaderboard({ view, initialPeriod, initialGenre }: { view: TopShelfView
       cover: book.coverUrl,
       title: book.title,
       subtitle: book.author,
-      label: valueLabel(board, book.value),
+      label: valueLabel(board, book.value, locale),
       fraction: barFraction(board, book.value, books[0]?.value ?? 0),
       onPress: () => router.push(workPath(book.workId, segments) as never),
     }));
@@ -68,12 +71,12 @@ function Leaderboard({ view, initialPeriod, initialGenre }: { view: TopShelfView
   function body() {
     if (query.isError || !data) {
       return query.isError
-        ? <View style={styles.page}><ErrorState body={query.error instanceof Error ? query.error.message : "Couldn't load this leaderboard."} actionLabel="Retry" onAction={() => void query.refetch()} /></View>
+        ? <View style={styles.page}><ErrorState body={query.error instanceof Error ? query.error.message : t("sharing.leaderboardLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void query.refetch()} /></View>
         : <View style={styles.page}><Skeleton height={200} /></View>;
     }
     const list = rows();
     if (list.length === 0) {
-      return <View style={styles.page}><EmptyState title={`Nothing here yet${data.period === "month" ? " this month" : ""}${isGames ? "." : " — games count once 5 people vote."}`} /></View>;
+      return <View style={styles.page}><EmptyState title={t(isGames ? (data.period === "month" ? "sharing.nothingGamesMonth" : "sharing.nothingGamesAll") : (data.period === "month" ? "sharing.nothingHereMonth" : "sharing.nothingHereAll"))} /></View>;
     }
     return list.map((row, index) => (
       <Pressable key={row.key} accessibilityRole="button" accessibilityLabel={`${index + 1}. ${row.title}, ${row.label}`} onPress={row.onPress}>
@@ -96,7 +99,7 @@ function Leaderboard({ view, initialPeriod, initialGenre }: { view: TopShelfView
   }
 
   return <Screen top={false}>
-    <Stack.Screen options={{ headerShown: true, title: boardTitle(view, genre), headerLargeTitleEnabled: false }} />
+    <Stack.Screen options={{ headerShown: true, title: boardTitle(view, genre, locale), headerLargeTitleEnabled: false }} />
     <ScrollView stickyHeaderIndices={[0]} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.list}>
       {bar}
       {body()}

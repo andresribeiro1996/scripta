@@ -11,11 +11,14 @@ import { publicContentUrl } from "../sharing/links";
 import { workPath } from "../works/workPath";
 import { fetchRecap, fetchRecapIndex } from "./api";
 import { RECAP_COLORS, RecapCard } from "./RecapCard";
+import { useLocale, useT } from "../../i18n";
 import { recapLinkPath, recapTitle } from "./recapModel";
 
 const missing = (error: unknown) => error instanceof ApiError && (error.status === 404 || error.status === 400);
 
 export function RecapScreen({ month }: { month: string }) {
+  const t = useT();
+  const locale = useLocale();
   const insets = useSafeAreaInsets();
   const segments = useSegments();
   const [index, setIndex] = useState(0);
@@ -49,16 +52,16 @@ export function RecapScreen({ month }: { month: string }) {
   useEffect(() => {
     if (!sharing || !card) return;
     let active = true;
-    void publicContentUrl(recapLinkPath(card)).then((url) => { if (active) { setShareUrl(url); setLinkError(null); } }).catch((reason) => { if (active) setLinkError(reason instanceof Error ? reason.message : "Couldn't create a public link."); });
+    void publicContentUrl(recapLinkPath(card)).then((url) => { if (active) { setShareUrl(url); setLinkError(null); } }).catch((reason) => { if (active) setLinkError(reason instanceof Error ? reason.message : t("sharing.publicLinkFailed")); });
     return () => { active = false; };
-  }, [sharing, card, linkAttempt]);
+  }, [sharing, card, linkAttempt, t]);
 
   const onCoversReady = useCallback(() => setCoversReady(true), []);
 
   if (unknown) return <View style={styles.root} />;
   if (recap.isError || recapIndex.isError) {
     return <View style={[styles.root, styles.center]}>
-      <ErrorState body="Couldn't load this recap." actionLabel="Retry" onAction={() => { void recap.refetch(); void recapIndex.refetch(); }} />
+      <ErrorState body={t("sharing.recapLoadFailed")} actionLabel={t("shell.retry")} onAction={() => { void recap.refetch(); void recapIndex.refetch(); }} />
       <CloseButton top={insets.top} onPress={close} />
     </View>;
   }
@@ -84,17 +87,17 @@ export function RecapScreen({ month }: { month: string }) {
 
   return (
     <View style={styles.root} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Next card" accessibilityHint="Tap the left side to go back, the right side to go on" accessibilityActions={[{ name: "activate" }, { name: "previous", label: "Previous card" }]} onAccessibilityAction={onAccessibilityAction} style={styles.fill} onPress={step}>
+      <Pressable accessibilityRole="button" accessibilityLabel={t("sharing.recapNextCard")} accessibilityHint={t("sharing.recapNextHint")} accessibilityActions={[{ name: "activate" }, { name: "previous", label: t("sharing.recapPreviousCard") }]} onAccessibilityAction={onAccessibilityAction} style={styles.fill} onPress={step}>
         <RecapCard card={card} month={month} currentMonth={currentMonth} onOpen={card.kind === "summary" ? undefined : open} />
       </Pressable>
       <View pointerEvents="none" style={[styles.dots, { top: insets.top + spacing.md }]}>
         {cards.map((_, position) => <View key={position} style={[styles.dot, { backgroundColor: position <= index ? RECAP_COLORS.gold : RECAP_COLORS.border }]} />)}
       </View>
       <CloseButton top={insets.top + spacing.lg} onPress={close} />
-      <Pressable accessibilityRole="button" accessibilityLabel="Share this card" onPress={() => setSharing(true)} style={[styles.share, { bottom: insets.bottom + spacing.lg }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={t("sharing.recapShareCard")} onPress={() => setSharing(true)} style={[styles.share, { bottom: insets.bottom + spacing.lg }]}>
         <Icon name="share" size={20} color={RECAP_COLORS.gold} />
       </Pressable>
-      <ContentShareSheet visible={sharing} onClose={() => setSharing(false)} title={recapTitle(card, month)} url={shareUrl} linkError={linkError} onRetryLink={() => setLinkAttempt((value) => value + 1)} imageReady={shareUrl !== null && coversReady}>
+      <ContentShareSheet visible={sharing} onClose={() => setSharing(false)} title={recapTitle(card, month, locale)} url={shareUrl} linkError={linkError} onRetryLink={() => setLinkAttempt((value) => value + 1)} imageReady={shareUrl !== null && coversReady}>
         {shareUrl ? <RecapCard sharing card={card} month={month} currentMonth={currentMonth} url={shareUrl} onCoversReady={onCoversReady} /> : null}
       </ContentShareSheet>
     </View>
@@ -102,7 +105,8 @@ export function RecapScreen({ month }: { month: string }) {
 }
 
 function CloseButton({ top, onPress }: { top: number; onPress: () => void }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel="Close recap" onPress={onPress} style={[styles.close, { top }]}><Icon name="close" size={20} color={RECAP_COLORS.text} /></Pressable>;
+  const t = useT();
+  return <Pressable accessibilityRole="button" accessibilityLabel={t("sharing.recapClose")} onPress={onPress} style={[styles.close, { top }]}><Icon name="close" size={20} color={RECAP_COLORS.text} /></Pressable>;
 }
 
 const styles = StyleSheet.create({

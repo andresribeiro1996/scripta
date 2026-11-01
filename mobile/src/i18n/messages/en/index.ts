@@ -5,7 +5,8 @@ import { community } from "./community";
 import { errors } from "./errors";
 import { library } from "./library";
 import { settings } from "./settings";
+import { sharing } from "./sharing";
 import { shell } from "./shell";
 
-export const en = { ...addBook, ...book, ...community, ...errors, ...library, ...settings, ...shell } satisfies Messages;
+export const en = { ...addBook, ...book, ...community, ...errors, ...library, ...settings, ...sharing, ...shell } satisfies Messages;
 export type MobileMessages = typeof en;

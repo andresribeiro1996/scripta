@@ -7,12 +7,13 @@ import { recapMonthName } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { IconButton, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { fetchRecapIndex } from "./api";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 const dismissedKey = (month: string) => `topShelfRecapDismissed:${month}`;
 
 export function RecapHomeCard() {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const index = useQuery({ queryKey: ["topShelfRecaps"], queryFn: fetchRecapIndex, retry: false });
   const month = index.data?.announce ? index.data.months[0] : undefined;
@@ -37,11 +38,11 @@ export function RecapHomeCard() {
   };
   return (
     <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Play ${name} recap`} onPress={() => router.push(`/recap/${month}` as never)} style={styles.body}>
-        <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{`${name} recap is ready`}</Text>
-        <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.accent }]}>▶ Play it</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel={t("sharing.recapPlayLabel", { month: name })} onPress={() => router.push(`/recap/${month}` as never)} style={styles.body}>
+        <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{t("sharing.recapReady", { month: name })}</Text>
+        <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.accent }]}>{t("sharing.recapPlayIt")}</Text>
       </Pressable>
-      <IconButton name="close" accessibilityLabel={`Dismiss ${name} recap`} onPress={dismiss} />
+      <IconButton name="close" accessibilityLabel={t("sharing.recapDismiss", { month: name })} onPress={dismiss} />
     </View>
   );
 }

@@ -10,6 +10,8 @@ export { getLocale, getLocalePreference, setDeviceLocaleTags, setLocalePreferenc
 
 const translators: Record<Locale, Translate<MobileMessages>> = { en: createTranslator(en), "pt-PT": createTranslator(ptPT) };
 
+export const translatorFor = (locale: Locale): Translate<MobileMessages> => translators[locale];
+
 export function useLocale(): Locale {
   return useSyncExternalStore(subscribeLocale, getLocale, getLocale);
 }
@@ -18,4 +20,4 @@ export function useT(): Translate<MobileMessages> {
   return translators[useLocale()];
 }
 
-export const t: Translate<MobileMessages> = (key, vars) => translators[getLocale()](key, vars);
+export const t: Translate<MobileMessages> = (key, vars) => translatorFor(getLocale())(key, vars);

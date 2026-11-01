@@ -9,12 +9,14 @@ import { EmptyState, ErrorState, Skeleton } from "../../ui";
 import { MuralScreen } from "../murals/MuralScreen";
 import { spacing, typography, useTheme } from "../../ui/theme";
 import type { GalleryImage } from "../gallery/api";
+import { useT } from "../../i18n";
 import { MuralCanvas } from "../murals";
 import type { Tierlist } from "../tierlists/api";
 import { reconstructBooks, reconstructTierlists } from "./adapters";
 import { fetchSharedMural } from "./api";
 
 export function SharedMuralScreen({ token }: { token: string }) {
+  const t = useT();
   const { colors } = useTheme();
   const query = useQuery({ queryKey: ["shared-mural", token], queryFn: () => fetchSharedMural(token), enabled: Boolean(token), retry: false });
   const books = useMemo(() => query.data ? reconstructBooks(query.data.books, query.data.currentlyReading, query.data.highlights) : [], [query.data]);
@@ -22,12 +24,12 @@ export function SharedMuralScreen({ token }: { token: string }) {
   const tierlists = useMemo<Tierlist[]>(() => reconstructTierlists(query.data?.tierlists ?? {}), [query.data]);
 
   if (query.isPending) return <View style={[styles.center, { backgroundColor: colors.background }]}><Skeleton height={180} /></View>;
-  if (query.isError || !query.data) return <View style={[styles.center, { backgroundColor: colors.background }]}><ErrorState title="Mural unavailable" body="This link is invalid or no longer active." actionLabel={isPermanentError(query.error) ? "Go to Atmyshelf" : "Retry"} onAction={isPermanentError(query.error) ? () => router.replace("/") : () => void query.refetch()} /></View>;
+  if (query.isError || !query.data) return <View style={[styles.center, { backgroundColor: colors.background }]}><ErrorState title={t("sharing.muralUnavailable")} body={t("sharing.linkInvalidOrInactive")} actionLabel={isPermanentError(query.error) ? t("shell.notFoundAction") : t("shell.retry")} onAction={isPermanentError(query.error) ? () => router.replace("/") : () => void query.refetch()} /></View>;
   const mural: Mural = { ...query.data.mural, blocks: ensureBookBlockHeights(query.data.mural.blocks), coverImageId: undefined, coverImageUrl: query.data.mural.coverImageUrl ?? undefined, shareToken: null, shareUrl: null, folderId: null, createdAt: "", updatedAt: "" };
   return <MuralScreen bottom theme={muralThemeId(mural.theme)}>
     <Stack.Screen options={{ headerShown: true, title: mural.name }} />
     <ScrollView contentContainerStyle={styles.screen}>
-    {mural.blocks.length ? <MuralCanvas mural={mural} books={books} images={images} tierlists={tierlists} profile={query.data.profile} shelfThemeOverride={query.data.shelfTheme} readerCardOverride={query.data.readerCard} statsOverride={query.data.stats} /> : <EmptyState title="This mural is empty" />}
+    {mural.blocks.length ? <MuralCanvas mural={mural} books={books} images={images} tierlists={tierlists} profile={query.data.profile} shelfThemeOverride={query.data.shelfTheme} readerCardOverride={query.data.readerCard} statsOverride={query.data.stats} /> : <EmptyState title={t("sharing.muralEmpty")} />}
     </ScrollView>
   </MuralScreen>;
 }
