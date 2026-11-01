@@ -13,5 +13,5 @@ export function DailyChapterTiles({ summary }: { summary: Pick<DailyChapterPlaye
     <Text {...dynamicType} style={[typography.heading, { alignSelf: "stretch", textAlign: "center", color: colors.text, fontWeight: "700" }]}>{value}</Text>
     <Text {...dynamicType} style={[typography.caption, { alignSelf: "stretch", textAlign: "center", color: colors.textDim }]}>{label}</Text>
   </View>;
-  return <View style={{ flexDirection: "row", gap: spacing.sm }}>{tile(String(summary.streak), t("quizzes.statStreak"))}{tile(decimalText(summary.average, locale), t("quizzes.statAverage"))}{tile(String(summary.perfect), t("quizzes.statPerfect"))}</View>;
+  return <View style={{ flexDirection: "row", gap: spacing.sm }}>{tile(String(summary.streak), t("quizzes.statStreak", { count: summary.streak }))}{tile(decimalText(summary.average, locale), t("quizzes.statAverage"))}{tile(String(summary.perfect), t("quizzes.statPerfect", { count: summary.perfect }))}</View>;
 }

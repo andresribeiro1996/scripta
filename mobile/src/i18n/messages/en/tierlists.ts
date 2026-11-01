@@ -83,7 +83,7 @@ export const tierlists = {
   "tierlists.allBooksRanked": "All books ranked",
   "tierlists.allCharactersRanked": "All characters ranked",
   "tierlists.saveBoard": "Save board",
-  "tierlists.rankLeft": "Rank · {count} left",
+  "tierlists.rankLeft": { one: "Rank · {count} left", other: "Rank · {count} left" },
   "tierlists.continueRanking": "Continue ranking",
   "tierlists.editVotes": "Edit votes",
   "tierlists.rankYourVotes": "Rank your votes",

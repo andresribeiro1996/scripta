@@ -84,7 +84,7 @@ export const tierlists: CatalogOf<typeof en> = {
   "tierlists.allBooksRanked": "Todos os livros classificados",
   "tierlists.allCharactersRanked": "Todas as personagens classificadas",
   "tierlists.saveBoard": "Guardar tabela",
-  "tierlists.rankLeft": "Classificar · faltam {count}",
+  "tierlists.rankLeft": { one: "Classificar · falta {count}", other: "Classificar · faltam {count}" },
   "tierlists.continueRanking": "Continuar a classificar",
   "tierlists.editVotes": "Editar votos",
   "tierlists.rankYourVotes": "Classificar os seus votos",

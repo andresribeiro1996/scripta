@@ -87,7 +87,7 @@ export const book: CatalogOf<typeof en> = {
   "book.bracketSize": "Tamanho do quadro",
   "book.roundDurationHours": "Duração da ronda (horas)",
   "book.castTicked": "{count} de {size} personagens",
-  "book.castSelected": "{count} personagens",
+  "book.castSelected": { one: "{count} personagem", other: "{count} personagens" },
   "book.gameCreateFailed": "Não foi possível criar o jogo.",
   "book.createTierlist": "Criar tabela de níveis",
   "book.createTournament": "Criar torneio",

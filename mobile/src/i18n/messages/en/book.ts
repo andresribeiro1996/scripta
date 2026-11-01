@@ -86,7 +86,7 @@ export const book = {
   "book.bracketSize": "Bracket size",
   "book.roundDurationHours": "Round duration (hours)",
   "book.castTicked": "{count} of {size} characters",
-  "book.castSelected": "{count} characters",
+  "book.castSelected": { one: "{count} characters", other: "{count} characters" },
   "book.gameCreateFailed": "Couldn't create the game.",
   "book.createTierlist": "Create tier list",
   "book.createTournament": "Create tournament",

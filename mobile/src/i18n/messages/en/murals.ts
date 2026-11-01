@@ -41,7 +41,7 @@ export const murals = {
   "murals.cornerRounded": "Rounded",
   "murals.cornerSlight": "Slight",
   "murals.cornerSquare": "Square",
-  "murals.countFinished": "{count} finished",
+  "murals.countFinished": { one: "{count} finished", other: "{count} finished" },
   "murals.countReading": "{count} reading",
   "murals.countToRead": "{count} to read",
   "murals.createFailed": "Couldn't create the mural. Try again.",

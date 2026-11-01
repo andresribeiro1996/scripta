@@ -42,7 +42,7 @@ export const murals: CatalogOf<typeof en> = {
   "murals.cornerRounded": "Arredondado",
   "murals.cornerSlight": "Ligeiro",
   "murals.cornerSquare": "Quadrado",
-  "murals.countFinished": "{count} lidos",
+  "murals.countFinished": { one: "{count} lido", other: "{count} lidos" },
   "murals.countReading": "{count} a ler",
   "murals.countToRead": "{count} por ler",
   "murals.createFailed": "Não foi possível criar o mural. Tente novamente.",
