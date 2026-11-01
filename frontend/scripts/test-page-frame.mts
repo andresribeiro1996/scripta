@@ -39,7 +39,7 @@ test("the row nav and side nav share one tab-link helper", () => {
 
 test("the Appearance tab uses the Account tab's group: a heading above its panel", () => {
   const src = readFileSync(new URL("../src/pages/SettingsAppearancePage.tsx", import.meta.url), "utf8");
-  assert.match(src, /<SettingGroup title="Appearance">\s*<div className=\{`\$\{PANEL\} p-5`\}>/);
+  assert.match(src, /<SettingGroup title=\{t\("shell\.tabAppearance"\)\}>\s*<div className=\{`\$\{PANEL\} p-5`\}>/);
   assert.doesNotMatch(src, /<h[1-6]/);
 });
 

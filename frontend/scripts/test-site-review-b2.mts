@@ -79,7 +79,7 @@ test("save status announces saving and saved, and is blank when idle", () => {
 
 test("the library style preview sits before the controls and stays in view", () => {
   const page = src("pages/LibraryStylePage.tsx");
-  assert.ok(page.indexOf("Preview{") < page.indexOf('<Section title="Card layout">'));
+  assert.ok(page.indexOf('t("settings.preview")') < page.indexOf('<Section title={t("settings.cardLayout")}>'));
   assert.match(page, /sticky top-\[calc\(var\(--app-top\)\+0\.5rem\)\]/);
   assert.match(page, /grid items-start gap-6/);
 });

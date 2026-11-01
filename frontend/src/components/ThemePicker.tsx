@@ -3,10 +3,12 @@ import { THEME_IDS, type ThemePreference } from "@scripta/shared/themes";
 import { isAppearanceSyncFailure, saveAccountAppearance } from "../api/appearance";
 import { fadeToThemePreference, useThemePreference } from "../lib/theme";
 import { ThemeOptionGrid } from "./ThemeOptionGrid";
+import { useT } from "../i18n";
 
 const OPTIONS: ThemePreference[] = ["system", ...THEME_IDS];
 
 export function ThemePicker() {
+  const t = useT();
   const selected = useThemePreference();
   const [error, setError] = useState<string | null>(null);
 
@@ -17,7 +19,7 @@ export function ThemePicker() {
       await saveAccountAppearance({ theme: preference });
     } catch (err) {
       if (!isAppearanceSyncFailure(err)) throw err;
-      setError("Couldn't save to your account. Try again.");
+      setError(t("settings.languageSaveFailed"));
     }
   }
 

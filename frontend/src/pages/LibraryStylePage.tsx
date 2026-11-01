@@ -1,5 +1,5 @@
 import { CHECKBOX_CLASS } from "../components/Toolbar";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { saveFailureMessage } from "@scripta/shared";
 import { BookCard } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
@@ -21,7 +21,7 @@ import {
   type LibraryStyleSettings,
   type PerCardStyle
 } from "../lib/libraryStyle";
-import { getLocale } from "../i18n";
+import { getLocale, useT } from "../i18n";
 
 // A flat-color SVG, inlined as a data: URI — stands in for a "real cover"
 // in the preview below without spending an actual network request on one.
@@ -36,14 +36,17 @@ const SAMPLE_COVER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/sv
 // `_coverUrl` (see above) so the "Show title and author" toggle actually
 // has something to demonstrate: with a cover, hiding the text is possible;
 // without one, BookCard keeps showing it regardless of the setting.
-const PREVIEW_BOOKS: Array<Record<string, unknown>> = [
-  { ContentID: "preview-1", Title: "Sample Book One", Attribution: "A. Author", ReadStatus: 1, ___PercentRead: 55, highlights: [], _coverUrl: SAMPLE_COVER },
-  { ContentID: "preview-2", Title: "Sample Book Two", Attribution: "B. Author", ReadStatus: 2, ___PercentRead: 100, highlights: [{ BookmarkID: "p1" }], _coverUrl: SAMPLE_COVER },
-  { ContentID: "preview-3", Title: "Sample Book Three (no cover)", Attribution: "C. Author", ReadStatus: 0, ___PercentRead: 0, highlights: [] },
-  { ContentID: "preview-4", Title: "Sample Book Four (no cover)", Attribution: "D. Author", ReadStatus: 1, ___PercentRead: 20, highlights: [] }
-];
+function previewBooksFor(t: ReturnType<typeof useT>): Array<Record<string, unknown>> {
+  return [
+    { ContentID: "preview-1", Title: t("settings.sampleBookOne"), Attribution: t("settings.sampleAuthor", { initial: "A" }), ReadStatus: 1, ___PercentRead: 55, highlights: [], _coverUrl: SAMPLE_COVER },
+    { ContentID: "preview-2", Title: t("settings.sampleBookTwo"), Attribution: t("settings.sampleAuthor", { initial: "B" }), ReadStatus: 2, ___PercentRead: 100, highlights: [{ BookmarkID: "p1" }], _coverUrl: SAMPLE_COVER },
+    { ContentID: "preview-3", Title: t("settings.sampleBookThree"), Attribution: t("settings.sampleAuthor", { initial: "C" }), ReadStatus: 0, ___PercentRead: 0, highlights: [] },
+    { ContentID: "preview-4", Title: t("settings.sampleBookFour"), Attribution: t("settings.sampleAuthor", { initial: "D" }), ReadStatus: 1, ___PercentRead: 20, highlights: [] }
+  ];
+}
 
 export function LibraryStylePage() {
+  const t = useT();
   const { data: library, updateLibrary } = useLibrary();
   const toast = useToast();
 
@@ -67,7 +70,7 @@ export function LibraryStylePage() {
 
   function saveStyle(next: LibraryStyleSettings) {
     updateLibrary((data) => ({ ...data, style: next })).catch((error) => {
-      toast({ message: saveFailureMessage(error, "Couldn't save the style change.", getLocale()), kind: "error" });
+      toast({ message: saveFailureMessage(error, t("settings.couldntSaveStyle"), getLocale()), kind: "error" });
     });
   }
 
@@ -96,18 +99,19 @@ export function LibraryStylePage() {
     saveNow({ ...draft, ...patch });
   }
 
-  const previewBooks = library?.data.books.length ? library.data.books.slice(0, 4) : PREVIEW_BOOKS;
+  const sampleBooks = useMemo(() => previewBooksFor(t), [t]);
+  const previewBooks = library?.data.books.length ? library.data.books.slice(0, 4) : sampleBooks;
   const usingCustomBackground = draft.backgroundColor !== null;
 
   return (
-    <Page title="Settings" subtitle="Everything about how your cards and the canvas behind them look — applied across Library, Series, and Collections." tabs={area("settings").tabs} sideTabs>
+    <Page title={t("shell.areaSettings")} subtitle={t("settings.libraryStyleSubtitle")} tabs={area("settings").tabs} sideTabs>
       <p className="mb-6 text-sm text-(--color-text-dim)">
-        These settings stay inside your books: they never restyle the app's own menus, page headers, or search and filter bar. A series can override its own card appearance from its own style panel (Series page) — those settings take priority over these for that series' cards.
+        {t("settings.libraryStyleIntro")}
       </p>
 
       <div className="sticky top-[calc(var(--app-top)+0.5rem)] z-10 mb-6 bg-(--color-bg) pb-2">
         <h2 className={`${SECTION_HEADING} mb-3`}>
-          Preview{!library?.data.books.length && " (sample books — your library is empty)"}
+          {library?.data.books.length ? t("settings.preview") : t("settings.previewSample")}
         </h2>
         <div className="max-h-[40dvh] overflow-y-auto rounded-xl border border-dashed border-(--color-border)">
           <LibraryCanvas style={draft}>
@@ -121,10 +125,10 @@ export function LibraryStylePage() {
       </div>
 
       <div className="mb-6 grid items-start gap-6 sm:grid-cols-2">
-        <Section title="Card layout">
-          <SliderRow id="card-size" label="Card size" value={draft.cardMinWidth} range={CARD_MIN_WIDTH_RANGE} onChange={(v) => applyDraft({ ...draft, cardMinWidth: v })} />
-          <SliderRow id="card-gap" label="Spacing between cards" value={draft.cardGap} range={CARD_GAP_RANGE} onChange={(v) => applyDraft({ ...draft, cardGap: v })} />
-          <SliderRow id="row-gap" label="Spacing between rows" value={draft.rowGap} range={CARD_GAP_RANGE} onChange={(v) => applyDraft({ ...draft, rowGap: v })} />
+        <Section title={t("settings.cardLayout")}>
+          <SliderRow id="card-size" label={t("settings.cardSize")} value={draft.cardMinWidth} range={CARD_MIN_WIDTH_RANGE} onChange={(v) => applyDraft({ ...draft, cardMinWidth: v })} />
+          <SliderRow id="card-gap" label={t("settings.cardSpacing")} value={draft.cardGap} range={CARD_GAP_RANGE} onChange={(v) => applyDraft({ ...draft, cardGap: v })} />
+          <SliderRow id="row-gap" label={t("settings.rowSpacing")} value={draft.rowGap} range={CARD_GAP_RANGE} onChange={(v) => applyDraft({ ...draft, rowGap: v })} />
         </Section>
 
         <CardAppearanceSection idPrefix="lib" draft={draft} onApply={applyCardPatch} onSaveNow={saveCardPatchNow} />
@@ -132,7 +136,7 @@ export function LibraryStylePage() {
         <CardContentSection idPrefix="lib" draft={draft} onApply={applyCardPatch} onSaveNow={saveCardPatchNow} />
         <CardTextSection idPrefix="lib" draft={draft} onApply={applyCardPatch} onSaveNow={saveCardPatchNow} />
 
-        <Section title="Library canvas" wide>
+        <Section title={t("settings.libraryCanvas")} wide>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <div className="mb-1 flex items-center justify-between">
@@ -154,7 +158,7 @@ export function LibraryStylePage() {
                       }
                     }}
                   />
-                  Custom background color
+                  {t("settings.customBackgroundColor")}
                 </label>
               </div>
               {usingCustomBackground && (
@@ -169,7 +173,7 @@ export function LibraryStylePage() {
             <div />
             <SliderRow
               id="content-max-width"
-              label="Content width"
+              label={t("settings.contentWidth")}
               value={draft.contentMaxWidth}
               range={CONTENT_MAX_WIDTH_RANGE}
               onChange={(v) => applyDraft({ ...draft, contentMaxWidth: v })}
@@ -177,14 +181,14 @@ export function LibraryStylePage() {
             <div />
             <SliderRow
               id="content-padding-x"
-              label="Padding around books (sides)"
+              label={t("settings.paddingSides")}
               value={draft.contentPaddingX}
               range={CONTENT_PADDING_RANGE}
               onChange={(v) => applyDraft({ ...draft, contentPaddingX: v })}
             />
             <SliderRow
               id="content-padding-y"
-              label="Padding around books (top/bottom)"
+              label={t("settings.paddingTopBottom")}
               value={draft.contentPaddingY}
               range={CONTENT_PADDING_RANGE}
               onChange={(v) => applyDraft({ ...draft, contentPaddingY: v })}
@@ -197,12 +201,10 @@ export function LibraryStylePage() {
         onClick={() => saveNow(DEFAULT_LIBRARY_STYLE)}
         className={`${BUTTON_SECONDARY} mb-8`}
       >
-        Reset all to defaults
+        {t("settings.resetAll")}
       </button>
       <p className="text-xs text-(--color-text-dim)">
-        The dashed edge is where your canvas ends — the app's own menus, page header, and search bar sit outside it and
-        keep the app's theme no matter what you set here. Content width applies on the Library, Series and Collections
-        pages. Hover a card in the preview to see the shadow and hover animation settings.
+        {t("settings.canvasNote")}
       </p>
     </Page>
   );

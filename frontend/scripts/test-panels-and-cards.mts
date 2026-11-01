@@ -92,7 +92,7 @@ test("Settings: Library style groups sit under a PANEL_HEADING above their panel
   assert.match(controls, /<h2 className=\{`\$\{PANEL_HEADING\} mb-3`\}>\{title\}<\/h2>\s*\}\s*<div className=\{`\$\{PANEL\} p-4`\}>/);
   assert.doesNotMatch(controls, /<h4/);
   const style = src("pages/LibraryStylePage");
-  assert.match(style, /<h2 className=\{`\$\{SECTION_HEADING\} mb-3`\}>\s*Preview/);
+  assert.match(style, /<h2 className=\{`\$\{SECTION_HEADING\} mb-3`\}>\s*\{library\?\.data\.books\.length \? t\("settings\.preview"\)/);
   assert.match(style, /className=\{`\$\{BUTTON_SECONDARY\} mb-8`\}/);
 });
 
