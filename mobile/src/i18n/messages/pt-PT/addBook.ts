@@ -72,4 +72,5 @@ export const addBook: CatalogOf<typeof en> = {
   "addBook.importChooseFile": "Escolher ficheiro da biblioteca",
   "addBook.importFailed": "Não foi possível pré-visualizar essa importação.",
   "addBook.importFailedTitle": "Não foi possível pré-visualizar a importação",
+  "addBook.importBooksFound": { one: "{count} livro encontrado", other: "{count} livros encontrados" },
 };

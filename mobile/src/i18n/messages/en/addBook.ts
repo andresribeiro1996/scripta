@@ -71,4 +71,5 @@ export const addBook = {
   "addBook.importChooseFile": "Choose library file",
   "addBook.importFailed": "Couldn't preview that import.",
   "addBook.importFailedTitle": "Couldn't preview import",
+  "addBook.importBooksFound": { one: "{count} books found", other: "{count} books found" },
 } satisfies Messages;

@@ -36,7 +36,7 @@ export function ImportPreviewPanel({ pickFile }: { pickFile: ImportFilePicker })
       {preview ? (
         <View style={[styles.preview, { borderColor: colors.border, backgroundColor: colors.surface }]}>
           <Text style={[typography.title, { color: colors.text }]}>{t("library.readyToImport")}</Text>
-          <Text style={[typography.body, { color: colors.textDim }]}>{t("library.booksFound", { count: preview.data.books.length })}</Text>
+          <Text style={[typography.body, { color: colors.textDim }]}>{t("addBook.importBooksFound", { count: preview.data.books.length })}</Text>
           {preview.warnings.map((warning) => <Text key={warning} style={[typography.caption, { color: colors.danger }]}>{warning}</Text>)}
           {preview.data.books.slice(0, 3).map((book, index) => (
             <Text key={`${String(book.ContentID ?? book.Title ?? "book")}-${index}`} numberOfLines={1} style={[typography.body, { color: colors.text }]}>
