@@ -7,13 +7,15 @@ import { booksByWork, filterBooks, roundMinutesFromHours, seedCoverLookup, toSee
 import { Button, EmptyState, ErrorState, Input, Screen, Sheet, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { useLibrary, useWorkBooks } from "../library";
 import { createTournament, fetchTournament, randomFillTournament, resolveCover, setTournamentSlots, startTournament, type Tournament } from "./api";
-import { useLocale } from "../../i18n";
+import { decimalText } from "@scripta/shared/i18n";
+import { useLocale, useT } from "../../i18n";
 
 export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tournament; onStarted: (id: string) => void }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const queryClient = useQueryClient();
-  const [name, setName] = useState(tournament?.name ?? "Untitled tournament");
+  const [name, setName] = useState(tournament?.name ?? t("arena.untitledTournament"));
   const [size, setSize] = useState(tournament?.bracketSize ?? 16);
   const [duration, setDuration] = useState(String((tournament?.roundDurationMinutes ?? 1440) / 60));
   const [current, setCurrent] = useState(tournament);
@@ -46,7 +48,7 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
 
   async function materialize() {
     if (current) return current;
-    const created = await createTournament({ name: name.trim() || "Untitled tournament", bracketSize: size, roundDurationMinutes: roundMinutesFromHours(duration) });
+    const created = await createTournament({ name: name.trim() || t("arena.untitledTournament"), bracketSize: size, roundDurationMinutes: roundMinutesFromHours(duration.replace(",", ".")) });
     setCurrent(created);
     await queryClient.invalidateQueries({ queryKey: ["arena", "mine"] });
     return created;
@@ -70,7 +72,7 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
     try {
       await persist();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Couldn't save.");
+      setError(reason instanceof Error ? reason.message : t("arena.saveFailed"));
     } finally {
       setSaving(false);
       setBusy(false);
@@ -84,14 +86,14 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
       const lookup = seedCoverLookup(book);
       const cover = lookup ? await resolveCover(book) : null;
       const seed = toSeedBook(book, cover, locale);
-      if (!seed) throw new Error("That book isn't in the catalog.");
+      if (!seed) throw new Error(t("arena.bookNotInCatalog"));
       const next = [...slots];
       next[slotIndex] = seed;
       setSlots(next);
       setSlotToAssign(null);
       await persist(next);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Couldn't assign that book.");
+      setError(reason instanceof Error ? reason.message : t("arena.assignFailed"));
     } finally {
       setBusy(false);
     }
@@ -111,7 +113,7 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
       setSavedSlots(filled);
       await queryClient.invalidateQueries({ queryKey: ["arena"] });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Couldn't fill the bracket.");
+      setError(reason instanceof Error ? reason.message : t("arena.fillFailed"));
     } finally {
       setBusy(false);
     }
@@ -126,7 +128,7 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
       await queryClient.invalidateQueries({ queryKey: ["arena"] });
       onStarted(target.id);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Couldn't start the tournament.");
+      setError(reason instanceof Error ? reason.message : t("arena.startFailed"));
     } finally {
       setBusy(false);
     }
@@ -136,47 +138,47 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
   const isSaved = Boolean(current) && savedSlots !== null && JSON.stringify(slots) === JSON.stringify(savedSlots);
   return (
     <Screen top={false} style={styles.screen}>
-      <Stack.Screen options={{ headerShown: true, title: "Seed tournament" }} />
+      <Stack.Screen options={{ headerShown: true, title: t("arena.seedTitle") }} />
       {!current ? (
         <View style={styles.form}>
-          <Input label="Tournament name" value={name} onChangeText={setName} maxLength={200} />
-          <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>Bracket size</Text>
+          <Input label={t("arena.tournamentName")} value={name} onChangeText={setName} maxLength={200} />
+          <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>{t("book.bracketSize")}</Text>
           <View style={styles.row}>{[4, 8, 16, 32, 64].map((value) => <Button key={value} label={String(value)} variant={size === value ? "primary" : "secondary"} onPress={() => { setSize(value); setSlots(Array.from({ length: value }, () => null)); }} />)}</View>
-          <Input label="Round duration (hours)" keyboardType="decimal-pad" value={duration} onChangeText={setDuration} />
+          <Input label={t("book.roundDurationHours")} keyboardType="decimal-pad" value={duration} onChangeText={setDuration} />
         </View>
       ) : (
-        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{current.name} · {current.bracketSize} slots · {current.roundDurationMinutes / 60} h rounds</Text>
+        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("arena.seedSummary", { name: current.name, size: current.bracketSize, hours: decimalText(current.roundDurationMinutes / 60, locale) })}</Text>
       )}
       {error ? <Toast visible message={error} tone="error" /> : null}
       <View style={styles.actions}>
-        <Button label="Random fill" variant="secondary" loading={busy} disabled={!books.length} onPress={randomFill} />
-        <Button label={saving ? "Saving…" : isSaved ? "Saved" : "Save progress"} variant="secondary" disabled={busy || isSaved} onPress={() => void saveProgress()} />
-        <Button label="Start" loading={busy} disabled={slots.some((slot) => !slot)} onPress={start} />
+        <Button label={t("arena.randomFill")} variant="secondary" loading={busy} disabled={!books.length} onPress={randomFill} />
+        <Button label={saving ? t("shell.saving") : isSaved ? t("shell.saved") : t("arena.saveProgress")} variant="secondary" disabled={busy || isSaved} onPress={() => void saveProgress()} />
+        <Button label={t("arena.start")} loading={busy} disabled={slots.some((slot) => !slot)} onPress={start} />
       </View>
-      {slots.some((slot) => !slot) ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Fill every slot to start.</Text> : null}
-      {library.isSuccess && !books.length ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Random fill needs books in your library.</Text> : null}
-      {library.isPending ? <Skeleton height={120} /> : library.isError ? <ErrorState body="Your library couldn't be loaded." actionLabel="Retry" onAction={() => void library.refetch()} /> : (
+      {slots.some((slot) => !slot) ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("arena.fillEverySlot")}</Text> : null}
+      {library.isSuccess && !books.length ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("arena.randomFillNeedsBooks")}</Text> : null}
+      {library.isPending ? <Skeleton height={120} /> : library.isError ? <ErrorState body={t("arena.libraryLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void library.refetch()} /> : (
         <FlatList
           data={slots}
           keyExtractor={(_, index) => String(index)}
           contentContainerStyle={styles.list}
-          ListEmptyComponent={<EmptyState title="No slots" />}
+          ListEmptyComponent={<EmptyState title={t("arena.noSlots")} />}
           renderItem={({ item, index }) => (
-            <Pressable accessibilityRole="button" accessibilityLabel={item ? `Slot ${index + 1}, ${item.title}. Change book` : `Assign slot ${index + 1}`} onPress={() => setSlotToAssign(index)} style={[styles.slot, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Slot {index + 1}</Text>
-              <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{item?.title ?? "Empty — tap to assign"}</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel={item ? t("arena.slotChange", { number: index + 1, title: item.title }) : t("arena.slotAssign", { number: index + 1 })} onPress={() => setSlotToAssign(index)} style={[styles.slot, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("arena.slotNumber", { number: index + 1 })}</Text>
+              <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{item?.title ?? t("arena.slotEmpty")}</Text>
             </Pressable>
           )}
         />
       )}
-      <Sheet visible={slotToAssign !== null} title={`Choose book for slot ${(slotToAssign ?? 0) + 1}`} onClose={() => setSlotToAssign(null)}>
-        <Input label="Search books" value={bookSearch} onChangeText={setBookSearch} placeholder="Title or author" autoCapitalize="none" autoCorrect={false} returnKeyType="search" />
+      <Sheet visible={slotToAssign !== null} title={t("arena.chooseBookForSlot", { number: (slotToAssign ?? 0) + 1 })} onClose={() => setSlotToAssign(null)}>
+        <Input label={t("arena.searchBooks")} value={bookSearch} onChangeText={setBookSearch} placeholder={t("arena.titleOrAuthor")} autoCapitalize="none" autoCorrect={false} returnKeyType="search" />
         <FlatList
           data={pickable}
           keyExtractor={(book) => workIdOf(book) ?? ""}
           style={styles.picker}
-          ListEmptyComponent={<EmptyState title="No available books" body={bookSearch ? "Try a different search." : "Every available book is already assigned."} />}
-          renderItem={({ item }) => <Pressable accessibilityLabel={`Assign ${String(item.Title ?? "Untitled")}`} accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => void seedBook(item, slotToAssign!)} style={styles.pickRow}><Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.text }]}>{String(item.Title ?? "Untitled")}</Text></Pressable>}
+          ListEmptyComponent={<EmptyState title={t("arena.noAvailableBooks")} body={bookSearch ? t("arena.tryDifferentSearch") : t("arena.allBooksAssigned")} />}
+          renderItem={({ item }) => <Pressable accessibilityLabel={t("arena.assignBook", { title: String(item.Title ?? t("library.untitled")) })} accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => void seedBook(item, slotToAssign!)} style={styles.pickRow}><Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.text }]}>{String(item.Title ?? t("library.untitled"))}</Text></Pressable>}
         />
       </Sheet>
     </Screen>

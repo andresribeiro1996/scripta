@@ -9,17 +9,19 @@
 
 import { Pressable, StyleSheet } from "react-native";
 import { Icon, radii, useTheme } from "../../ui";
+import { useT } from "../../i18n";
 
 export type BracketView = "rounds" | "classic";
 
 export function BracketViewToggle({ to, onPress }: { to: BracketView; onPress: () => void }) {
+  const t = useT();
   const { colors } = useTheme();
   const showingClassic = to === "rounds";
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: showingClassic }}
-      accessibilityLabel={showingClassic ? "Show the bracket round by round" : "Show the whole bracket at once"}
+      accessibilityLabel={t(showingClassic ? "arena.showRounds" : "arena.showWholeBracket")}
       hitSlop={10}
       onPress={onPress}
       style={({ pressed }) => [

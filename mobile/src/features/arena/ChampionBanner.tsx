@@ -7,18 +7,20 @@ import { Text } from "../../ui/Text";
 import type { DuelSide } from "@scripta/shared";
 import { Icon, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";
+import { useT } from "../../i18n";
 
 const COVER_WIDTH = 140;
 const COVER_HEIGHT = 210;
 
 export function ChampionBanner({ champion, character = false }: { champion: DuelSide; character?: boolean }) {
+  const t = useT();
   const { colors } = useTheme();
   return (
-    <View accessibilityLabel={character ? `Winner: ${champion.title}` : `Winner: ${champion.title} by ${champion.author}`} style={styles.wrap}>
+    <View accessibilityLabel={character ? t("arena.winnerTitle", { title: champion.title }) : t("arena.winnerTitleBy", { title: champion.title, author: champion.author })} style={styles.wrap}>
       <BookCover cover={champion.cover} title={champion.title} width={COVER_WIDTH} height={COVER_HEIGHT} />
       <View style={styles.label}>
         <Icon name="champion" size={16} color={colors.accent} />
-        <Text {...dynamicType} style={[typography.caption, styles.labelText, { color: colors.accent }]}>Winner</Text>
+        <Text {...dynamicType} style={[typography.caption, styles.labelText, { color: colors.accent }]}>{t("arena.winner")}</Text>
       </View>
       <Text {...dynamicType} numberOfLines={3} style={[typography.heading, styles.title, { color: colors.text }]}>{champion.title}</Text>
       {character ? null : <Text {...dynamicType} numberOfLines={1} style={[typography.body, styles.center, { color: colors.textDim }]}>{champion.author}</Text>}

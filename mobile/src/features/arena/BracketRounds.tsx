@@ -39,14 +39,15 @@
 import { Fragment, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View, type ScrollViewInstance } from "react-native";
 import { Text } from "../../ui/Text";
-import { bracketShape, countdownLabel, duelWinner, needsVote, roundLabel, sharePercent, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
+import { bracketShape, duelWinner, needsVote, roundLabel, sharePercent, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
 import { Icon, Sheet, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";
 import { DuelSideRow } from "./DuelSideRow";
 import { BracketViewToggle } from "./BracketViewToggle";
-import { matchNote, roundHeadline, tournamentChampion } from "./arenaView";
+import { sharedT } from "@scripta/shared/i18n";
+import { matchHeading, matchNote, roundHeadline, tournamentChampion } from "./arenaView";
 import type { TournamentView } from "./api";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 const BAR_HEIGHT = 64;
 // The strip's own height plus a gap, so the last match scrolls clear of it.
@@ -56,6 +57,7 @@ const COVER_WIDTH = 32;
 const COVER_HEIGHT = 48;
 
 function MatchRow({ side, character, isWinner, isChampion, decided, busy, blankTally, onPick }: { side: DuelSide; character: boolean; isWinner: boolean; isChampion: boolean; decided: boolean; busy: boolean; blankTally: boolean; onPick?: () => void }) {
+  const t = useT();
   const { colors } = useTheme();
   const faded = decided && !isWinner;
   const won = decided && isWinner;
@@ -69,7 +71,7 @@ function MatchRow({ side, character, isWinner, isChampion, decided, busy, blankT
       {onPick ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${side.title} wins the tiebreak`}
+          accessibilityLabel={t("arena.winsTiebreak", { title: side.title })}
           disabled={busy}
           hitSlop={6}
           onPress={onPick}
@@ -77,7 +79,7 @@ function MatchRow({ side, character, isWinner, isChampion, decided, busy, blankT
         >
           {/* Near-black, not accent: accent on accentSoft is 3.92:1, and a
             *  caption is nowhere near the size that would excuse it. */}
-          <Text {...dynamicType} style={[typography.caption, styles.bold, { color: colors.text }]}>Wins</Text>
+          <Text {...dynamicType} style={[typography.caption, styles.bold, { color: colors.text }]}>{t("arena.wins")}</Text>
         </Pressable>
       ) : null}
       {/* No tick beside the tint: the row's fill, the brace's filled half and
@@ -149,19 +151,21 @@ function MatchCard({
   onSettle: (duelId: string) => void;
   onTiebreak: (duelId: string, workId: string) => void;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const { colors } = useTheme();
   if (!duel) {
     return (
       <View style={[styles.block, { borderBottomColor: colors.border }]}>
         <View style={styles.labelRow}>
-          <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.meta, styles.grow, { color: colors.textDim }]}>Match {matchNumber}</Text>
+          <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.meta, styles.grow, { color: colors.textDim }]}>{t("arena.matchNumber", { number: matchNumber })}</Text>
         </View>
         <View style={styles.pair}>
           <Brace winnerSide={null} />
           <View style={styles.grow}>
-            <PendingRow label={feeders ? feeders[0] : "Not decided yet"} />
+            <PendingRow label={feeders ? feeders[0] : t("arena.notDecidedYet")} />
             <VersusRule />
-            <PendingRow label={feeders ? feeders[1] : "Not decided yet"} />
+            <PendingRow label={feeders ? feeders[1] : t("arena.notDecidedYet")} />
           </View>
         </View>
       </View>
@@ -175,33 +179,33 @@ function MatchCard({
   // Every duel in a round shares one deadline, so the countdown belongs to
   // the round header, not to each card. Only a match that has left the
   // round's own state behind says anything here.
-  const note = matchNote(duel);
+  const note = matchNote(duel, locale);
   // A settled match nobody voted in shows dashes: a pair of zeroes next to a
   // winner's tick reads as a bug rather than as an empty ballot.
   const unvoted = duel.status === "settled" && duel.bookA.votes + duel.bookB.votes === 0;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Match ${matchNumber}, ${duel.bookA.title} versus ${duel.bookB.title}${winner ? `, ${winner.title} won` : ""}`}
+      accessibilityLabel={winner ? t("arena.matchVersusWon", { number: matchNumber, first: duel.bookA.title, second: duel.bookB.title, winner: winner.title }) : t("arena.matchVersus", { number: matchNumber, first: duel.bookA.title, second: duel.bookB.title })}
       onPress={() => onOpen(duel)}
       style={({ pressed }) => [styles.block, { borderBottomColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}
     >
       <View style={styles.labelRow}>
         {needsVote(duel) ? <View style={[styles.voteDot, { backgroundColor: colors.accent }]} /> : null}
         <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.meta, styles.grow, { color: needsVote(duel) ? colors.accent : colors.textDim }]}>
-          Match {matchNumber}
+          {t("arena.matchNumber", { number: matchNumber })}
         </Text>
         {note ? <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.meta, { color: colors.textDim }]}>{note}</Text> : null}
         {isOwner && duel.status === "active" ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Settle this match now"
+            accessibilityLabel={t("arena.settleNow")}
             disabled={busy}
             hitSlop={12}
             onPress={() => onSettle(duel.id)}
             style={[styles.settle, { borderColor: colors.border, opacity: busy ? 0.5 : 1 }]}
           >
-            <Text {...dynamicType} style={[typography.caption, styles.bold, { color: colors.accent }]}>Settle</Text>
+            <Text {...dynamicType} style={[typography.caption, styles.bold, { color: colors.accent }]}>{t("arena.settle")}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -267,6 +271,7 @@ export function BracketRounds({
   onTiebreak: (duelId: string, workId: string) => void;
 }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const [openId, setOpenId] = useState<string | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
@@ -282,10 +287,10 @@ export function BracketRounds({
 
   function nodeLabel(roundIdx: number): string {
     const count = byRound[roundIdx]?.length ?? 0;
-    if (count === 1) return "F";
-    if (count === 2) return "SF";
-    if (count === 4) return "QF";
-    return `R${roundIdx + 1}`;
+    if (count === 1) return t("arena.nodeFinal");
+    if (count === 2) return t("arena.nodeSemis");
+    if (count === 4) return t("arena.nodeQuarters");
+    return t("arena.nodeRound", { number: roundIdx + 1 });
   }
 
   // Named rounds read as "Winner of Quarters 2"; the early numbered ones
@@ -293,7 +298,7 @@ export function BracketRounds({
   // number matches the "Match N" on that round's own cards.
   function feederLabel(prevRoundIdx: number, matchNumber: number): string {
     const label = labelFor(prevRoundIdx);
-    return label.startsWith("Round") ? `Winner of match ${matchNumber}` : `Winner of ${label} ${matchNumber}`;
+    return label === sharedT(locale)("shared.arenaBracket.round", { number: prevRoundIdx + 1 }) ? t("arena.winnerOfMatch", { number: matchNumber }) : t("arena.winnerOfRound", { label, number: matchNumber });
   }
 
   const liveRound = byRound.findIndex((slots) => slots.some((duel) => !duel || duel.status !== "settled"));
@@ -301,7 +306,7 @@ export function BracketRounds({
   const slots = byRound[roundIdx]!;
 
   const champion = tournamentChampion(tournament.bracketSize, tournament.duels);
-  const headline = roundHeadline(byRound, roundIdx);
+  const headline = roundHeadline(byRound, roundIdx, locale);
 
   // A round you switch into is shorter than the one you left as often as
   // not, so keeping the old offset can land you in empty space.
@@ -357,14 +362,14 @@ export function BracketRounds({
           // Done rounds are solid, the one in play is a ring, rounds the draw
           // hasn't got to are hollow — so the rail fills as the tournament does.
           const nodeColor = done ? colors.accent : reached ? colors.surface : colors.border;
-          const state = done ? "complete" : i === liveRound ? "in play" : "not started";
+          const stateKey = done ? "arena.roundComplete" : i === liveRound ? "arena.roundInPlay" : "arena.roundNotStarted";
           return (
             <Fragment key={i}>
               {i > 0 ? <View style={[styles.rail, { backgroundColor: reached ? colors.accent : colors.border }]} /> : null}
               <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ selected: on }}
-                accessibilityLabel={`${labelFor(i)}, ${state}`}
+                accessibilityLabel={t(stateKey, { label: labelFor(i) })}
                 hitSlop={10}
                 onPress={() => pickRound(i)}
                 style={styles.node}
@@ -383,11 +388,11 @@ export function BracketRounds({
       {/* Read-only: bigger covers and the exact share a card has no room
        *  for. Acting (vote, settle, tiebreak) happens on the card itself,
        *  not here — see the file header. */}
-      <Sheet visible={Boolean(openDuel)} title="Match" onClose={() => setOpenId(null)}>
+      <Sheet visible={Boolean(openDuel)} title={t("arena.matchTitle")} onClose={() => setOpenId(null)}>
         {openDuel ? (
           <ScrollView style={styles.sheetScroll} contentContainerStyle={styles.sheetBody}>
             <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>
-              Round {openDuel.roundNumber} · Match {openDuel.duelIndex + 1} · {openDuel.status === "active" ? countdownLabel(openDuel.closesAt, locale) : openDuel.status === "tied_pending_tiebreak" ? "Owner tiebreak needed" : "Settled"}
+              {matchHeading(openDuel, locale)}
             </Text>
             <DuelSideRow side={openDuel.bookA} duel={openDuel} character={tournament.subject !== null} onClose={() => setOpenId(null)} />
             <DuelSideRow side={openDuel.bookB} duel={openDuel} character={tournament.subject !== null} onClose={() => setOpenId(null)} />

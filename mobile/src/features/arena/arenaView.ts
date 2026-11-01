@@ -1,21 +1,25 @@
 import { bracketShape, countdownLabel, duelWinner, needsVote, roundLabel, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
+import { sharedT, type Locale } from "@scripta/shared/i18n";
 import type { TournamentView } from "./api";
-import { getLocale } from "../../i18n";
+import { translatorFor, type MobileMessages } from "../../i18n";
+
+type MessageKey = Extract<keyof MobileMessages, string>;
 
 const ALL_ARENA_VIEW_TABS = [
-  { value: "bracket", label: "Bracket" },
+  { value: "bracket", labelKey: "arena.tabBracket" },
   // "Vote", not "Match": the badge beside it counts votes this reader still
   // owes, which the word "Match" leaves them to infer.
-  { value: "match", label: "Vote" },
-] as const;
+  { value: "match", labelKey: "arena.tabVote" },
+] as const satisfies readonly { value: string; labelKey: MessageKey }[];
 
 export type ArenaViewTab = (typeof ALL_ARENA_VIEW_TABS)[number]["value"];
 
 /** Both tabs, always: a finished tournament keeps Match because that is
  *  where its winner is shown, and a pane that disappears on the last vote
  *  would take the result with it. */
-export function arenaViewTabs(_status: TournamentView["status"]): Array<{ value: ArenaViewTab; label: string }> {
-  return [...ALL_ARENA_VIEW_TABS];
+export function arenaViewTabs(_status: TournamentView["status"], locale: Locale): Array<{ value: ArenaViewTab; label: string }> {
+  const t = translatorFor(locale);
+  return ALL_ARENA_VIEW_TABS.map((option) => ({ value: option.value, label: t(option.labelKey) }));
 }
 
 export function votableDuels(duels: Duel[]): Duel[] {
@@ -49,15 +53,16 @@ export function tournamentChampion(bracketSize: number, duels: Duel[]): DuelSide
   return final ? duelWinner(final) : null;
 }
 
-export function matchEmptyCopy(status: TournamentView["status"], hasDuels: boolean): { title: string; body: string } {
-  if (status === "seeding") return { title: "Not started yet", body: "The first matches open once every slot is seeded." };
-  if (status === "completed") return { title: "No matches", body: "Every match has been played." };
-  if (!hasDuels) return { title: "No matches yet", body: "Pull to refresh for updates." };
-  return { title: "All caught up", body: "Every open match already has your vote. The next round opens when this one closes." };
+export function matchEmptyCopy(status: TournamentView["status"], hasDuels: boolean, locale: Locale): { title: string; body: string } {
+  const t = translatorFor(locale);
+  if (status === "seeding") return { title: t("arena.notStartedTitle"), body: t("arena.notStartedBody") };
+  if (status === "completed") return { title: t("arena.noMatchesTitle"), body: t("arena.noMatchesBody") };
+  if (!hasDuels) return { title: t("arena.noMatchesYetTitle"), body: t("arena.pullToRefresh") };
+  return { title: t("arena.allCaughtUpTitle"), body: t("arena.allCaughtUpBody") };
 }
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WEEKDAYS = ["arena.weekday0", "arena.weekday1", "arena.weekday2", "arena.weekday3", "arena.weekday4", "arena.weekday5", "arena.weekday6"] as const satisfies readonly MessageKey[];
+const MONTHS = ["arena.month0", "arena.month1", "arena.month2", "arena.month3", "arena.month4", "arena.month5", "arena.month6", "arena.month7", "arena.month8", "arena.month9", "arena.month10", "arena.month11"] as const satisfies readonly MessageKey[];
 
 /** Where this round sits, how much of it is done, and when it closes — the
  *  three things the screen never said. Split in two because all of it on one
@@ -66,31 +71,41 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
  *  A deadline more than a day out is given as a date: "2d 6h left" is a sum
  *  the reader has to turn back into a day before it means anything. Inside
  *  the last day the countdown is the useful form. */
-export function roundHeadline(byRound: BracketSlot[][], roundIdx: number, now = Date.now()): { title: string; status: string } {
-  const locale = getLocale();
+export function roundHeadline(byRound: BracketSlot[][], roundIdx: number, locale: Locale, now = Date.now()): { title: string; status: string } {
+  const t = translatorFor(locale);
   const slots = byRound[roundIdx] ?? [];
   const name = roundLabel(byRound[roundIdx]?.length ?? 0, roundIdx + 1, locale);
-  const position = `Round ${roundIdx + 1} of ${byRound.length}`;
+  const position = t("arena.roundOf", { round: roundIdx + 1, total: byRound.length });
   const settled = slots.filter((duel) => duel?.status === "settled").length;
-  const parts = [`${settled} of ${slots.length} settled`];
+  const parts = [t("arena.settledCount", { settled, total: slots.length })];
   const closesAt = slots.find((duel) => duel?.status === "active")?.closesAt;
-  if (closesAt) parts.push(closesLabel(closesAt, now));
-  return { title: name === position.split(" of ")[0] ? position : `${name} · ${position}`, status: parts.join(" · ") };
+  if (closesAt) parts.push(closesLabel(closesAt, locale, now));
+  const numbered = name === sharedT(locale)("shared.arenaBracket.round", { number: roundIdx + 1 });
+  return { title: numbered ? position : t("arena.roundTitle", { name, position }), status: parts.join(" · ") };
 }
 
-function closesLabel(closesAt: string, now: number): string {
-  const locale = getLocale();
+function closesLabel(closesAt: string, locale: Locale, now: number): string {
   const closes = new Date(closesAt);
   const remainingMs = closes.getTime() - now;
-  if (remainingMs > 86_400_000) return `Closes ${WEEKDAYS[closes.getDay()]} ${closes.getDate()} ${MONTHS[closes.getMonth()]}`;
+  if (remainingMs > 86_400_000) {
+    const t = translatorFor(locale);
+    return t("arena.closesOn", { weekday: t(WEEKDAYS[closes.getDay()]!), day: closes.getDate(), month: t(MONTHS[closes.getMonth()]!) });
+  }
   return countdownLabel(closesAt, locale, now);
+}
+
+export function matchHeading(duel: Duel, locale: Locale): string {
+  const t = translatorFor(locale);
+  const status = duel.status === "active" ? countdownLabel(duel.closesAt, locale) : duel.status === "tied_pending_tiebreak" ? t("arena.ownerTiebreakNeeded") : t("arena.settled");
+  return t("arena.matchHeading", { round: duel.roundNumber, match: duel.duelIndex + 1, status });
 }
 
 /** What a match's tally can't say on its own. A settled duel with nothing in
  *  it reads as a bug otherwise — and the record doesn't say whether the owner
  *  settled it early or it simply expired unvoted, so this says neither. */
-export function matchNote(duel: Duel): string | null {
-  if (duel.status === "tied_pending_tiebreak") return "Tiebreak needed";
+export function matchNote(duel: Duel, locale: Locale): string | null {
+  const t = translatorFor(locale);
+  if (duel.status === "tied_pending_tiebreak") return t("arena.tiebreakNeeded");
   if (duel.status !== "settled") return null;
-  return duel.bookA.votes + duel.bookB.votes === 0 ? "Settled · no votes" : "Settled";
+  return t(duel.bookA.votes + duel.bookB.votes === 0 ? "arena.settledNoVotes" : "arena.settled");
 }
