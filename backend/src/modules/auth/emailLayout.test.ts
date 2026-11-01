@@ -51,3 +51,16 @@ test("dark mode adds a media query and both marks with absolute URLs", () => {
   assert.ok(/class="em-mark-dark"[^>]*style="display:none"/.test(html));
   assert.ok(html.includes("Atmyshelf · app.example.com"));
 });
+
+test("a Portuguese locale sets the html lang and translates the paste-link line", () => {
+  const { html } = renderEmail({ heading: "Olá", paragraphs: ["Corpo"], button: { label: "Ir", url: "https://atmyshelf.com/x" } }, site, "pt-PT");
+  assert.ok(html.includes('<html lang="pt-PT">'));
+  assert.ok(html.includes("Ou cole esta ligação no seu navegador:"));
+  assert.ok(!html.includes("Or paste this link"));
+});
+
+test("English is the default locale", () => {
+  const { html } = renderEmail({ heading: "Hi", paragraphs: ["Body"], button: { label: "Go", url: "https://atmyshelf.com/x" } }, site);
+  assert.ok(html.includes('<html lang="en">'));
+  assert.ok(html.includes("Or paste this link into your browser:"));
+});

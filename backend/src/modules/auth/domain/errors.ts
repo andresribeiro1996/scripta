@@ -4,35 +4,37 @@
 // form calling this module's HTTP API is the more common integration path
 // than importing this class directly.
 
-export class AuthError extends Error {}
+import { LocalizedError } from "../../../i18n/index.js";
+
+export class AuthError extends LocalizedError {}
 
 export class InvalidCredentialsError extends AuthError {
   constructor() {
-    super("Invalid email or password.");
+    super("auth.invalidCredentials");
   }
 }
 
 export class EmailInUseError extends AuthError {
   constructor(email: string) {
-    super(`An account with email "${email}" already exists.`);
+    super("auth.emailInUse", { email });
   }
 }
 
 export class UsernameInUseError extends AuthError {
   constructor(username: string) {
-    super(`Username "${username}" is already taken.`);
+    super("auth.usernameInUse", { username });
   }
 }
 
 export class InvalidRefreshTokenError extends AuthError {
   constructor() {
-    super("Refresh token is invalid, expired, or already used.");
+    super("auth.invalidRefreshToken");
   }
 }
 
 export class OAuthAccountConflictError extends AuthError {
   constructor(email: string) {
-    super(`An account with email "${email}" already exists with a different sign-in method.`);
+    super("auth.oauthConflict", { email });
   }
 }
 
@@ -43,18 +45,18 @@ export class AvatarError extends AuthError {}
 
 export class AvatarTooLargeError extends AvatarError {
   constructor(maxBytes: number) {
-    super(`Avatar must be at most ${Math.floor(maxBytes / (1024 * 1024))} MB.`);
+    super("auth.avatarTooLarge", { mb: Math.floor(maxBytes / (1024 * 1024)) });
   }
 }
 
 export class InvalidAvatarError extends AvatarError {
   constructor() {
-    super("That file doesn't look like a supported image.");
+    super("auth.invalidAvatar");
   }
 }
 
 export class AvatarDimensionsTooLargeError extends AvatarError {
   constructor(maxDimension: number) {
-    super(`Avatar image is too large — at most ${maxDimension}px per side.`);
+    super("auth.avatarDimensions", { px: maxDimension });
   }
 }

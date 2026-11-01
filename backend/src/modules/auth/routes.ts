@@ -7,6 +7,7 @@
 
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { localeOf, t, validationMessage } from "../../i18n/index.js";
 import { authorizationCodeErrorMessage, consumeAuthorizationCode } from "./authorizationCode.js";
 import {
   AvatarDimensionsTooLargeError,
@@ -30,14 +31,14 @@ import { authGuard } from "./guard.js";
 const usernameSchema = z
   .string()
   .trim()
-  .min(3, "Username must be at least 3 characters.")
-  .max(30, "Username must be at most 30 characters.")
-  .regex(/^[a-zA-Z0-9_.]+$/, "Username can only contain letters, numbers, underscores, and periods.");
+  .min(3, "auth.usernameMin")
+  .max(30, "auth.usernameMax")
+  .regex(/^[a-zA-Z0-9_.]+$/, "auth.usernameChars");
 
 const signupSchema = z.object({
   email: z.string().trim().email(),
   username: usernameSchema,
-  password: z.string().min(8, "Password must be at least 8 characters.").max(128, "Use at most 128 characters.")
+  password: z.string().min(8, "auth.passwordMin").max(128, "auth.passwordMax")
 });
 
 const loginSchema = z.object({
@@ -89,83 +90,87 @@ export function buildAuthRoutes(service: AuthService, avatarUrlFor: (id: string)
       const tokenSchema = z.string().regex(/^[A-Za-z0-9_-]{64}$/);
       app.get("/auth/account", { preHandler: authGuard }, async (request) => security.status(request.user.id));
       app.post("/auth/forgot-password", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, reply) => {
+        const locale = localeOf(request);
         const parsed = emailSchema.safeParse(request.body);
-        if (!parsed.success) return reply.code(400).send({ error: "Enter a valid email address." });
-        if (!security.enabled) return reply.code(503).send({ error: "Email delivery is unavailable. Please try again later." });
-        deliver(() => security.forgotPassword(parsed.data.email));
-        return reply.code(202).send({ message: recoveryMessage("en") });
+        if (!parsed.success) return reply.code(400).send({ error: t(locale, "auth.invalidEmail") });
+        if (!security.enabled) return reply.code(503).send({ error: t(locale, "auth.emailUnavailable") });
+        deliver(() => security.forgotPassword(parsed.data.email, locale));
+        return reply.code(202).send({ message: recoveryMessage(locale) });
       });
       app.post("/auth/reset-password", async (request, reply) => {
         const parsed = z.object({ token: tokenSchema, password: signupSchema.shape.password }).safeParse(request.body);
-        if (!parsed.success) return reply.code(400).send({ error: "Use a valid reset link and a password between 8 and 128 characters." });
-        await security.resetPassword(parsed.data.token, parsed.data.password);
+        if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "auth.resetInvalid") });
+        await security.resetPassword(parsed.data.token, parsed.data.password, localeOf(request));
         return reply.code(204).send();
       });
       app.post("/auth/change-password", { preHandler: authGuard }, async (request, reply) => {
         const parsed = z.object({ currentPassword: z.string().min(1), password: signupSchema.shape.password }).safeParse(request.body);
-        if (!parsed.success) return reply.code(400).send({ error: "Enter your current password and a new password between 8 and 128 characters." });
-        await security.changePassword(request.user.id, parsed.data.currentPassword, parsed.data.password);
+        if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "auth.changePasswordInvalid") });
+        await security.changePassword(request.user.id, parsed.data.currentPassword, parsed.data.password, localeOf(request));
         return reply.code(204).send();
       });
       app.post("/auth/delete-account", { preHandler: authGuard, config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, reply) => {
         const parsed = z.object({ password: z.string().max(128).optional(), confirmation: z.string().max(320).optional() }).safeParse(request.body ?? {});
-        if (!parsed.success) return reply.code(400).send({ error: "Confirm with your password, or your username if you sign in with Google." });
-        await security.deleteAccount(request.user.id, parsed.data.password, parsed.data.confirmation);
+        if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "auth.deleteInvalid") });
+        await security.deleteAccount(request.user.id, parsed.data.password, parsed.data.confirmation, localeOf(request));
         return reply.code(204).send();
       });
       app.post("/auth/verification-email", { preHandler: authGuard, config: { rateLimit: { max: 3, timeWindow: "1 minute" } } }, async (request, reply) => {
         const parsed = z.object({ email: z.string().trim().email().optional(), currentPassword: z.string().optional() }).safeParse(request.body ?? {});
-        if (!parsed.success) return reply.code(400).send({ error: "Enter a valid email address." });
-        await security.requestVerification(request.user.id, parsed.data.email, parsed.data.currentPassword);
-        return reply.send({ message: "Check your inbox. You can request another email in a minute." });
+        if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "auth.invalidEmail") });
+        await security.requestVerification(request.user.id, parsed.data.email, parsed.data.currentPassword, localeOf(request));
+        return reply.send({ message: t(localeOf(request), "auth.verificationSent") });
       });
       app.post("/auth/verify-email", async (request, reply) => {
         const parsed = z.object({ token: tokenSchema }).safeParse(request.body);
-        if (!parsed.success) return reply.code(400).send({ error: "This verification link is invalid. Request a new one." });
+        if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "auth.verifyLinkInvalid") });
         security.verifyEmail(parsed.data.token);
         return reply.code(204).send();
       });
     }
     app.post("/auth/signup", async (request, reply) => {
+      const locale = localeOf(request);
       const parsed = signupSchema.safeParse(request.body);
       if (!parsed.success) {
-        return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request." });
+        return reply.code(400).send({ error: validationMessage(locale, parsed.error) });
       }
       try {
         const { user, tokens } = await service.signup(parsed.data.email, parsed.data.username, parsed.data.password);
-        if (security?.enabled) deliver(() => security.requestVerification(user.id));
+        if (security?.enabled) deliver(() => security.requestVerification(user.id, undefined, undefined, locale));
         return reply.code(201).send({ user, ...tokens });
       } catch (err) {
-        if (err instanceof EmailInUseError) return reply.code(409).send({ error: "An account already uses this email. Log in or recover your password.", field: "identifier" });
-        if (err instanceof UsernameInUseError) return reply.code(409).send({ error: err.message, field: "username" });
+        if (err instanceof EmailInUseError) return reply.code(409).send({ error: t(locale, "auth.emailAlreadyUsed"), field: "identifier" });
+        if (err instanceof UsernameInUseError) return reply.code(409).send({ error: t(locale, err.key, err.vars), field: "username" });
         throw err;
       }
     });
 
     app.post("/auth/login", async (request, reply) => {
+      const locale = localeOf(request);
       const parsed = loginSchema.safeParse(request.body);
       if (!parsed.success) {
-        return reply.code(400).send({ error: "Email/username and password are required." });
+        return reply.code(400).send({ error: t(locale, "auth.loginRequired") });
       }
       try {
         const { user, tokens } = await service.login(parsed.data.identifier, parsed.data.password);
         return reply.send({ user, ...tokens });
       } catch (err) {
-        if (err instanceof InvalidCredentialsError) return reply.code(401).send({ error: err.message });
+        if (err instanceof InvalidCredentialsError) return reply.code(401).send({ error: t(locale, err.key) });
         throw err;
       }
     });
 
     app.post("/auth/refresh", async (request, reply) => {
+      const locale = localeOf(request);
       const parsed = refreshSchema.safeParse(request.body);
       if (!parsed.success) {
-        return reply.code(400).send({ error: "refreshToken is required." });
+        return reply.code(400).send({ error: t(locale, "auth.refreshTokenRequired") });
       }
       try {
         const tokens = await service.refresh(parsed.data.refreshToken);
         return reply.send(tokens);
       } catch (err) {
-        if (err instanceof InvalidRefreshTokenError) return reply.code(401).send({ error: err.message });
+        if (err instanceof InvalidRefreshTokenError) return reply.code(401).send({ error: t(locale, err.key) });
         throw err;
       }
     });
@@ -179,13 +184,14 @@ export function buildAuthRoutes(service: AuthService, avatarUrlFor: (id: string)
     // flag. Same wire shape as /auth/login and /auth/signup, so a client
     // handles all three identically.
     app.post("/auth/google/exchange", async (request, reply) => {
+      const locale = localeOf(request);
       const parsed = googleExchangeSchema.safeParse(request.body);
       if (!parsed.success) {
-        return reply.code(400).send({ error: "code is required." });
+        return reply.code(400).send({ error: t(locale, "auth.codeRequired") });
       }
       const result = consumeAuthorizationCode(parsed.data.code, parsed.data.codeVerifier ?? null);
       if (!result.ok) {
-        return reply.code(400).send({ error: authorizationCodeErrorMessage(result.reason) });
+        return reply.code(400).send({ error: authorizationCodeErrorMessage(result.reason, locale) });
       }
       return reply.send({ user: result.user, ...result.tokens });
     });
@@ -193,7 +199,7 @@ export function buildAuthRoutes(service: AuthService, avatarUrlFor: (id: string)
     app.post("/auth/logout", async (request, reply) => {
       const parsed = refreshSchema.safeParse(request.body);
       if (!parsed.success) {
-        return reply.code(400).send({ error: "refreshToken is required." });
+        return reply.code(400).send({ error: t(localeOf(request), "auth.refreshTokenRequired") });
       }
       service.logout(parsed.data.refreshToken);
       return reply.code(204).send();
@@ -219,9 +225,10 @@ export function buildAuthRoutes(service: AuthService, avatarUrlFor: (id: string)
     // Claims a username for the signed-in account — the step a Google
     // sign-in without one yet is routed through on its first login.
     app.post("/auth/username", { preHandler: authGuard }, async (request, reply) => {
+      const locale = localeOf(request);
       const parsed = setUsernameSchema.safeParse(request.body);
       if (!parsed.success) {
-        return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid username." });
+        return reply.code(400).send({ error: validationMessage(locale, parsed.error) });
       }
       try {
         const user = await service.setUsername(request.user.id, parsed.data.username);
@@ -236,7 +243,7 @@ export function buildAuthRoutes(service: AuthService, avatarUrlFor: (id: string)
 
     app.put("/auth/appearance", { preHandler: authGuard, config: { rateLimit: { max: 120, timeWindow: "1 minute" } } }, async (request, reply) => {
       const parsed = setAppearanceSchema.safeParse(request.body);
-      if (!parsed.success) return reply.code(400).send({ error: "Unknown appearance." });
+      if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "auth.unknownAppearance") });
       service.setAppearance(request.user.id, parsed.data);
       return reply.code(204).send();
     });
@@ -253,7 +260,7 @@ export function buildAuthRoutes(service: AuthService, avatarUrlFor: (id: string)
       async (request, reply) => {
         const upload = await request.file();
         if (!upload) {
-          return reply.code(400).send({ error: "No file uploaded — send a multipart/form-data request with an \"image\" field." });
+          return reply.code(400).send({ error: t(localeOf(request), "auth.noFile") });
         }
         const buffer = await upload.toBuffer();
         try {
@@ -261,7 +268,7 @@ export function buildAuthRoutes(service: AuthService, avatarUrlFor: (id: string)
           return reply.send({ user });
         } catch (err) {
           if (err instanceof AvatarError) {
-            return reply.code(statusForAvatarError(err)).send({ error: err.message });
+            return reply.code(statusForAvatarError(err)).send({ error: t(localeOf(request), err.key, err.vars) });
           }
           throw err;
         }
@@ -280,15 +287,15 @@ export function buildAuthRoutes(service: AuthService, avatarUrlFor: (id: string)
     app.get("/auth/avatar/:id/file", async (request, reply) => {
       const parsed = avatarIdParamSchema.safeParse(request.params);
       if (!parsed.success) {
-        return reply.code(400).send({ error: "Invalid avatar id." });
+        return reply.code(400).send({ error: t(localeOf(request), "auth.invalidAvatarId") });
       }
       return reply.redirect(avatarUrlFor(parsed.data.id), 301);
     });
 
-    app.setErrorHandler((error, _request, reply) => {
-      if (error instanceof AccountActionError) return reply.code(error.status).send({ error: error.message });
+    app.setErrorHandler((error, request, reply) => {
+      if (error instanceof AccountActionError) return reply.code(error.status).send({ error: t(localeOf(request), error.key, error.vars) });
       if (error instanceof OAuthAccountConflictError) {
-        return reply.code(409).send({ error: error.message });
+        return reply.code(409).send({ error: t(localeOf(request), error.key, error.vars) });
       }
       throw error;
     });

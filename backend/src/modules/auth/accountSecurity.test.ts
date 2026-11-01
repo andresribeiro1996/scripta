@@ -41,17 +41,17 @@ test("reset revokes required and optional access, refresh rotation grace, and re
   try {
     const session = await auth.signup("reader@example.com", "reader", "old password");
     const rotated = await auth.refresh(session.tokens.refreshToken);
-    await security.forgotPassword(" READER@example.com ");
+    await security.forgotPassword(" READER@example.com ", "en");
     const resetToken = token();
     assert.equal(emails.length, 1);
     assert.notEqual(repo.findAccountToken(hashRefreshToken(resetToken), "reset")?.token_hash, resetToken);
-    await security.forgotPassword("reader@example.com");
+    await security.forgotPassword("reader@example.com", "en");
     assert.equal(emails.length, 1);
-    await security.resetPassword(resetToken, "new password");
+    await security.resetPassword(resetToken, "new password", "en");
     assert.equal(getAuthenticatedUserFromAccessToken(session.tokens.accessToken, repo.findUserById), null);
     await assert.rejects(auth.refresh(rotated.refreshToken));
     await assert.rejects(auth.refresh(session.tokens.refreshToken));
-    await assert.rejects(security.resetPassword(resetToken, "another password"));
+    await assert.rejects(security.resetPassword(resetToken, "another password", "en"));
     await assert.rejects(auth.login("reader", "old password"));
     const fresh = await auth.login("reader", "new password");
     const app = Fastify();
@@ -117,14 +117,14 @@ test("expired, replaced and concurrently consumed reset tokens cannot change the
   const { db, auth, security, token } = setup();
   try {
     await auth.signup("reader@example.com", "reader", "old password");
-    await security.forgotPassword("reader@example.com");
+    await security.forgotPassword("reader@example.com", "en");
     const old = token();
     db.exec("UPDATE account_tokens SET expires_at = '2000-01-01'");
-    await assert.rejects(security.resetPassword(old, "new password"));
-    await security.forgotPassword("reader@example.com");
+    await assert.rejects(security.resetPassword(old, "new password", "en"));
+    await security.forgotPassword("reader@example.com", "en");
     const fresh = token();
     assert.notEqual(old, fresh);
-    const results = await Promise.allSettled([security.resetPassword(fresh, "first password"), security.resetPassword(fresh, "second password")]);
+    const results = await Promise.allSettled([security.resetPassword(fresh, "first password", "en"), security.resetPassword(fresh, "second password", "en")]);
     assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
   } finally { db.close(); }
 });
@@ -134,13 +134,13 @@ test("verification and email correction require the right purpose, password and 
   try {
     const session = await auth.signup("reader@example.com", "reader", "old password");
     assert.equal(security.status(session.user.id).emailVerified, false);
-    await security.requestVerification(session.user.id);
-    await assert.rejects(security.resetPassword(token(), "new password"));
+    await security.requestVerification(session.user.id, undefined, undefined, "en");
+    await assert.rejects(security.resetPassword(token(), "new password", "en"));
     security.verifyEmail(token());
     assert.equal(security.status(session.user.id).emailVerified, true);
     assert.throws(() => security.verifyEmail(token()));
-    await assert.rejects(security.requestVerification(session.user.id, "correct@example.com", "wrong"));
-    await security.requestVerification(session.user.id, "correct@example.com", "old password");
+    await assert.rejects(security.requestVerification(session.user.id, "correct@example.com", "wrong", "en"));
+    await security.requestVerification(session.user.id, "correct@example.com", "old password", "en");
     assert.equal(security.status(session.user.id).email, "reader@example.com");
     security.verifyEmail(token());
     assert.equal(security.status(session.user.id).email, "correct@example.com");
@@ -153,9 +153,9 @@ test("changing password requires current credentials and revokes sessions", asyn
   const { db, auth, security } = setup(false);
   try {
     const session = await auth.signup("reader@example.com", "reader", "old password");
-    await assert.rejects(security.changePassword(session.user.id, "wrong", "new password"));
+    await assert.rejects(security.changePassword(session.user.id, "wrong", "new password", "en"));
     await auth.login("reader", "old password");
-    await security.changePassword(session.user.id, "old password", "new password");
+    await security.changePassword(session.user.id, "old password", "new password", "en");
     await assert.rejects(auth.login("reader", "old password"));
     await assert.rejects(auth.refresh(session.tokens.refreshToken));
     await auth.login("reader", "new password");
@@ -166,8 +166,8 @@ test("recovery and verification emails carry the link in both the text and html 
   const { db, auth, security, emails } = setup();
   try {
     const session = await auth.signup("reader@example.com", "reader", "old password");
-    await security.requestVerification(session.user.id);
-    await security.forgotPassword("reader@example.com");
+    await security.requestVerification(session.user.id, undefined, undefined, "en");
+    await security.forgotPassword("reader@example.com", "en");
     assert.equal(emails.length, 2);
     for (const mail of emails) {
       const link = mail.text.match(/https:\/\/\S+/)![0];
@@ -180,10 +180,10 @@ test("Google-only recovery sends guidance without creating a password", async ()
   const { db, auth, security, emails } = setup();
   try {
     const { user } = await auth.loginWithGoogle({ googleId: "google1", email: "google@example.com" });
-    await security.forgotPassword(user.email);
+    await security.forgotPassword(user.email, "en");
     assert.match(emails[0]!.text, /Google sign-in/);
     assert.equal(security.status(user.id).hasPassword, false);
-    await security.forgotPassword(user.email);
+    await security.forgotPassword(user.email, "en");
     assert.equal(emails.length, 1);
   } finally { db.close(); }
 });
@@ -212,11 +212,11 @@ test("deleting an account needs the password, signs out everywhere, erases every
   try {
     const session = await auth.signup("reader@example.com", "reader", "a password");
     const userId = session.user.id;
-    await assert.rejects(security.deleteAccount(userId, "wrong password"), { status: 403 });
-    await assert.rejects(security.deleteAccount(userId), { status: 403 });
+    await assert.rejects(security.deleteAccount(userId, "wrong password", undefined, "en"), { status: 403 });
+    await assert.rejects(security.deleteAccount(userId, undefined, undefined, "en"), { status: 403 });
     assert.deepEqual(erased, []);
     assert.ok(repo.findUserById(userId));
-    await security.deleteAccount(userId, "a password");
+    await security.deleteAccount(userId, "a password", undefined, "en");
     assert.deepEqual(erased, [userId]);
     assert.equal(repo.findUserById(userId), undefined);
     assert.equal(getAuthenticatedUserFromAccessToken(session.tokens.accessToken, repo.findUserById), null);
@@ -231,9 +231,9 @@ test("an account without a password confirms deletion by typing its username", a
   const { db, repo, security, erased } = setup(false);
   try {
     const user = repo.createUser({ email: "google@example.com", username: "Reader", passwordHash: null, googleId: "google-1" });
-    await assert.rejects(security.deleteAccount(user.id, "a password"), { status: 403 });
-    await assert.rejects(security.deleteAccount(user.id, undefined, "someone"), { status: 403 });
-    await security.deleteAccount(user.id, undefined, " reader ");
+    await assert.rejects(security.deleteAccount(user.id, "a password", undefined, "en"), { status: 403 });
+    await assert.rejects(security.deleteAccount(user.id, undefined, "someone", "en"), { status: 403 });
+    await security.deleteAccount(user.id, undefined, " reader ", "en");
     assert.deepEqual(erased, [user.id]);
     assert.equal(repo.findUserById(user.id), undefined);
   } finally { db.close(); }
@@ -244,9 +244,101 @@ test("a rejected erase fails the deletion and keeps the account so deleting agai
   try {
     const session = await auth.signup("reader@example.com", "reader", "a password");
     failErase();
-    await assert.rejects(security.deleteAccount(session.user.id, "a password"), /erase failed/);
+    await assert.rejects(security.deleteAccount(session.user.id, "a password", undefined, "en"), /erase failed/);
     assert.ok(repo.findUserById(session.user.id));
     assert.equal(getAuthenticatedUserFromAccessToken(session.tokens.accessToken, repo.findUserById), null);
     assert.ok(await auth.login("reader", "a password"));
   } finally { db.close(); }
+});
+
+test("forgot-password follows the request's language in the background email", async () => {
+  const { db, auth, security, emails } = setup();
+  const app = Fastify();
+  try {
+    await auth.signup("reader@example.com", "reader", "old password");
+    await app.register(buildAuthRoutes(auth, () => "", security));
+    const res = await app.inject({ method: "POST", url: "/auth/forgot-password", headers: { "accept-language": "pt-PT,en;q=0.5" }, payload: { email: "reader@example.com" } });
+    assert.equal(res.statusCode, 202);
+    assert.match(res.json().message, /^Se existir uma conta/);
+    await app.close();
+    assert.equal(emails.length, 1);
+    assert.equal(emails[0]!.subject, "Redefina a sua palavra-passe do Atmyshelf");
+    assert.match(emails[0]!.text, /^Escolha uma nova palavra-passe/);
+    assert.match(emails[0]!.text, /Esta ligação expira em 30 minutos/);
+    assert.match(emails[0]!.html!, /<html lang="pt-PT">/);
+    assert.match(emails[0]!.html!, /Ou cole esta ligação no seu navegador:/);
+    assert.ok(!emails[0]!.html!.includes("Or paste this link"));
+  } finally { await app.close(); db.close(); }
+});
+
+test("an English request still gets the English email", async () => {
+  const { db, auth, security, emails } = setup();
+  const app = Fastify();
+  try {
+    await auth.signup("reader@example.com", "reader", "old password");
+    await app.register(buildAuthRoutes(auth, () => "", security));
+    await app.inject({ method: "POST", url: "/auth/forgot-password", payload: { email: "reader@example.com" } });
+    await app.close();
+    assert.equal(emails[0]!.subject, "Reset your Atmyshelf password");
+    assert.match(emails[0]!.html!, /<html lang="en">/);
+    assert.match(emails[0]!.html!, /Or paste this link into your browser:/);
+  } finally { await app.close(); db.close(); }
+});
+
+test("each account email is rendered in Portuguese", async () => {
+  const { db, auth, security, emails, token } = setup();
+  try {
+    const session = await auth.signup("reader@example.com", "reader", "old password");
+    await security.requestVerification(session.user.id, undefined, undefined, "pt-PT");
+    await security.forgotPassword("reader@example.com", "pt-PT");
+    await security.resetPassword(token(), "new password", "pt-PT");
+    await security.changePassword(session.user.id, "new password", "newer password", "pt-PT");
+    const google = await auth.loginWithGoogle({ googleId: "google1", email: "google@example.com" });
+    await security.forgotPassword(google.user.email, "pt-PT");
+    await security.deleteAccount(session.user.id, "newer password", undefined, "pt-PT");
+    assert.deepEqual(emails.map((mail) => mail.subject), [
+      "Confirme o seu email no Atmyshelf",
+      "Redefina a sua palavra-passe do Atmyshelf",
+      "A sua palavra-passe do Atmyshelf foi alterada",
+      "A sua palavra-passe do Atmyshelf foi alterada",
+      "Inicie sessão no Atmyshelf",
+      "A sua conta Atmyshelf foi eliminada"
+    ]);
+    assert.deepEqual(emails.map((mail) => mail.text.split("\n")[0]), [
+      "Confirme o seu endereço de email",
+      "Escolha uma nova palavra-passe",
+      "A sua palavra-passe foi redefinida",
+      "A sua palavra-passe foi alterada",
+      "Utilize o Google para iniciar sessão",
+      "A sua conta foi eliminada"
+    ]);
+    for (const mail of emails) assert.match(mail.html!, /<html lang="pt-PT">/);
+  } finally { db.close(); }
+});
+
+test("auth errors follow the request's language and English is unchanged", async () => {
+  const { db, auth, security } = setup();
+  const app = Fastify();
+  try {
+    await auth.signup("reader@example.com", "reader", "old password");
+    await app.register(buildAuthRoutes(auth, () => "", security));
+    const pt = { "accept-language": "pt-PT" };
+    const wrong = { identifier: "reader", password: "wrong password" };
+    const login = await app.inject({ method: "POST", url: "/auth/login", payload: wrong });
+    assert.deepEqual(login.json(), { error: "Invalid email or password." });
+    const loginPt = await app.inject({ method: "POST", url: "/auth/login", headers: pt, payload: wrong });
+    assert.equal(loginPt.statusCode, 401);
+    assert.deepEqual(loginPt.json(), { error: "Email ou palavra-passe inválidos." });
+    const short = { email: "other@example.com", username: "other", password: "short" };
+    assert.equal((await app.inject({ method: "POST", url: "/auth/signup", payload: short })).json().error, "Password must be at least 8 characters.");
+    assert.equal((await app.inject({ method: "POST", url: "/auth/signup", headers: pt, payload: short })).json().error, "A palavra-passe deve ter pelo menos 8 caracteres.");
+    const taken = { email: "other@example.com", username: "reader", password: "long enough" };
+    assert.equal((await app.inject({ method: "POST", url: "/auth/signup", headers: pt, payload: taken })).json().error, "O nome de utilizador \"reader\" já está a ser utilizado.");
+    const expired = { token: "a".repeat(64), password: "new password" };
+    const reset = await app.inject({ method: "POST", url: "/auth/reset-password", payload: expired });
+    assert.equal(reset.json().error, "This link has expired or was already used. Request a new one.");
+    const resetPt = await app.inject({ method: "POST", url: "/auth/reset-password", headers: pt, payload: expired });
+    assert.equal(resetPt.statusCode, 400);
+    assert.equal(resetPt.json().error, "Esta ligação expirou ou já foi utilizada. Peça uma nova.");
+  } finally { await app.close(); db.close(); }
 });
