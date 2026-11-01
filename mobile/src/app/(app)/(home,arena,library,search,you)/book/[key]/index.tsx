@@ -5,10 +5,11 @@ import { BookScreen, bookMenuItems } from "@/features/works/BookScreen";
 import { useBook } from "@/features/library/hooks/useBook";
 import { useLibrary } from "@/features/library/hooks/useLibrary";
 import { ActionSheet, ErrorState, HeaderActions, IconButton, Screen, Skeleton } from "@/ui";
-import { useLocale } from "../../../../../i18n";
+import { useLocale, useT } from "../../../../../i18n";
 
 export default function BookRoute() {
   const locale = useLocale();
+  const t = useT();
   const { key } = useLocalSearchParams<{ key: string }>();
   const { book, loading, workId } = useBook(key);
   const { isError, refetch } = useLibrary();
@@ -31,8 +32,8 @@ export default function BookRoute() {
           headerRight: menuItems.length > 0
             ? () => (
                 <HeaderActions>
-                  <ActionSheet title={typeof book?.title === "string" && book.title ? book.title : "Book"} groups={[menuItems]}>
-                    {(open) => <IconButton accessibilityLabel="Book actions" name="more" onPress={open} />}
+                  <ActionSheet title={typeof book?.title === "string" && book.title ? book.title : t("shell.book")} groups={[menuItems]}>
+                    {(open) => <IconButton accessibilityLabel={t("shell.bookActions")} name="more" onPress={open} />}
                   </ActionSheet>
                 </HeaderActions>
               )
@@ -44,9 +45,9 @@ export default function BookRoute() {
       ) : book && model ? (
         <BookScreen page={null} book={book} model={model} signedIn />
       ) : isError ? (
-        <ErrorState body="Couldn't load your library." actionLabel="Retry" onAction={() => void refetch()} />
+        <ErrorState body={t("shell.libraryLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void refetch()} />
       ) : (
-        <ErrorState title="Book not found" body="It may have been removed from your library." actionLabel="Back" onAction={() => router.back()} />
+        <ErrorState title={t("shell.bookNotFound")} body={t("shell.bookRemovedHint")} actionLabel={t("shell.back")} onAction={() => router.back()} />
       )}
     </Screen>
   );

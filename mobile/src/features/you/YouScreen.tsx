@@ -9,19 +9,23 @@ import { LanguagePicker } from "../settings/LanguagePicker";
 import { ThemePicker } from "../settings/ThemePicker";
 import { SocialsSection } from "../socials";
 import { ProfileHeader } from "./ProfileHeader";
+import { useT, type MobileMessages } from "../../i18n";
 
-type Card = { label: string; icon: IconName } & ({ href: string } | { sheet: "appearance" | "socials" });
+type MessageKey = Extract<keyof MobileMessages, string>;
+
+type Card = { label: MessageKey; icon: IconName } & ({ href: string } | { sheet: "appearance" | "socials" });
 
 const CARDS: Card[] = [
-  { label: "Your shelf", href: "/me", icon: "shelf" },
-  { label: "Murals", href: "/murals", icon: "murals" },
-  { label: "Reader card", href: "/reader-card", icon: "readerCard" },
-  { label: "Gallery", href: "/gallery", icon: "image" },
-  { label: "Appearance", sheet: "appearance", icon: "theme" },
-  { label: "Socials", sheet: "socials", icon: "link" },
+  { label: "shell.youYourShelf", href: "/me", icon: "shelf" },
+  { label: "shell.youMurals", href: "/murals", icon: "murals" },
+  { label: "shell.youReaderCard", href: "/reader-card", icon: "readerCard" },
+  { label: "shell.youGallery", href: "/gallery", icon: "image" },
+  { label: "shell.youAppearance", sheet: "appearance", icon: "theme" },
+  { label: "shell.youSocials", sheet: "socials", icon: "link" },
 ];
 
 export function YouScreen() {
+  const t = useT();
   const { colors } = useTheme();
   const { signOut } = useAuth();
   const [sheet, setSheet] = useState<"appearance" | "socials" | null>(null);
@@ -35,13 +39,13 @@ export function YouScreen() {
       await signOut();
       router.replace("/(public)/login");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Something went wrong.");
+      setError(reason instanceof Error ? reason.message : t("shell.somethingWentWrongSentence"));
     }
   }
 
   return (
     <Screen top={false}>
-      <Stack.Screen options={{ headerShown: true, title: "You" }} />
+      <Stack.Screen options={{ headerShown: true, title: t("shell.tabYou") }} />
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
         <ProfileHeader />
         <View style={styles.grid}>
@@ -50,28 +54,28 @@ export function YouScreen() {
             <View key={card.label} style={styles.cell}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={card.label}
+                accessibilityLabel={t(card.label)}
                 onPress={() => ("href" in card ? router.push(card.href as never) : setSheet(card.sheet))}
                 style={({ pressed }) => [styles.card, pressed ? { backgroundColor: colors.surfacePressed } : null]}
               >
                 <Icon name={card.icon} size={44} color={colors.accent} />
-                <Text {...dynamicType} numberOfLines={1} style={[typography.body, styles.label, { color: colors.text }]}>{card.label}</Text>
+                <Text {...dynamicType} numberOfLines={1} style={[typography.body, styles.label, { color: colors.text }]}>{t(card.label)}</Text>
               </Pressable>
             </View>
           ))}
         </View>
         <View style={[styles.rows, { borderColor: colors.border }]}>
           <Pressable accessibilityRole="button" onPress={() => router.push("/account-security")} style={({ pressed }) => [styles.row, { borderColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}>
-            <Text {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>Account and security</Text>
+            <Text {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{t("shell.youAccountSecurity")}</Text>
             <Icon name="chevronRight" size={18} color={colors.textDim} />
           </Pressable>
           <Pressable accessibilityRole="button" onPress={() => setSignOutOpen(true)} style={({ pressed }) => [styles.row, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}>
-            <Text {...dynamicType} style={[typography.body, { color: colors.danger }]}>Sign out</Text>
+            <Text {...dynamicType} style={[typography.body, { color: colors.danger }]}>{t("shell.signOut")}</Text>
           </Pressable>
         </View>
         {error ? <Text accessibilityRole="alert" style={[typography.caption, styles.center, { color: colors.danger }]}>{error}</Text> : null}
       </ScrollView>
-      <Sheet visible={sheet === "appearance"} title="Appearance" onClose={() => setSheet(null)}>
+      <Sheet visible={sheet === "appearance"} title={t("shell.youAppearance")} onClose={() => setSheet(null)}>
         <ScrollView contentContainerStyle={styles.sheetBody}>
           <ThemePicker />
           <FontPicker slot="display" />
@@ -79,12 +83,12 @@ export function YouScreen() {
           <LanguagePicker />
         </ScrollView>
       </Sheet>
-      <Sheet visible={sheet === "socials"} title="Socials" onClose={() => setSheet(null)}>
+      <Sheet visible={sheet === "socials"} title={t("shell.youSocials")} onClose={() => setSheet(null)}>
         <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
           <SocialsSection />
         </ScrollView>
       </Sheet>
-      <ConfirmDialog visible={signOutOpen} title="Sign out" body="Sign out of Atmyshelf on this device?" confirmLabel="Sign out" destructive onConfirm={() => void confirmSignOut()} onCancel={() => setSignOutOpen(false)} />
+      <ConfirmDialog visible={signOutOpen} title={t("shell.signOut")} body={t("shell.signOutConfirm")} confirmLabel={t("shell.signOut")} destructive onConfirm={() => void confirmSignOut()} onCancel={() => setSignOutOpen(false)} />
     </Screen>
   );
 }

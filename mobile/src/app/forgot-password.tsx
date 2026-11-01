@@ -6,10 +6,11 @@ import { recoveryMessage } from "@scripta/shared";
 import { apiClient } from "../core/api";
 import { Button, Input, Screen } from "../ui";
 import { spacing, typography, useTheme } from "../ui/theme";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
 export default function ForgotPassword() {
   const locale = useLocale();
+  const t = useT();
   const params = useLocalSearchParams<{ email?: string }>();
   const [email, setEmail] = useState(params.email ?? "");
   const [busy, setBusy] = useState(false);
@@ -28,18 +29,18 @@ export default function ForgotPassword() {
     try {
       await apiClient.request("/auth/forgot-password", { method: "POST", body: { email: email.trim() } });
       setSent(true); setCooldown(60);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Couldn’t connect. Please try again."); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : t("shell.connectFailedShort")); }
     finally { setBusy(false); }
   }
-  return <Screen top={false} bottom><Stack.Screen options={{ headerShown: true, title: "Recover account" }} />
+  return <Screen top={false} bottom><Stack.Screen options={{ headerShown: true, title: t("shell.recoverAccount") }} />
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: spacing.xl, gap: spacing.lg }}>
-        <Text style={[typography.body, { color: colors.textDim }]}>Enter your account’s email address. We’ll send a link that opens securely in your browser.</Text>
+        <Text style={[typography.body, { color: colors.textDim }]}>{t("shell.recoverIntro")}</Text>
         {sent && <Text accessibilityLiveRegion="polite" style={[typography.body, { color: colors.text }]}>{recoveryMessage(locale)}</Text>}
-        <Input label="Email" autoComplete="email" textContentType="emailAddress" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" value={email} onChangeText={(value) => { setEmail(value); setSent(false); }} editable={!busy} returnKeyType="send" onSubmitEditing={() => void submit()} />
+        <Input label={t("shell.email")} autoComplete="email" textContentType="emailAddress" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" value={email} onChangeText={(value) => { setEmail(value); setSent(false); }} editable={!busy} returnKeyType="send" onSubmitEditing={() => void submit()} />
         {error ? <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>{error}</Text> : null}
-        <View><Button label={cooldown ? `Resend in ${cooldown}s` : sent ? "Resend email" : "Send recovery email"} loading={busy} disabled={cooldown > 0 || !email.trim()} onPress={() => void submit()} /></View>
-        <Button label="Back to login" variant="secondary" onPress={() => router.replace("/login")} />
+        <View><Button label={cooldown ? t("shell.resendIn", { seconds: cooldown }) : sent ? t("shell.resendEmail") : t("shell.sendRecoveryEmail")} loading={busy} disabled={cooldown > 0 || !email.trim()} onPress={() => void submit()} /></View>
+        <Button label={t("shell.backToLogin")} variant="secondary" onPress={() => router.replace("/login")} />
       </ScrollView>
     </KeyboardAvoidingView>
   </Screen>;

@@ -3,7 +3,7 @@ import type { Locale } from "@scripta/shared/i18n";
 import { themes, themeLabel, type ThemeColors, type ThemePreference } from "@scripta/shared/themes";
 import { Text } from "./Text";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "./theme";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
 function Swatch({ colors }: { colors: ThemeColors }) {
   return (
@@ -17,18 +17,19 @@ function Swatch({ colors }: { colors: ThemeColors }) {
   );
 }
 
-export function themeTile(option: ThemePreference, locale: Locale) {
-  return option === "system" ? { label: "System", palettes: [themes.light.colors, themes.dark.colors] } : { label: themeLabel(option, locale), palettes: [themes[option].colors] };
+export function themeTile(option: ThemePreference, locale: Locale, systemLabel: string) {
+  return option === "system" ? { label: systemLabel, palettes: [themes.light.colors, themes.dark.colors] } : { label: themeLabel(option, locale), palettes: [themes[option].colors] };
 }
 
 export function ThemeGrid<T extends ThemePreference>({ options, value, onChange }: { options: readonly T[]; value: T; onChange: (option: T) => void }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   return (
-    <View accessibilityRole="radiogroup" accessibilityLabel="Theme" style={styles.grid}>
+    <View accessibilityRole="radiogroup" accessibilityLabel={t("settings.theme")} style={styles.grid}>
       {options.map((option) => {
         const checked = option === value;
-        const { label, palettes } = themeTile(option, locale);
+        const { label, palettes } = themeTile(option, locale, t("settings.themeSystem"));
         return (
           <Pressable
             key={option}

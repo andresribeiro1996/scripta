@@ -4,6 +4,7 @@ import { catalogMismatches } from "@scripta/shared/i18n";
 import { reconcileAppearance, type AccountAppearance } from "@scripta/shared/themes";
 import { en } from "./messages/en";
 import { ptPT } from "./messages/pt-PT";
+import { authorizationCodeFromGoogleRedirect } from "../features/auth/googleSignInResult";
 import { getLocale, getLocalePreference, setDeviceLocaleTags, setLocalePreference, t } from "./index";
 
 test("the mobile catalog has no placeholder mismatches", () => {
@@ -30,6 +31,20 @@ test("an explicit pt-PT pick switches t()", () => {
     setLocalePreference("auto");
   }
   assert.equal(t("settings.language"), "Language");
+});
+
+test("the shell strings and the sign-in redirect error follow the pick", () => {
+  assert.equal(t("shell.signIn"), "Sign in");
+  assert.throws(() => authorizationCodeFromGoogleRedirect("scripta://oauth-redirect?state=wrong", "nonce"), /did not match the request/);
+  setLocalePreference("pt-PT");
+  try {
+    assert.equal(t("shell.signIn"), "Iniciar sessão");
+    assert.equal(t("shell.tabYou"), "Perfil");
+    assert.equal(t("shell.resendIn", { seconds: 30 }), "Reenviar em 30s");
+    assert.throws(() => authorizationCodeFromGoogleRedirect("scripta://oauth-redirect?state=wrong", "nonce"), /não corresponde ao pedido/);
+  } finally {
+    setLocalePreference("auto");
+  }
 });
 
 test("a locale from the account is applied to the device pick and the device pick is what gets reconciled", () => {

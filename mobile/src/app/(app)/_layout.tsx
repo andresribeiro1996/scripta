@@ -5,6 +5,7 @@ import { ActivityIndicator, View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
 import { newCountLabel } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
+import { useT } from "../../i18n";
 import { useActivityFeed } from "../../features/home/FeedRow";
 import { useAccountAppearanceSync } from "../../features/settings/appearanceSync";
 import { useGenreEnrichment } from "../../features/library/hooks/useGenreEnrichment";
@@ -27,6 +28,7 @@ function AppearanceSync() {
 }
 
 function AppTabs() {
+  const t = useT();
   const appTheme = useTheme();
   const { colors } = appTheme;
   const [tabTheme, setTabTheme] = useState<Theme | null>(null);
@@ -54,22 +56,23 @@ function AppTabs() {
         <Tabs.Screen
           name="(home)"
           options={{
-            title: "Home",
+            title: t("shell.tabHome"),
             tabBarBadge: newCountLabel(newCount) ?? undefined,
             tabBarBadgeStyle: { backgroundColor: colors.accent, color: colors.onAccent },
             tabBarIcon: ({ color, focused, size }) => <Icon name="home" filled={focused} color={color} size={size} />,
           }}
         />
-        <Tabs.Screen name="(library)" options={{ title: "Library", tabBarIcon: ({ color, focused, size }) => <Icon name="library" filled={focused} color={color} size={size} /> }} />
-        <Tabs.Screen name="(search)" options={{ title: "Search", tabBarIcon: ({ color, focused, size }) => <Icon name="search" filled={focused} color={color} size={size} /> }} />
-        <Tabs.Screen name="(arena)" options={{ title: "Games", tabBarIcon: ({ color, focused, size }) => <Icon name="arena" filled={focused} color={color} size={size} /> }} />
-        <Tabs.Screen name="(you)" options={{ title: "You", tabBarIcon: ({ color, focused, size }) => <Icon name="profile" filled={focused} color={color} size={size} /> }} />
+        <Tabs.Screen name="(library)" options={{ title: t("shell.tabLibrary"), tabBarIcon: ({ color, focused, size }) => <Icon name="library" filled={focused} color={color} size={size} /> }} />
+        <Tabs.Screen name="(search)" options={{ title: t("shell.tabSearch"), tabBarIcon: ({ color, focused, size }) => <Icon name="search" filled={focused} color={color} size={size} /> }} />
+        <Tabs.Screen name="(arena)" options={{ title: t("shell.tabGames"), tabBarIcon: ({ color, focused, size }) => <Icon name="arena" filled={focused} color={color} size={size} /> }} />
+        <Tabs.Screen name="(you)" options={{ title: t("shell.tabYou"), tabBarIcon: ({ color, focused, size }) => <Icon name="profile" filled={focused} color={color} size={size} /> }} />
       </Tabs>
     </TabThemeContext.Provider>
   );
 }
 
 export default function AppLayout() {
+  const t = useT();
   const pathname = usePathname();
   const params = useGlobalSearchParams();
   const returnTo = pathWithQuery(pathname, params);
@@ -90,9 +93,9 @@ export default function AppLayout() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: "center" }}>
         <ErrorState
-          title="Can't reach the server"
-          body="You're still signed in — we just couldn't load your account. Check your connection and try again."
-          actionLabel="Try again"
+          title={t("shell.serverUnreachableTitle")}
+          body={t("shell.serverUnreachableBody")}
+          actionLabel={t("shell.tryAgain")}
           onAction={() => void retry()}
         />
       </View>

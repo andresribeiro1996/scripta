@@ -1,9 +1,11 @@
 import { useRef, useState } from "react";
 import { Stack } from "expo-router";
 import { GroupsView, TYPE_FILTER_OPTIONS, type GroupsViewHandle, type TypeFilter } from "@/features/library/components/GroupsView";
+import { useT } from "@/i18n";
 import { IconButton, Screen, SearchDock, searchDockClearance } from "@/ui";
 
 export default function CollectionsRoute() {
+  const t = useT();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const groupsView = useRef<GroupsViewHandle>(null);
@@ -16,19 +18,19 @@ export default function CollectionsRoute() {
       <Stack.Screen
         options={{
           headerShown: true,
-          headerRight: () => <IconButton accessibilityLabel="New collection" name="add" onPress={() => groupsView.current?.startCreating()} />,
+          headerRight: () => <IconButton accessibilityLabel={t("shell.newCollection")} name="add" onPress={() => groupsView.current?.startCreating()} />,
         }}
       />
       <SearchDock
-        accessibilityLabel="Search collections"
-        placeholder="Search collections"
+        accessibilityLabel={t("shell.searchCollections")}
+        placeholder={t("shell.searchCollections")}
         value={search}
         onChangeText={setSearch}
         cycle={{
           icon: typeFilterOption.icon,
           active: typeFilter !== "all",
-          accessibilityLabel: `Showing ${typeFilterOption.label.toLowerCase()}`,
-          accessibilityHint: "Switches to the next type",
+          accessibilityLabel: t("shell.showingType", { type: typeFilterOption.label.toLowerCase() }),
+          accessibilityHint: t("shell.switchesToNextType"),
           onPress: () => setTypeFilter(nextTypeFilter.value),
         }}
       >

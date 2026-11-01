@@ -6,7 +6,7 @@ import { themeTile } from "../../ui/ThemeGrid";
 import { Icon } from "../../ui/icon";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
 import { isAppearanceSyncFailure, saveAccountAppearance } from "./appearanceSync";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 const OPTIONS: ThemePreference[] = ["system", ...THEME_IDS];
 
@@ -14,6 +14,7 @@ export const SWATCH = 46;
 
 export function ThemePicker() {
   const locale = useLocale();
+  const t = useT();
   const { colors, preference, setPreference } = useTheme();
   const [error, setError] = useState<string | null>(null);
 
@@ -22,16 +23,16 @@ export function ThemePicker() {
     setError(null);
     saveAccountAppearance({ theme: next }).catch((err: unknown) => {
       if (!isAppearanceSyncFailure(err)) throw err;
-      setError("Couldn't save to your account. Try again.");
+      setError(t("settings.languageSaveFailed"));
     });
   }
 
   return (
     <View style={styles.wrap}>
-      <View accessibilityRole="radiogroup" accessibilityLabel="Theme" style={styles.grid}>
+      <View accessibilityRole="radiogroup" accessibilityLabel={t("settings.theme")} style={styles.grid}>
         {OPTIONS.map((option) => {
           const checked = option === preference;
-          const { label, palettes } = themeTile(option, locale);
+          const { label, palettes } = themeTile(option, locale, t("settings.themeSystem"));
           const left = palettes[0];
           const right = palettes[palettes.length - 1];
           return (

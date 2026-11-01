@@ -15,6 +15,7 @@ import { SYSTEM_FAMILY } from "./systemFont";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useReducedMotion, useTheme } from "./theme";
 import { THEME_DECOR, withOpacity, type ThemeId } from "@scripta/shared/themes";
 import { decorLayerStyle, pieceStyle } from "./decorLayout";
+import { useT } from "../i18n";
 
 const AnimatedPagerView = Animated.createAnimatedComponent(PagerView);
 
@@ -246,10 +247,11 @@ export function IconButton({
   disabled?: boolean;
 }) {
   const { colors } = useTheme();
+  const t = useT();
   const color = tone === "danger" ? colors.danger : tone === "accent" ? colors.onAccent : colors.textDim;
   return (
     <Pressable
-      accessibilityLabel={badge ? `${accessibilityLabel}, ${badge} new` : accessibilityLabel}
+      accessibilityLabel={badge ? t("shell.badgeNew", { label: accessibilityLabel, badge }) : accessibilityLabel}
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}
@@ -276,7 +278,8 @@ export function HeaderActions({ children }: { children: ReactNode }) {
 }
 
 export function SaveStateButton({ busy, unsaved, onPress }: { busy: boolean; unsaved: boolean; onPress: () => void }) {
-  return <IconButton framed disabled={busy || !unsaved} tone={unsaved ? "accent" : "default"} label={busy ? "Saving…" : unsaved ? "Save" : "Saved"} accessibilityLabel={busy ? "Saving changes" : unsaved ? "Save changes" : "All changes saved"} name={!busy && !unsaved ? "confirm" : "save"} onPress={onPress} />;
+  const t = useT();
+  return <IconButton framed disabled={busy || !unsaved} tone={unsaved ? "accent" : "default"} label={busy ? t("shell.saving") : unsaved ? t("shell.save") : t("shell.saved")} accessibilityLabel={busy ? t("shell.savingChanges") : unsaved ? t("shell.saveChanges") : t("shell.allChangesSaved")} name={!busy && !unsaved ? "confirm" : "save"} onPress={onPress} />;
 }
 
 export function Input({
@@ -296,6 +299,7 @@ export function Input({
   ...props
 }: Omit<TextInputProps, "style"> & { label?: string; error?: string; hint?: string; icon?: IconName; ref?: Ref<TextInputInstance>; style?: ViewStyle }) {
   const { colors, fonts } = useTheme();
+  const t = useT();
   const [visible, setVisible] = useState(false);
   const inputRef = useRef<TextInputInstance>(null);
   const fieldRef = useRef<HostInstance>(null);
@@ -334,12 +338,12 @@ export function Input({
           fontStyleFor(fonts.text, "text", { fontSize: typography.input.fontSize }) ?? { fontFamily: SYSTEM_FAMILY },
         ]}
       />
-      {secureTextEntry && <Pressable accessibilityRole="button" accessibilityLabel={visible ? "Hide password" : "Show password"} accessibilityState={{ disabled: !editable }}
+      {secureTextEntry && <Pressable accessibilityRole="button" accessibilityLabel={visible ? t("shell.hidePassword") : t("shell.showPassword")} accessibilityState={{ disabled: !editable }}
         disabled={!editable} onPress={() => { setVisible(!visible); inputRef.current?.focus(); }}
         style={styles.inputTrailing}>
         <Icon name={visible ? "hidePassword" : "showPassword"} size={20} color={colors.textDim} />
       </Pressable>}
-      {clearable ? <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => props.onChangeText?.("")}
+      {clearable ? <Pressable accessibilityRole="button" accessibilityLabel={t("shell.clearSearch")} onPress={() => props.onChangeText?.("")}
         style={styles.inputTrailing}>
         <Icon name="close" size={20} color={colors.textDim} />
       </Pressable> : null}
@@ -361,11 +365,12 @@ type OverlayProps = {
 
 export function SheetHeader({ title, onClose }: { title: string; onClose: () => void }) {
   const { colors } = useTheme();
+  const t = useT();
   return (
     <View style={styles.overlayHeader}>
       <Text accessibilityRole="header" {...dynamicType} style={[styles.overlayTitle, { color: colors.text }]}>{title}</Text>
-      <Pressable accessibilityLabel={`Close ${title}`} accessibilityRole="button" hitSlop={8} onPress={onClose} style={styles.closeButton}>
-        <Text {...dynamicType} style={[styles.closeText, { color: colors.textDim }]}>Close</Text>
+      <Pressable accessibilityLabel={t("shell.closeTitle", { title })} accessibilityRole="button" hitSlop={8} onPress={onClose} style={styles.closeButton}>
+        <Text {...dynamicType} style={[styles.closeText, { color: colors.textDim }]}>{t("shell.close")}</Text>
       </Pressable>
     </View>
   );
@@ -375,6 +380,7 @@ function Overlay({ visible, title, children, onClose, onDismiss, closeAccessibil
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
+  const t = useT();
 
   return (
     <Modal
@@ -386,7 +392,7 @@ function Overlay({ visible, title, children, onClose, onDismiss, closeAccessibil
     >
       <View style={[styles.overlay, sheet ? styles.sheetOverlay : styles.dialogOverlay]}>
         <Pressable
-          accessibilityLabel={closeAccessibilityLabel ?? `Close ${title}`}
+          accessibilityLabel={closeAccessibilityLabel ?? t("shell.closeTitle", { title })}
           accessibilityRole="button"
           onPress={onClose}
           style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim }]}
@@ -479,14 +485,15 @@ export function Dialog(props: OverlayProps) {
   return <Overlay {...props} sheet={false} />;
 }
 
-export function ConfirmDialog({ visible, title, body, confirmLabel, cancelLabel = "Cancel", destructive = false, loading = false, onConfirm, onCancel }: { visible: boolean; title: string; body?: string; confirmLabel: string; cancelLabel?: string; destructive?: boolean; loading?: boolean; onConfirm: () => void; onCancel: () => void }) {
+export function ConfirmDialog({ visible, title, body, confirmLabel, cancelLabel, destructive = false, loading = false, onConfirm, onCancel }: { visible: boolean; title: string; body?: string; confirmLabel: string; cancelLabel?: string; destructive?: boolean; loading?: boolean; onConfirm: () => void; onCancel: () => void }) {
   const { colors } = useTheme();
+  const t = useT();
   return (
     <Dialog visible={visible} title={title} onClose={onCancel}>
       <View style={styles.confirm}>
         {body ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{body}</Text> : null}
         <Button label={confirmLabel} variant={destructive ? "destructive" : "primary"} loading={loading} onPress={onConfirm} />
-        <Button label={cancelLabel} variant="secondary" disabled={loading} onPress={onCancel} />
+        <Button label={cancelLabel ?? t("shell.cancel")} variant="secondary" disabled={loading} onPress={onCancel} />
       </View>
     </Dialog>
   );
@@ -598,6 +605,7 @@ export function SwipeableTabs<T extends string>({
   accessibilityLabel?: string;
 }) {
   const { colors } = useTheme();
+  const t = useT();
   const reducedMotion = useReducedMotion();
   const pager = useRef<PagerView>(null);
   const [tabLayouts, setTabLayouts] = useState<readonly ({ x: number; width: number } | undefined)[]>([]);
@@ -636,7 +644,7 @@ export function SwipeableTabs<T extends string>({
           const selected = option.value === value;
           return (
             <Pressable
-              accessibilityLabel={option.accessibilityLabel ?? (option.badge ? `${option.label}, ${option.badge} remaining` : option.label)}
+              accessibilityLabel={option.accessibilityLabel ?? (option.badge ? t("shell.badgeRemaining", { label: option.label, badge: option.badge }) : option.label)}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
               key={option.value}
@@ -847,8 +855,9 @@ export function Toast({ visible, message, tone = "default" }: { visible: boolean
   );
 }
 
-export function Skeleton({ width = "100%", height = 16, radius = radii.sm, accessibilityLabel = "Loading" }: { width?: ViewStyle["width"]; height?: number; radius?: number; accessibilityLabel?: string }) {
+export function Skeleton({ width = "100%", height = 16, radius = radii.sm, accessibilityLabel }: { width?: ViewStyle["width"]; height?: number; radius?: number; accessibilityLabel?: string }) {
   const { colors } = useTheme();
+  const t = useT();
   const reducedMotion = useReducedMotion();
   const opacity = useRef(new Animated.Value(0.45)).current;
 
@@ -865,7 +874,7 @@ export function Skeleton({ width = "100%", height = 16, radius = radii.sm, acces
     return () => animation.stop();
   }, [opacity, reducedMotion]);
 
-  return <Animated.View accessibilityLabel={accessibilityLabel} accessibilityRole="progressbar" style={{ width, height, borderRadius: radius, backgroundColor: colors.border, opacity }} />;
+  return <Animated.View accessibilityLabel={accessibilityLabel ?? t("shell.loading")} accessibilityRole="progressbar" style={{ width, height, borderRadius: radius, backgroundColor: colors.border, opacity }} />;
 }
 
 function StatePanel({ title, body, actionLabel, onAction, secondaryActionLabel, onSecondaryAction, error }: { title: string; body?: string; actionLabel?: string; onAction?: () => void; secondaryActionLabel?: string; onSecondaryAction?: () => void; error?: boolean }) {
@@ -887,26 +896,29 @@ export function EmptyState(props: { title: string; body?: string; actionLabel?: 
 }
 
 export function ErrorState(props: { title?: string; body?: string; actionLabel?: string; onAction?: () => void }) {
-  return <StatePanel title="Something went wrong" {...props} error />;
+  const t = useT();
+  return <StatePanel title={t("shell.somethingWentWrong")} {...props} error />;
 }
 
 export function EditorHeading({ name, onRename, accessibilityLabel }: { name: string; onRename?: () => void; accessibilityLabel?: string }) {
   const { colors } = useTheme();
+  const t = useT();
   const title = <Text display numberOfLines={2} style={[typography.title, styles.headingText, { color: colors.text }]}>{name}</Text>;
   if (!onRename) return <View accessibilityRole="header" style={styles.heading}>{title}</View>;
   return (
-    <Pressable accessibilityLabel={accessibilityLabel ?? `Rename ${name}`} accessibilityRole="button" hitSlop={spacing.sm} onPress={onRename} style={styles.heading}>
+    <Pressable accessibilityLabel={accessibilityLabel ?? t("shell.rename", { name })} accessibilityRole="button" hitSlop={spacing.sm} onPress={onRename} style={styles.heading}>
       {title}
       <Icon color={colors.textDim} name="edit" size={18} />
     </Pressable>
   );
 }
 
-export function OfflineBanner({ message = "You're offline. Connect to refresh." }: { message?: string }) {
+export function OfflineBanner({ message }: { message?: string }) {
   const { colors } = useTheme();
+  const t = useT();
   return (
     <View accessibilityLiveRegion="polite" accessibilityRole="alert" style={[styles.banner, { backgroundColor: colors.accentSoft }]}>
-      <Text {...dynamicType} style={[typography.body, styles.bannerText, { color: colors.text }]}>{message}</Text>
+      <Text {...dynamicType} style={[typography.body, styles.bannerText, { color: colors.text }]}>{message ?? t("shell.offline")}</Text>
     </View>
   );
 }
