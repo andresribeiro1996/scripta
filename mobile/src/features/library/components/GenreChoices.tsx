@@ -1,10 +1,12 @@
 import { Pressable, StyleSheet, View } from "react-native";
-import { BOOK_GENRES, type BookGenre } from "@scripta/shared";
+import { BOOK_GENRES, genreLabel, type BookGenre } from "@scripta/shared";
 import { Text } from "../../../ui/Text";
 import { radii, spacing, useTheme } from "../../../ui/theme";
+import { useLocale } from "../../../i18n";
 
 export function GenreChoices({ value, onChange }: { value: readonly BookGenre[]; onChange: (next: BookGenre[]) => void }) {
   const { colors } = useTheme();
+  const locale = useLocale();
   return (
     <View style={styles.choices}>
       {BOOK_GENRES.map((genre) => {
@@ -17,7 +19,7 @@ export function GenreChoices({ value, onChange }: { value: readonly BookGenre[];
             onPress={() => onChange(checked ? value.filter((item) => item !== genre) : [...value, genre])}
             style={[styles.choice, { backgroundColor: checked ? colors.accentSoft : colors.surface, borderColor: checked ? colors.accent : colors.border }]}
           >
-            <Text style={{ color: checked ? colors.accent : colors.text }}>{genre}</Text>
+            <Text style={{ color: checked ? colors.accent : colors.text }}>{genreLabel(genre, locale)}</Text>
           </Pressable>
         );
       })}

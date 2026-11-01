@@ -8,6 +8,7 @@ import {
   BOOK_FORMATS,
   buildManualBook,
   coverQueryKey,
+  genreLabel,
   normalizeIsbn,
   searchInsideOutside,
   searchResultByline,
@@ -37,23 +38,25 @@ import { FoundCovers } from "./FoundCovers";
 import { GenreChoices } from "./GenreChoices";
 import { IsbnScanner } from "./IsbnScanner";
 import { Chip } from "./StyleControls";
-import { useLocale } from "../../../i18n";
+import { t as translateNow, useLocale, useT, type MobileMessages } from "../../../i18n";
 
-const FORMAT_CHIPS: Record<BookFormat, { label: string; icon: IconName }> = {
-  hardcopy: { label: "Hardcopy", icon: "book" },
-  ebook: { label: "Ebook", icon: "ebook" },
-  audiobook: { label: "Audiobook", icon: "audiobook" },
-  other: { label: "Other", icon: "otherFormat" },
+type MessageKey = Extract<keyof MobileMessages, string>;
+
+const FORMAT_CHIPS: Record<BookFormat, { labelKey: MessageKey; icon: IconName }> = {
+  hardcopy: { labelKey: "addBook.formatHardcopy", icon: "book" },
+  ebook: { labelKey: "addBook.formatEbook", icon: "ebook" },
+  audiobook: { labelKey: "addBook.formatAudiobook", icon: "audiobook" },
+  other: { labelKey: "addBook.formatOther", icon: "otherFormat" },
 };
 
-const STATUS_OPTIONS = [
-  { value: 1, label: "Reading" },
-  { value: 0, label: "To read" },
-  { value: 2, label: "Finished" },
+const STATUS_OPTIONS: Array<{ value: number; labelKey: MessageKey }> = [
+  { value: 1, labelKey: "library.layoutReading" },
+  { value: 0, labelKey: "addBook.statusToRead" },
+  { value: 2, labelKey: "shell.finished" },
 ];
 
-const UPLOAD_CLEANUP_FAILED = "Couldn't remove the uploaded photo from your gallery.";
-const REPLACED_CLEANUP_FAILED = "Couldn't remove the replaced photo from your gallery.";
+const UPLOAD_CLEANUP_FAILED = "addBook.uploadCleanupFailed";
+const REPLACED_CLEANUP_FAILED = "addBook.replacedCleanupFailed";
 
 function draftCoverUrl(cover: DraftCover): string | null {
   switch (cover.kind) {
@@ -80,6 +83,7 @@ export function AddBookForm({
   initialScanning?: boolean;
 }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const toast = useToast();
   const insets = useSafeAreaInsets();
@@ -125,8 +129,8 @@ export function AddBookForm({
     setOutsidePending(false);
   }, []));
 
-  function removeUpload(imageId: string, failure: string) {
-    deleteGalleryImage(imageId).catch(() => toastRef.current.show(failure, "error"));
+  function removeUpload(imageId: string, failure: MessageKey) {
+    deleteGalleryImage(imageId).catch(() => toastRef.current.show(translateNow(failure), "error"));
   }
 
   useEffect(() => {
@@ -223,7 +227,7 @@ export function AddBookForm({
     } catch (err) {
       if (run !== searchRun.current) return;
       setSearching(false);
-      setSearchError(err instanceof Error ? err.message : "Search failed — try again.");
+      setSearchError(err instanceof Error ? err.message : t("addBook.searchFailed"));
     }
   }
 
@@ -238,7 +242,7 @@ export function AddBookForm({
   async function handleUpload() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      setUploadError("Photo library access is off — enable it in Settings to upload a cover.");
+      setUploadError(t("library.photoAccessOffCover"));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.9 });
@@ -255,7 +259,7 @@ export function AddBookForm({
       if (mounted.current) setCover({ kind: "upload", image });
       else removeUpload(image.id, UPLOAD_CLEANUP_FAILED);
     } catch (err) {
-      if (mounted.current) setUploadError(err instanceof Error ? err.message : "Couldn't upload that image.");
+      if (mounted.current) setUploadError(err instanceof Error ? err.message : t("library.uploadFailed"));
     } finally {
       if (mounted.current) setUploading(false);
     }
@@ -294,10 +298,10 @@ export function AddBookForm({
     pendingSave.current = attempt.then(() => true, saveMayHaveLanded);
     try {
       await attempt;
-      toast.show("Added to your library", "success");
+      toast.show(t("addBook.added"), "success");
       if (mounted.current) onClose();
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Couldn't add that book.");
+      setSaveError(err instanceof Error ? err.message : t("addBook.addFailed"));
     } finally {
       setSaving(false);
     }
@@ -313,16 +317,16 @@ export function AddBookForm({
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={filledFrom ? `Search for a book, filled from ${filledFrom}` : "Search for a book"}
+            accessibilityLabel={filledFrom ? t("addBook.searchCardFilled", { title: filledFrom }) : t("addBook.searchCard")}
             accessibilityState={{ expanded: searchOpen }}
             onPress={toggleSearchCard}
             style={styles.cardHeader}
           >
             <Icon name="search" size={20} color={colors.accent} />
             <View style={styles.cardHeaderText}>
-              <Text style={[typography.body, { color: colors.text, fontWeight: "600" }]}>Search for a book</Text>
+              <Text style={[typography.body, { color: colors.text, fontWeight: "600" }]}>{t("addBook.searchCard")}</Text>
               <Text numberOfLines={1} style={[typography.caption, { color: colors.accent }]}>
-                {filledFrom ? `Filled from “${filledFrom}” · tap to search again` : "Auto-fill title, author, pages & cover"}
+                {filledFrom ? t("addBook.filledFrom", { title: filledFrom }) : t("addBook.autoFill")}
               </Text>
             </View>
             <View style={searchOpen ? styles.chevronOpen : null}>
@@ -334,8 +338,8 @@ export function AddBookForm({
               <View style={styles.searchRow}>
                 <View style={styles.grow}>
                   <Input
-                    accessibilityLabel="Title, author or ISBN"
-                    placeholder="Title, author or ISBN"
+                    accessibilityLabel={t("addBook.queryPlaceholder")}
+                    placeholder={t("addBook.queryPlaceholder")}
                     value={query}
                     onChangeText={setQuery}
                     onSubmitEditing={() => void runSearch()}
@@ -344,15 +348,15 @@ export function AddBookForm({
                     returnKeyType="search"
                   />
                 </View>
-                <IconButton name="scan" framed accessibilityLabel={scanning ? "Stop scanning" : "Scan barcode"} disabled={saving} onPress={toggleScanner} />
-                <IconButton name="search" framed tone="accent" accessibilityLabel="Search" disabled={searching || query.trim() === ""} onPress={() => void runSearch()} />
+                <IconButton name="scan" framed accessibilityLabel={scanning ? t("addBook.stopScanning") : t("library.scanBarcode")} disabled={saving} onPress={toggleScanner} />
+                <IconButton name="search" framed tone="accent" accessibilityLabel={t("shell.tabSearch")} disabled={searching || query.trim() === ""} onPress={() => void runSearch()} />
               </View>
-              {scanning ? <IsbnScanner hint="Point at the ISBN barcode on the back cover." onIsbn={handleScanned} /> : null}
+              {scanning ? <IsbnScanner hint={t("addBook.scanHint")} onIsbn={handleScanned} /> : null}
               {searchError ? <Text style={[typography.caption, { color: colors.danger }]}>{searchError}</Text> : null}
-              {results !== null && results.length > 0 ? <Text style={[typography.caption, { color: colors.textDim }]}>Tap a result to fill the form</Text> : null}
+              {results !== null && results.length > 0 ? <Text style={[typography.caption, { color: colors.textDim }]}>{t("addBook.tapResult")}</Text> : null}
               {results !== null ? (
                 <View style={{ gap: spacing.xs }}>
-                  {results.length === 0 && !outsidePending && <Text style={[typography.body, { color: colors.textDim }]}>No matches — fill the form in below by hand instead.</Text>}
+                  {results.length === 0 && !outsidePending && <Text style={[typography.body, { color: colors.textDim }]}>{t("addBook.noMatches")}</Text>}
                   {results.map((r, i) => (
                     <Pressable
                       accessibilityRole="button"
@@ -381,8 +385,8 @@ export function AddBookForm({
                       <Icon name="chevronRight" size={18} color={colors.textDim} />
                     </Pressable>
                   ))}
-                  {outsidePending && <Text style={[typography.caption, { color: colors.textDim }]}>Searching Open Library…</Text>}
-                  {outsideFailed && <Text style={[typography.caption, { color: colors.textDim }]}>Couldn't reach Open Library</Text>}
+                  {outsidePending && <Text style={[typography.caption, { color: colors.textDim }]}>{t("addBook.searchingOpenLibrary")}</Text>}
+                  {outsideFailed && <Text style={[typography.caption, { color: colors.textDim }]}>{t("addBook.openLibraryFailed")}</Text>}
                 </View>
               ) : null}
             </View>
@@ -392,57 +396,57 @@ export function AddBookForm({
         <View style={styles.coverRow}>
           <View style={[styles.cover, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
             {coverUrl ? (
-              <Image accessibilityLabel="Cover preview" source={{ uri: coverUrl }} style={styles.coverImage} contentFit="cover" />
+              <Image accessibilityLabel={t("addBook.coverPreview")} source={{ uri: coverUrl }} style={styles.coverImage} contentFit="cover" />
             ) : (
               <Icon name="book" size={28} color={colors.accent} />
             )}
           </View>
           <View style={styles.coverSide}>
-            <Text style={[typography.body, { color: colors.text, fontWeight: "600" }]}>Cover image</Text>
+            <Text style={[typography.body, { color: colors.text, fontWeight: "600" }]}>{t("addBook.coverImage")}</Text>
             <Text style={[typography.caption, { color: colors.textDim }]}>{coverStatusLabel(cover)}</Text>
             <View style={styles.coverButtons}>
               <View style={styles.grow}>
-                <Button label="Find cover" variant="secondary" disabled={!canFindCover || saving || uploading} onPress={openCoverSearch} />
+                <Button label={t("addBook.findCover")} variant="secondary" disabled={!canFindCover || saving || uploading} onPress={openCoverSearch} />
               </View>
               <View style={styles.grow}>
-                <Button label={uploading ? "Uploading…" : "Upload"} variant="secondary" loading={uploading} disabled={saving} onPress={() => void handleUpload()} />
+                <Button label={uploading ? t("library.uploading") : t("addBook.upload")} variant="secondary" loading={uploading} disabled={saving} onPress={() => void handleUpload()} />
               </View>
             </View>
-            {!canFindCover ? <Text style={[typography.caption, { color: colors.textDim }]}>Add a title or ISBN to find a cover.</Text> : null}
+            {!canFindCover ? <Text style={[typography.caption, { color: colors.textDim }]}>{t("addBook.needTitleOrIsbn")}</Text> : null}
             {uploadError ? <Text style={[typography.caption, { color: colors.danger }]}>{uploadError}</Text> : null}
           </View>
         </View>
 
-        <Input label="Title *" accessibilityLabel="Title (required)" placeholder="e.g. The Hobbit" value={title} onChangeText={setTitle} />
-        <Input label="Author *" accessibilityLabel="Author (required)" placeholder="e.g. J.R.R. Tolkien" value={author} onChangeText={setAuthor} />
+        <Input label={t("addBook.titleLabel")} accessibilityLabel={t("addBook.titleRequired")} placeholder={t("addBook.titleExample")} value={title} onChangeText={setTitle} />
+        <Input label={t("addBook.authorLabel")} accessibilityLabel={t("addBook.authorRequired")} placeholder={t("addBook.authorExample")} value={author} onChangeText={setAuthor} />
 
         <View style={styles.group}>
-          <FieldLabel>Format</FieldLabel>
+          <FieldLabel>{t("addBook.format")}</FieldLabel>
           <View style={styles.chips}>
             {BOOK_FORMATS.map((value) => (
-              <Chip key={value} label={FORMAT_CHIPS[value].label} icon={FORMAT_CHIPS[value].icon} selected={format === value} onPress={() => setFormat(value)} />
+              <Chip key={value} label={t(FORMAT_CHIPS[value].labelKey)} icon={FORMAT_CHIPS[value].icon} selected={format === value} onPress={() => setFormat(value)} />
             ))}
           </View>
         </View>
 
-        <Input label="Total pages" placeholder="e.g. 310" value={pagesText} onChangeText={setPagesText} keyboardType="number-pad" maxLength={5} />
+        <Input label={t("addBook.totalPages")} placeholder={t("addBook.pagesExample")} value={pagesText} onChangeText={setPagesText} keyboardType="number-pad" maxLength={5} />
 
         <View style={styles.group}>
-          <FieldLabel>Genre (optional)</FieldLabel>
+          <FieldLabel>{t("addBook.genreOptional")}</FieldLabel>
           <View style={styles.chips}>
             {genres.map((genre) => (
-              <Chip key={genre} label={genre} selected onPress={() => changeGenres(genres.filter((item) => item !== genre))} />
+              <Chip key={genre} label={genreLabel(genre, locale)} selected onPress={() => changeGenres(genres.filter((item) => item !== genre))} />
             ))}
-            <Chip label={genresOpen ? "Done" : "+ Add"} selected={genresOpen} onPress={() => setGenresOpen((open) => !open)} />
+            <Chip label={genresOpen ? t("library.done") : t("addBook.addGenre")} selected={genresOpen} onPress={() => setGenresOpen((open) => !open)} />
           </View>
           {genresOpen ? <GenreChoices value={genres} onChange={changeGenres} /> : null}
         </View>
 
         <View style={styles.group}>
-          <FieldLabel>Add as</FieldLabel>
+          <FieldLabel>{t("addBook.addAs")}</FieldLabel>
           <View style={styles.statusRow}>
             {STATUS_OPTIONS.map((option) => (
-              <Chip key={option.value} grow label={option.label} selected={readStatus === option.value} onPress={() => setReadStatus(option.value)} />
+              <Chip key={option.value} grow label={t(option.labelKey)} selected={readStatus === option.value} onPress={() => setReadStatus(option.value)} />
             ))}
           </View>
         </View>
@@ -450,20 +454,20 @@ export function AddBookForm({
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="More details"
+            accessibilityLabel={t("addBook.moreDetails")}
             accessibilityState={{ expanded: moreOpen }}
             onPress={() => setMoreOpen((open) => !open)}
             style={styles.cardHeader}
           >
-            <Text style={[typography.body, styles.grow, { color: colors.textDim }]}>More details · ISBN, publisher</Text>
+            <Text style={[typography.body, styles.grow, { color: colors.textDim }]}>{t("addBook.moreDetailsHint")}</Text>
             <View style={moreOpen ? styles.chevronOpen : null}>
               <Icon name="chevronDown" size={20} color={colors.textDim} />
             </View>
           </Pressable>
           {moreOpen ? (
             <View style={[styles.cardBody, { borderTopColor: colors.border }]}>
-              <Input label="ISBN" value={isbn} onChangeText={setIsbn} keyboardType="numeric" />
-              <Input label="Publisher" value={publisher} onChangeText={setPublisher} />
+              <Input label={t("addBook.isbn")} value={isbn} onChangeText={setIsbn} keyboardType="numeric" />
+              <Input label={t("addBook.publisher")} value={publisher} onChangeText={setPublisher} />
             </View>
           ) : null}
         </View>
@@ -471,10 +475,10 @@ export function AddBookForm({
 
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
         {saveError ? <Text style={[typography.caption, { color: colors.danger }]}>{saveError}</Text> : null}
-        <Button label={saving ? "Adding…" : "Add to library"} loading={saving} disabled={!canSave} onPress={() => void handleSave()} />
+        <Button label={saving ? t("addBook.adding") : t("addBook.addToLibrary")} loading={saving} disabled={!canSave} onPress={() => void handleSave()} />
       </View>
 
-      <Sheet visible={coverLookup !== null} title="Find a cover" onClose={() => setCoverLookup(null)}>
+      <Sheet visible={coverLookup !== null} title={t("addBook.findCoverTitle")} onClose={() => setCoverLookup(null)}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xl }}>
           {coverLookup ? (
             <FoundCovers

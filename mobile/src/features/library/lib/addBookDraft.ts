@@ -1,5 +1,6 @@
 import { positiveInteger, setBookCover, setBookCoverUrl, type GalleryImage } from "@scripta/shared";
 import { isPermanentError } from "../../../core/apiClient";
+import { t } from "../../../i18n";
 
 export type DraftCover =
   | { kind: "none" }
@@ -40,11 +41,11 @@ export function parsePages(text: string): number | null {
   return /^\d+$/.test(trimmed) ? positiveInteger(Number(trimmed)) : null;
 }
 
-export function coverStatusLabel(cover: DraftCover): "No cover yet" | "From search" | "Chosen" | "Uploaded" {
+export function coverStatusLabel(cover: DraftCover): string {
   switch (cover.kind) {
-    case "none": return "No cover yet";
-    case "search": return "From search";
-    case "found": return "Chosen";
-    case "upload": return "Uploaded";
+    case "none": return t("addBook.coverNone");
+    case "search": return t("addBook.coverFromSearch");
+    case "found": return t("addBook.coverChosen");
+    case "upload": return t("addBook.coverUploaded");
   }
 }
