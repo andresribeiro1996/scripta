@@ -197,6 +197,8 @@ export const en = {
   "murals.folderMissing": "That folder doesn't exist.",
   "murals.folderCycle": "A folder can't be moved into itself or one of its own subfolders.",
   "murals.conflict": "This mural changed elsewhere since it was loaded.",
+  "murals.privatePassage": "Private passage",
+  "murals.privatePassageBody": "Rediscovered passages are only visible to the owner.",
   "gallery.invalidImage": "That file isn't a valid image (or is corrupted) — only JPEG, PNG, and WebP are supported.",
   "gallery.fileTooLarge": "Files can't be larger than {mb} MB.",
   "gallery.dimensionsTooLarge": "Image dimensions can't exceed {max}×{max}px.",

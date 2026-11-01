@@ -381,7 +381,7 @@ test("suggested people GET is authed, defaults the limit to 20, and validates it
   await app.register(
     buildCommunityRoutes(
       fakeService({
-        suggestPeople: (viewerId, limit, previews) => {
+        suggestPeople: (viewerId, limit, _locale, previews) => {
           seen.push({ viewerId, limit, previews });
           return [suggestion];
         }

@@ -146,7 +146,7 @@ export function buildCommunityRoutes(service: CommunityService) {
       scoped.get("/community/people/suggested", { preHandler: authGuard }, async (request, reply) => {
         const parsed = suggestedQuerySchema.safeParse(request.query);
         if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "community.expectedSuggestedQuery") });
-        return reply.send({ people: service.suggestPeople(request.user.id, parsed.data.limit, parsed.data.previews === "1") });
+        return reply.send({ people: service.suggestPeople(request.user.id, parsed.data.limit, localeOf(request), parsed.data.previews === "1") });
       });
     });
   };
@@ -158,7 +158,7 @@ export function buildPublicCommunityRoutes(service: CommunityService) {
       const { username } = request.params as { username: string };
       try {
         const viewer = getOptionalAuthenticatedUser(request);
-        const view = service.getProfileByUsername(username, viewer?.id);
+        const view = service.getProfileByUsername(username, localeOf(request), viewer?.id);
         reply.header("Cache-Control", "no-store");
         return reply.send(view);
       } catch (err) {

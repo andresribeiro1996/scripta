@@ -303,7 +303,7 @@ export function buildPublicMuralRoutes(service: MuralsService, getTierlistData?:
       // are the whole privacy boundary this route exists to enforce — see
       // resolvePublicLibraryData's top comment (modules/library/publicResolver.ts)
       // for exactly what is and isn't safe to include in the response built from them.
-      const payload = resolveMuralPublicPayload(row, blocks, getTierlistData);
+      const payload = resolveMuralPublicPayload(row, blocks, localeOf(request), getTierlistData);
       reply.header("Cache-Control", "no-store");
       return reply.send({
         mural: payload.mural,

@@ -760,7 +760,7 @@ test("getProfileByUsername assembles identity, mural, and published content", ()
   tournamentRefs.set("g1", tournRef("g1", "alice"));
   service.follow("bob", "alice");
 
-  const view = service.getProfileByUsername("alice", "bob");
+  const view = service.getProfileByUsername("alice", "en", "bob");
   assert.equal(view.profile.user.username, "user-alice");
   assert.equal(view.profile.viewerFollows, true);
   assert.equal(view.profile.followerCount, 1);
@@ -768,7 +768,7 @@ test("getProfileByUsername assembles identity, mural, and published content", ()
   assert.deepEqual(view.published.tierlists.map((t) => t.id), ["t1"]);
   assert.deepEqual(view.published.tournaments.map((t) => t.id), ["g1"]);
 
-  const anonymous = service.getProfileByUsername("alice");
+  const anonymous = service.getProfileByUsername("alice", "en");
   assert.equal(anonymous.profile.viewerFollows, undefined);
 });
 
@@ -782,7 +782,7 @@ test("getProfileByUsername's user carries a reader glyph only when published, sw
   repo.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, readerGlyph: true });
   readerGlyphs.set("alice", "star");
 
-  const view = service.getProfileByUsername("alice");
+  const view = service.getProfileByUsername("alice", "en");
   assert.equal(view.profile.user.readerGlyph, "star");
   assert.deepEqual(readerGlyphCalls, ["alice"]);
 });
@@ -791,7 +791,7 @@ test("getProfileByUsername 404s for an unknown username", () => {
   const { repo } = createRepoFake();
   const { deps } = createDeps(repo);
   const service = createCommunityService(deps);
-  assert.throws(() => service.getProfileByUsername("ghost"), ProfileNotFoundError);
+  assert.throws(() => service.getProfileByUsername("ghost", "en"), ProfileNotFoundError);
 });
 
 test("the owner sees their own unpublished profile in full", () => {
@@ -804,7 +804,7 @@ test("the owner sees their own unpublished profile in full", () => {
   muralPayloads.set("alice:m1", fakePayload);
   tierlistRefs.set("t1", tierRef("t1", "alice"));
   profiles.set("alice", profileRow("alice", { published: 0, mural_id: "m1" }));
-  const view = service.getProfileByUsername("alice", "alice");
+  const view = service.getProfileByUsername("alice", "en", "alice");
   assert.equal(view.private, false);
   assert.equal(view.profile.publishedAt, null);
   assert.deepEqual(view.mural, fakePayload);
@@ -818,7 +818,7 @@ test("owner without a profiles row sees their own profile", () => {
   const service = createCommunityService(deps);
   usernames.set("alice", "alice");
   readerProfiles.set("alice", reader("alice"));
-  const view = service.getProfileByUsername("alice", "alice");
+  const view = service.getProfileByUsername("alice", "en", "alice");
   assert.equal(view.private, false);
   assert.equal(view.mural, null);
 });
@@ -832,7 +832,7 @@ test("a follower of an unpublished user still gets the private shell and 404s", 
   libraries.set("alice", { books: [] });
   profiles.set("alice", profileRow("alice", { published: 0 }));
   repo.insertFollow({ follower_id: "bob", followee_id: "alice", created_at: at(1) });
-  const view = service.getProfileByUsername("alice", "bob");
+  const view = service.getProfileByUsername("alice", "en", "bob");
   assert.equal(view.private, true);
   assert.equal(view.mural, null);
   assert.throws(() => service.getActivity("alice", "bob", undefined, 10, "en"), ProfileNotFoundError);
@@ -858,7 +858,7 @@ test("getProfileByUsername shows an unpublished user as private, with nothing pu
   repo.insertFollow({ follower_id: "bob", followee_id: "alice", created_at: at(1) });
   repo.insertFollow({ follower_id: "alice", followee_id: "bob", created_at: at(1) });
 
-  const view = service.getProfileByUsername("alice", "me");
+  const view = service.getProfileByUsername("alice", "en", "me");
   assert.equal(view.private, true);
   assert.equal(view.profile.user.username, "user-alice");
   assert.equal(view.profile.user.readerGlyph, undefined);
@@ -869,7 +869,7 @@ test("getProfileByUsername shows an unpublished user as private, with nothing pu
   assert.equal(view.mural, null);
   assert.deepEqual(view.published, { tierlists: [], tournaments: [], quizzes: [] });
 
-  assert.equal(service.getProfileByUsername("bob").private, true);
+  assert.equal(service.getProfileByUsername("bob", "en").private, true);
 });
 
 test("getProfileByUsername marks a published profile as not private", () => {
@@ -879,7 +879,7 @@ test("getProfileByUsername marks a published profile as not private", () => {
   usernames.set("alice", "alice");
   readerProfiles.set("alice", reader("alice"));
   profiles.set("alice", profileRow("alice"));
-  const view = service.getProfileByUsername("alice");
+  const view = service.getProfileByUsername("alice", "en");
   assert.equal(view.private, false);
   assert.equal(view.profile.publishedAt, "2026-09-01T00:00:00.000Z");
 });
@@ -891,7 +891,7 @@ test("a profile mural deleted later resolves to null without breaking the view",
   usernames.set("alice", "alice");
   readerProfiles.set("alice", reader("alice"));
   profiles.set("alice", profileRow("alice", { mural_id: "deleted" }));
-  const view = service.getProfileByUsername("alice");
+  const view = service.getProfileByUsername("alice", "en");
   assert.equal(view.mural, null);
   assert.equal(view.profile.user.username, "user-alice");
 });
@@ -2222,8 +2222,8 @@ test("feed settings round-trip and reach only the owner's profile view", () => {
   const settings = { publications: false, reading: true, votes: false, follows: true };
   service.updateFeedSettings("alice", settings);
   assert.deepEqual(service.getFeedSettings("alice"), settings);
-  assert.deepEqual(service.getProfileByUsername("alice", "alice").feedSettings, settings);
-  assert.equal(service.getProfileByUsername("alice", "bob").feedSettings, undefined);
+  assert.deepEqual(service.getProfileByUsername("alice", "en", "alice").feedSettings, settings);
+  assert.equal(service.getProfileByUsername("alice", "en", "bob").feedSettings, undefined);
 });
 
 function withBackgroundTasks(deps: CommunityDeps): Promise<void>[] {
@@ -2487,7 +2487,7 @@ function suggestionFixture() {
       sharedShelves.set(id, Array.from({ length: shared }, (_, n) => ({ title: `Book ${n + 1}`, author: "A. Writer", coverUrl: null })));
     }
   };
-  const suggested = (limit = 20) => service.suggestPeople("viewer", limit);
+  const suggested = (limit = 20) => service.suggestPeople("viewer", limit, "en");
   return { repo, service, readerProfiles, readerGlyphs, libraryCalls, sharedCounts, sharedShelves, sharedBookCountsCalls, sharedBooksCalls, addReader, suggested };
 }
 
@@ -2638,20 +2638,20 @@ test("portrait previews resolve only the returned readers' selected public mural
   muralPayloads.set("first:m-first", payload);
   const calls: string[] = [];
   const resolve = deps.murals.getMuralPublicPayload;
-  deps.murals.getMuralPublicPayload = (owner, muralId) => {
+  deps.murals.getMuralPublicPayload = (owner, muralId, locale) => {
     calls.push(`${owner}:${muralId}`);
-    return resolve(owner, muralId);
+    return resolve(owner, muralId, locale);
   };
   const service = createCommunityService(deps);
-  assert.equal("mural" in service.suggestPeople("viewer", 1)[0]!, false);
+  assert.equal("mural" in service.suggestPeople("viewer", 1, "en")[0]!, false);
   assert.deepEqual(calls, []);
-  assert.deepEqual(service.suggestPeople("viewer", 1, true)[0]?.mural, payload);
+  assert.deepEqual(service.suggestPeople("viewer", 1, "en", true)[0]?.mural, payload);
   assert.deepEqual(calls, ["first:m-first"]);
-  assert.deepEqual(service.suggestPeople("viewer", 3, true).map(person => person.mural), [payload, null, null]);
+  assert.deepEqual(service.suggestPeople("viewer", 3, "en", true).map(person => person.mural), [payload, null, null]);
   assert.deepEqual(libraryCalls, []);
   repo.upsertProfile(profileRow("first", { published: 0, mural_id: "m-first" }));
   calls.length = 0;
-  assert.equal(service.suggestPeople("viewer", 3, true).some(person => person.user.userId === "first"), false);
+  assert.equal(service.suggestPeople("viewer", 3, "en", true).some(person => person.user.userId === "first"), false);
   assert.deepEqual(calls, ["second:m-second"]);
 });
 
@@ -2665,10 +2665,10 @@ test("portrait previews recheck visibility and propagate resolver failures", () 
   let calls = 0;
   deps.murals.getMuralPublicPayload = () => { calls++; throw new Error("Preview unavailable"); };
   const service = createCommunityService(deps);
-  assert.equal(service.suggestPeople("viewer", 1, true)[0]?.mural, null);
+  assert.equal(service.suggestPeople("viewer", 1, "en", true)[0]?.mural, null);
   assert.equal(calls, 0);
   repo.upsertProfile(row);
-  assert.throws(() => service.suggestPeople("viewer", 1, true), /Preview unavailable/);
+  assert.throws(() => service.suggestPeople("viewer", 1, "en", true), /Preview unavailable/);
 });
 
 test("a follower's dashboard shows a quiz publication and a quiz play, each under its own switch", () => {
@@ -2822,7 +2822,7 @@ test("profile published lists and completions send at most three covers per game
   deps.completedTournaments = () => [{ card: tournRef("cup", "alice", { status: "completed", covers }), completedAt: at(10), winner: { workId: "w1", title: "Dune", author: "Frank Herbert", cover: null } }];
   const service = createCommunityService(deps);
 
-  const { published } = service.getProfileByUsername("alice");
+  const { published } = service.getProfileByUsername("alice", "en");
   assert.deepEqual([published.tierlists[0]?.covers, published.tournaments[0]?.covers, published.quizzes[0]?.covers], [["a", "b", "c"], ["a", "b", "c"], ["a", "b", "c"]]);
   const completion = service.getDashboard("viewer", undefined, 20, new Set(["completion"])).items[0];
   assert.equal(completion?.kind === "completion" ? completion.tournament.covers.length : null, 3);
@@ -2850,9 +2850,9 @@ test("a profile's Published list includes its quizzes, and nothing while unpubli
   quizRefs.set("q1", quizRef("q1", "alice"));
   quizRefs.set("q2", quizRef("q2", "bob"));
 
-  assert.deepEqual(service.getProfileByUsername("alice").published.quizzes.map((q) => [q.kind, q.id]), [["quiz", "q1"]]);
+  assert.deepEqual(service.getProfileByUsername("alice", "en").published.quizzes.map((q) => [q.kind, q.id]), [["quiz", "q1"]]);
   repo.upsertProfile(profileRow("alice", { published: 0 }));
-  assert.deepEqual(service.getProfileByUsername("alice").published.quizzes, []);
+  assert.deepEqual(service.getProfileByUsername("alice", "en").published.quizzes, []);
 });
 
 test("discover's quiz filter returns only quizzes, all includes them, and the viewer's played flag is set", () => {

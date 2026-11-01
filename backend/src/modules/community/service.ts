@@ -113,12 +113,12 @@ export interface CommunityService {
   unpublishProfile(userId: string): void;
   getOwnProfile(userId: string): OwnProfile;
   setShelfMural(userId: string, muralId: string): void;
-  getProfileByUsername(username: string, viewerId?: string): CommunityProfileView;
+  getProfileByUsername(username: string, locale: Locale, viewerId?: string): CommunityProfileView;
   getDashboard(viewerId: string, cursor: string | undefined, limit: number, kinds?: ReadonlySet<string>): DashboardFeedPage & { newCount: number };
   markDashboardSeen(viewerId: string): void;
   getDiscover(type: DiscoverType, q: string, limit: number, offset: number, viewerId?: string): { items: DiscoverItem[]; nextOffset: number | null };
   searchPeople(viewerId: string, q: string, limit: number): PersonResult[];
-  suggestPeople(viewerId: string, limit: number, previews?: boolean): SuggestedReader[];
+  suggestPeople(viewerId: string, limit: number, locale: Locale, previews?: boolean): SuggestedReader[];
   getActivity(username: string, viewerId: string | undefined, cursor: string | undefined, limit: number, locale: Locale): Page<ActivityItem>;
   getLibrary(username: string, viewerId?: string): { data: Record<string, unknown> | null };
   getFeedSettings(userId: string): FeedSettings;
@@ -399,7 +399,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       });
       if (existing?.published === 1 && existing.mural_id !== muralId) emit(userId, "mural_published", "mural", muralId);
     },
-    getProfileByUsername(username, viewerId) {
+    getProfileByUsername(username, locale, viewerId) {
       const userId = deps.findUserIdByUsername(username);
       if (!userId) throw new ProfileNotFoundError();
       const author = deps.resolveProfiles([userId]).get(userId);
@@ -408,7 +408,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       const shown = visibility.canViewContent(userId);
       const published = visibility.standing(userId).published;
       const row = repo.getProfileRow(userId);
-      const mural = shown && row?.mural_id ? deps.murals.getMuralPublicPayload(userId, row.mural_id) : null;
+      const mural = shown && row?.mural_id ? deps.murals.getMuralPublicPayload(userId, row.mural_id, locale) : null;
       const glyphOf = glyphLookup();
       const view: CommunityProfileView = {
         private: visibility.isPrivate(userId),
@@ -500,7 +500,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         return [{ user: withGlyph(user, id, glyphOf), followerCount: repo.countFollowers(id), viewerFollows: repo.getFollow(viewerId, id) !== undefined, private: visibility.isPrivate(id) }];
       });
     },
-    suggestPeople(viewerId, limit, previews = false) {
+    suggestPeople(viewerId, limit, locale, previews = false) {
       const followees = new Set(repo.listFollowees(viewerId));
       const candidates = repo
         .listPublishedProfiles(SUGGESTION_SCAN_CAP)
@@ -527,7 +527,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         };
         if (previews) {
           const muralId = !person.private ? repo.getProfileRow(entry.id)?.mural_id : null;
-          person.mural = muralId ? deps.murals.getMuralPublicPayload(entry.id, muralId) : null;
+          person.mural = muralId ? deps.murals.getMuralPublicPayload(entry.id, muralId, locale) : null;
         }
         return person;
       });

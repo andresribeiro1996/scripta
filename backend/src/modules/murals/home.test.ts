@@ -190,3 +190,24 @@ test("a shared mural's tier-list block carries canonical works and resolves its 
     library.close();
   }
 });
+
+test("a shared mural's private passage placeholder follows the request's language", async () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(readFileSync(new URL("./adapters/sqlite/schema.sql", import.meta.url), "utf8"));
+  const service = createMuralsService(createSqliteMuralsRepository(db), (token) => `https://example.test/shared/${token}`, () => "light");
+  const app = Fastify();
+  await app.register(buildPublicMuralRoutes(service));
+  try {
+    const mural = service.createMural("owner", "Passages");
+    service.updateMural("owner", mural.id, { blocks: [{ id: "q", type: "quote", mode: "rediscover", bookKey: "", highlightId: "h", layout: { x: 0, y: 0, w: 8, h: 5 } }], updatedAt: mural.updatedAt });
+    const { shareToken } = service.share("owner", mural.id)!;
+    const url = `/murals/shared/${shareToken}`;
+    const portuguese = (await app.inject({ method: "GET", url, headers: { "accept-language": "pt-PT" } })).json().mural.blocks[0];
+    assert.deepEqual([portuguese.heading, portuguese.body], ["Passagem privada", "As passagens redescobertas só são visíveis para o proprietário."]);
+    const english = (await app.inject({ method: "GET", url })).json().mural.blocks[0];
+    assert.deepEqual([english.heading, english.body], ["Private passage", "Rediscovered passages are only visible to the owner."]);
+  } finally {
+    await app.close();
+    db.close();
+  }
+});

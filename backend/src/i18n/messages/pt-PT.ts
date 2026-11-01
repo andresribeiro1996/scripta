@@ -198,6 +198,8 @@ export const ptPT: CatalogOf<typeof en> = {
   "murals.folderMissing": "Essa pasta não existe.",
   "murals.folderCycle": "Uma pasta não pode ser movida para dentro de si própria nem das suas subpastas.",
   "murals.conflict": "Este mural foi alterado noutro local desde que foi carregado.",
+  "murals.privatePassage": "Passagem privada",
+  "murals.privatePassageBody": "As passagens redescobertas só são visíveis para o proprietário.",
   "gallery.invalidImage": "Esse ficheiro não é uma imagem válida (ou está corrompido) — só são suportados JPEG, PNG e WebP.",
   "gallery.fileTooLarge": "Os ficheiros não podem ter mais de {mb} MB.",
   "gallery.dimensionsTooLarge": "As dimensões da imagem não podem exceder {max}×{max}px.",
