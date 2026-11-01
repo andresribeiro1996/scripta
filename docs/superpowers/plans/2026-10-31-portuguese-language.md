@@ -908,6 +908,7 @@ Genres in `features/works/BookScreen.tsx` use `genreLabel`.
 - Create: `mobile/src/i18n/messages/pt-PT/sharing.ts`
 - Modify: `mobile/src/i18n/messages/en/index.ts`
 - Modify: `mobile/src/i18n/messages/pt-PT/index.ts`
+- Modify: `mobile/src/i18n/index.ts`
 - Modify: `mobile/src/features/sharing/`
 - Modify: `mobile/src/features/socials/`
 - Modify: `mobile/src/features/public/`
