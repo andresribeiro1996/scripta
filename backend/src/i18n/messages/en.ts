@@ -12,6 +12,7 @@ export const en = {
   "auth.avatarTooLarge": "Avatar must be at most {mb} MB.",
   "auth.invalidAvatar": "That file doesn't look like a supported image.",
   "auth.avatarDimensions": "Avatar image is too large — at most {px}px per side.",
+  "auth.invalidUsername": "Invalid username.",
   "auth.usernameMin": "Username must be at least 3 characters.",
   "auth.usernameMax": "Username must be at most 30 characters.",
   "auth.usernameChars": "Username can only contain letters, numbers, underscores, and periods.",

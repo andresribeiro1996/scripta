@@ -13,6 +13,7 @@ export const ptPT: CatalogOf<typeof en> = {
   "auth.avatarTooLarge": "O avatar deve ter no máximo {mb} MB.",
   "auth.invalidAvatar": "Este ficheiro não parece ser uma imagem suportada.",
   "auth.avatarDimensions": "A imagem do avatar é demasiado grande — no máximo {px} px por lado.",
+  "auth.invalidUsername": "Nome de utilizador inválido.",
   "auth.usernameMin": "O nome de utilizador deve ter pelo menos 3 caracteres.",
   "auth.usernameMax": "O nome de utilizador deve ter no máximo 30 caracteres.",
   "auth.usernameChars": "O nome de utilizador só pode conter letras, números, sublinhados e pontos.",

@@ -228,13 +228,13 @@ export function buildAuthRoutes(service: AuthService, avatarUrlFor: (id: string)
       const locale = localeOf(request);
       const parsed = setUsernameSchema.safeParse(request.body);
       if (!parsed.success) {
-        return reply.code(400).send({ error: validationMessage(locale, parsed.error) });
+        return reply.code(400).send({ error: parsed.error.issues[0]?.message === undefined ? t(locale, "auth.invalidUsername") : validationMessage(locale, parsed.error) });
       }
       try {
         const user = await service.setUsername(request.user.id, parsed.data.username);
         return reply.send({ user });
       } catch (err) {
-        if (err instanceof UsernameInUseError) return reply.code(409).send({ error: err.message, field: "username" });
+        if (err instanceof UsernameInUseError) return reply.code(409).send({ error: t(locale, err.key, err.vars), field: "username" });
         throw err;
       }
     });
