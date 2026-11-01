@@ -1,3 +1,4 @@
+import type { Locale } from "@scripta/shared/i18n";
 import { muralThemeId, type ResolvedTierlist } from "@scripta/shared";
 import type { MuralsRepository } from "./domain/ports.js";
 import { muralCoverImageUrl, resolveMuralPublicPayload, type MuralPublicPayload } from "./domain/publicPayload.js";
@@ -6,7 +7,7 @@ export type MuralSummary = Pick<MuralPublicPayload["mural"], "id" | "name" | "th
 
 export interface MuralsPublicApi {
   ownsMural(userId: string, muralId: string): boolean;
-  getMuralPublicPayload(userId: string, muralId: string): MuralPublicPayload | null;
+  getMuralPublicPayload(userId: string, muralId: string, locale: Locale): MuralPublicPayload | null;
   getMuralSummary(userId: string, muralId: string): MuralSummary | null;
 }
 
@@ -18,7 +19,7 @@ export function createMuralsPublicApi(
     ownsMural(userId, muralId) {
       return repo.getOwned(muralId, userId) !== undefined;
     },
-    getMuralPublicPayload(userId, muralId) {
+    getMuralPublicPayload(userId, muralId, locale) {
       const row = repo.getOwned(muralId, userId);
       if (!row) return null;
       let blocks: unknown;
@@ -27,7 +28,7 @@ export function createMuralsPublicApi(
       } catch {
         return null;
       }
-      return resolveMuralPublicPayload(row, blocks, getTierlistData);
+      return resolveMuralPublicPayload(row, blocks, locale, getTierlistData);
     },
     getMuralSummary(userId, muralId) {
       const row = repo.getOwned(muralId, userId);

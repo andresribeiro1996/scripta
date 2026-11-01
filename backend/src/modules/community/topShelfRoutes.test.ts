@@ -81,3 +81,11 @@ test("the Daily Chapter card is opt-in through ?daily=1 and nothing else", async
   assert.equal((await app.inject({ url: "/top-shelf/recaps/2026-09?daily=yes" })).statusCode, 400);
   await app.close();
 });
+
+test("answers a bad month in Portuguese for a Portuguese request", async () => {
+  const app = appWith();
+  const res = await app.inject({ method: "GET", url: "/top-shelf/recaps/nope", headers: { "accept-language": "pt-PT" } });
+  assert.equal(res.statusCode, 400);
+  assert.deepEqual(res.json(), { error: "Mês inválido." });
+  await app.close();
+});

@@ -23,12 +23,14 @@
 // here needs to survive longer than that.
 
 import { randomUUID } from "node:crypto";
+import type { Locale } from "@scripta/shared/i18n";
 
 const LINK_TTL_MS = 10 * 60 * 1000; // 10 minutes — plenty for a redirect round trip
 
 interface PendingLink {
   userId: string;
   provider: string;
+  locale: Locale;
   expiresAt: number;
 }
 
@@ -41,10 +43,10 @@ function sweepExpired(): void {
   }
 }
 
-export function createLinkSession(userId: string, provider: string): string {
+export function createLinkSession(userId: string, provider: string, locale: Locale): string {
   sweepExpired();
   const linkId = randomUUID();
-  pendingLinks.set(linkId, { userId, provider, expiresAt: Date.now() + LINK_TTL_MS });
+  pendingLinks.set(linkId, { userId, provider, locale, expiresAt: Date.now() + LINK_TTL_MS });
   return linkId;
 }
 
@@ -58,10 +60,10 @@ export function peekLinkSession(linkId: string, provider: string): boolean {
 
 /** Called from the callback route once the token exchange has already
  *  succeeded — single-use, so a replayed callback request can't reuse it. */
-export function consumeLinkSession(linkId: string, provider: string): string | null {
+export function consumeLinkSession(linkId: string, provider: string): { userId: string; locale: Locale } | null {
   sweepExpired();
   const link = pendingLinks.get(linkId);
   if (!link || link.provider !== provider) return null;
   pendingLinks.delete(linkId);
-  return link.userId;
+  return { userId: link.userId, locale: link.locale };
 }

@@ -284,7 +284,7 @@ test("choosing feed settings before publishing creates a private profile that ke
 
 test("listPublishedProfiles returns published rows newest update first and skips unpublished ones", () => {
   const r = repo();
-  const at = (day: number) => `2026-11-0${day}T00:00:00.000Z`;
+  const at = (day: number) => `2099-11-0${day}T00:00:00.000Z`;
   r.upsertProfile({ user_id: "listed-a", published: 1, mural_id: null, published_at: at(1), updated_at: at(1), feed_settings: null });
   r.upsertProfile({ user_id: "listed-b", published: 1, mural_id: "m1", published_at: at(1), updated_at: at(3), feed_settings: null });
   r.upsertProfile({ user_id: "listed-hidden", published: 0, mural_id: null, published_at: null, updated_at: at(4), feed_settings: null });

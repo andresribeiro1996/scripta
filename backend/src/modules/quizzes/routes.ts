@@ -7,6 +7,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { QUIZ_QUESTION_TYPES, type PlayResponse } from "@scripta/shared";
+import { localeOf, t, validationMessage } from "../../i18n/index.js";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
 import { duplicateWorkMessage } from "../library/index.js";
 import { sendWorksError } from "../../worksErrors.js";
@@ -34,7 +35,7 @@ const quizDataSchema = z.object({
 });
 
 const createQuizSchema = z.object({
-  name: z.string().trim().min(1, "name is required and must be non-empty.").max(200),
+  name: z.string().trim().min(1, "quizzes.nameRequired").max(200),
   data: quizDataSchema
 });
 
@@ -43,7 +44,7 @@ const createQuizSchema = z.object({
 // update can poison a later publish (null books made publish 500).
 const updateQuizSchema = z
   .object({ name: z.string().min(1).optional(), data: quizDataSchema.optional() })
-  .refine((body) => body.name !== undefined || body.data !== undefined, { message: "At least one of name or data must be provided." });
+  .refine((body) => body.name !== undefined || body.data !== undefined, { message: "quizzes.updateNeedsField" });
 
 const playStateSchema = z.object({ open: z.boolean() });
 
@@ -53,9 +54,10 @@ const playSchema = z.object({
   playerName: z.string().trim().max(40).optional()
 });
 
-function sendWriteFailure(reply: FastifyReply, outcome: Exclude<QuizWriteOutcome, { ok: true }>) {
-  if (outcome.reason === "duplicate-work") return reply.code(409).send({ error: duplicateWorkMessage({ workId: null, title: outcome.title }) });
-  return reply.code(outcome.reason === "not-found" ? 404 : 400).send({ error: outcome.error });
+function sendWriteFailure(request: FastifyRequest, reply: FastifyReply, outcome: Exclude<QuizWriteOutcome, { ok: true }>) {
+  const locale = localeOf(request);
+  if (outcome.reason === "duplicate-work") return reply.code(409).send({ error: duplicateWorkMessage(locale, { workId: null, title: outcome.title }) });
+  return reply.code(outcome.reason === "not-found" ? 404 : 400).send({ error: t(locale, outcome.error) });
 }
 
 export function buildQuizRoutes(service: QuizzesService) {
@@ -66,86 +68,86 @@ export function buildQuizRoutes(service: QuizzesService) {
 
     app.post("/quizzes", { preHandler: authGuard }, async (request, reply) => {
       const parsed = createQuizSchema.safeParse(request.body);
-      if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request." });
+      if (!parsed.success) return reply.code(400).send({ error: validationMessage(localeOf(request), parsed.error) });
       try {
         const outcome = service.createQuiz(request.user.id, parsed.data.name, parsed.data.data);
-        if (!outcome.ok) return sendWriteFailure(reply, outcome);
+        if (!outcome.ok) return sendWriteFailure(request, reply, outcome);
         return reply.code(201).send(quizToWorks(outcome.quiz, outcome.canonical));
       } catch (err) {
-        return sendWorksError(reply, err);
+        return sendWorksError(request, reply, err);
       }
     });
 
     app.get("/quizzes/:id", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
-      if (!params.success) return reply.code(400).send({ error: "Invalid quiz id." });
+      if (!params.success) return reply.code(400).send({ error: t(localeOf(request), "quizzes.invalidId") });
       const quiz = service.getQuiz(request.user.id, params.data.id);
-      if (!quiz) return reply.code(404).send({ error: "No quiz with that id." });
+      if (!quiz) return reply.code(404).send({ error: t(localeOf(request), "quizzes.notFound") });
       return reply.send(quizToWorks(quiz));
     });
 
     app.put("/quizzes/:id", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
-      if (!params.success) return reply.code(400).send({ error: "Invalid quiz id." });
+      if (!params.success) return reply.code(400).send({ error: t(localeOf(request), "quizzes.invalidId") });
       const body = updateQuizSchema.safeParse(request.body);
-      if (!body.success) return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
+      if (!body.success) return reply.code(400).send({ error: validationMessage(localeOf(request), body.error) });
       try {
         const outcome = service.updateQuiz(request.user.id, params.data.id, { ...(body.data.name !== undefined ? { name: body.data.name } : {}), ...(body.data.data !== undefined ? { data: body.data.data } : {}) });
-        if (!outcome.ok) return sendWriteFailure(reply, outcome);
+        if (!outcome.ok) return sendWriteFailure(request, reply, outcome);
         return reply.send(quizToWorks(outcome.quiz, outcome.canonical));
       } catch (err) {
-        return sendWorksError(reply, err);
+        return sendWorksError(request, reply, err);
       }
     });
 
     app.delete("/quizzes/:id", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
-      if (!params.success) return reply.code(400).send({ error: "Invalid quiz id." });
+      if (!params.success) return reply.code(400).send({ error: t(localeOf(request), "quizzes.invalidId") });
       const deleted = service.deleteQuiz(request.user.id, params.data.id);
-      if (!deleted) return reply.code(404).send({ error: "No quiz with that id." });
+      if (!deleted) return reply.code(404).send({ error: t(localeOf(request), "quizzes.notFound") });
       return reply.code(204).send();
     });
 
     app.post("/quizzes/:id/publish", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
-      if (!params.success) return reply.code(400).send({ error: "Invalid quiz id." });
+      if (!params.success) return reply.code(400).send({ error: t(localeOf(request), "quizzes.invalidId") });
       try {
         const outcome = service.publishQuiz(request.user.id, params.data.id);
         if (!outcome.ok) {
-          if (outcome.reason === "not-found") return reply.code(404).send({ error: "No quiz with that id." });
-          if (outcome.reason === "already-published") return reply.code(409).send({ error: outcome.error });
-          return reply.code(400).send({ error: outcome.error });
+          if (outcome.reason === "not-found") return reply.code(404).send({ error: t(localeOf(request), "quizzes.notFound") });
+          if (outcome.reason === "already-published") return reply.code(409).send({ error: t(localeOf(request), outcome.error) });
+          return reply.code(400).send({ error: t(localeOf(request), outcome.error) });
         }
         return reply.code(201).send({ quiz: quizToWorks(outcome.quiz, outcome.canonical), voteCode: outcome.quiz.voteCode });
       } catch (err) {
-        return sendWorksError(reply, err);
+        return sendWorksError(request, reply, err);
       }
     });
 
     app.put("/quizzes/:id/voting", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
-      if (!params.success) return reply.code(400).send({ error: "Invalid quiz id." });
+      if (!params.success) return reply.code(400).send({ error: t(localeOf(request), "quizzes.invalidId") });
       const body = playStateSchema.safeParse(request.body);
-      if (!body.success) return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
+      if (!body.success) return reply.code(400).send({ error: validationMessage(localeOf(request), body.error) });
       const owned = service.getQuiz(request.user.id, params.data.id);
-      if (!owned) return reply.code(404).send({ error: "No quiz with that id." });
+      if (!owned) return reply.code(404).send({ error: t(localeOf(request), "quizzes.notFound") });
       try {
         const known = canonicalForQuiz(owned);
         const quiz = service.setPlayState(request.user.id, params.data.id, body.data.open);
-        if (!quiz) return reply.code(404).send({ error: "No quiz with that id." });
+        if (!quiz) return reply.code(404).send({ error: t(localeOf(request), "quizzes.notFound") });
         return reply.send({ quiz: quizToWorks(quiz, known) });
       } catch (err) {
-        return sendWorksError(reply, err);
+        return sendWorksError(request, reply, err);
       }
     });
 
     app.get("/quizzes/:id/results", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
-      if (!params.success) return reply.code(400).send({ error: "Invalid quiz id." });
+      if (!params.success) return reply.code(400).send({ error: t(localeOf(request), "quizzes.invalidId") });
       // getResults is ownership-checked inside the service; undefined here
       // can only mean "not found or not owned".
       const results = service.getResults(request.user.id, params.data.id);
-      if (!results) return reply.code(404).send({ error: "No quiz with that id." });
+      if (!results) return reply.code(404).send({ error: t(localeOf(request), "quizzes.notFound") });
       return reply.send(results);
     });
   };
@@ -159,9 +161,9 @@ export function buildPublicQuizRoutes(service: QuizzesService) {
   return async function publicQuizRoutes(app: FastifyInstance) {
     app.get("/quizzes/voting/:code", async (request, reply) => {
       const params = codeParamSchema.safeParse(request.params);
-      if (!params.success) return reply.code(404).send({ error: "No quiz at that link." });
+      if (!params.success) return reply.code(404).send({ error: t(localeOf(request), "quizzes.noQuizAtLink") });
       const board = service.getPlayBoard(params.data.code);
-      if (!board) return reply.code(404).send({ error: "No quiz at that link." });
+      if (!board) return reply.code(404).send({ error: t(localeOf(request), "quizzes.noQuizAtLink") });
       return reply.send({ board });
     });
 
@@ -169,10 +171,10 @@ export function buildPublicQuizRoutes(service: QuizzesService) {
       const params = codeParamSchema.safeParse(request.params);
       const body = playSchema.safeParse(request.body);
       if (!params.success || !body.success) {
-        return reply.code(400).send({ error: "Invalid play." });
+        return reply.code(400).send({ error: t(localeOf(request), "quizzes.invalidPlay") });
       }
       const outcome = service.submitPlay(params.data.code, body.data.answers, body.data.durationMs, body.data.playerName ?? null, playerFor(request, null));
-      return sendPlayOutcome(reply, outcome);
+      return sendPlayOutcome(request, reply, outcome);
     });
 
     // Two shapes because the caller may hold either half of what playerFor
@@ -182,18 +184,18 @@ export function buildPublicQuizRoutes(service: QuizzesService) {
     const readPlay = async (request: FastifyRequest, reply: FastifyReply) => {
       const params = codeParamSchema.safeParse(request.params);
       const playId = (request.params as { playId?: string }).playId ?? null;
-      if (!params.success) return reply.code(404).send({ error: "No quiz at that link." });
+      if (!params.success) return reply.code(404).send({ error: t(localeOf(request), "quizzes.noQuizAtLink") });
       const outcome = service.getPlay(params.data.code, playerFor(request, playId));
-      return sendPlayOutcome(reply, outcome);
+      return sendPlayOutcome(request, reply, outcome);
     };
     app.get("/quizzes/voting/:code/play", readPlay);
     app.get("/quizzes/voting/:code/play/:playId", readPlay);
 
     app.get("/quizzes/voting/:code/results", async (request, reply) => {
       const params = codeParamSchema.safeParse(request.params);
-      if (!params.success) return reply.code(404).send({ error: "No quiz at that link." });
+      if (!params.success) return reply.code(404).send({ error: t(localeOf(request), "quizzes.noQuizAtLink") });
       const results = service.getPublicResults(params.data.code);
-      if (!results) return reply.code(404).send({ error: "No quiz at that link." });
+      if (!results) return reply.code(404).send({ error: t(localeOf(request), "quizzes.noQuizAtLink") });
       return reply.send(results);
     });
   };
@@ -207,12 +209,13 @@ function playerFor(request: FastifyRequest, playId: string | null): Player {
   return user ? { kind: "user", userId: user.id } : { kind: "anonymous", playId };
 }
 
-function sendPlayOutcome(reply: FastifyReply, outcome: PlayOutcome) {
+function sendPlayOutcome(request: FastifyRequest, reply: FastifyReply, outcome: PlayOutcome) {
   if (!outcome.ok) {
-    if (outcome.reason === "not-found") return reply.code(404).send({ error: "No quiz at that link." });
-    if (outcome.reason === "closed") return reply.code(403).send({ error: "This quiz isn't open for play." });
-    if (outcome.reason === "already-played") return reply.code(409).send({ error: "You've already played this quiz." });
-    return reply.code(400).send({ error: "Those answers don't match this quiz." });
+    const locale = localeOf(request);
+    if (outcome.reason === "not-found") return reply.code(404).send({ error: t(locale, "quizzes.noQuizAtLink") });
+    if (outcome.reason === "closed") return reply.code(403).send({ error: t(locale, "quizzes.notOpen") });
+    if (outcome.reason === "already-played") return reply.code(409).send({ error: t(locale, "quizzes.alreadyPlayed") });
+    return reply.code(400).send({ error: t(locale, "quizzes.answersMismatch") });
   }
   return reply.send({ playId: outcome.playId, score: outcome.score, correct: outcome.correct, answers: outcome.answers } satisfies PlayResponse);
 }

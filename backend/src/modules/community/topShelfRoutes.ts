@@ -1,6 +1,7 @@
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { localeOf, t } from "../../i18n/index.js";
 import type { TopShelfRecapService } from "./topShelfRecapService.js";
 import type { TopShelfService } from "./topShelfService.js";
 
@@ -21,7 +22,7 @@ export function buildTopShelfRoutes(service: TopShelfService, recaps: TopShelfRe
     });
     app.get("/top-shelf", async (request, reply) => {
       const parsed = querySchema.safeParse(request.query);
-      if (!parsed.success) return reply.code(400).send({ error: "Invalid period/genre/view." });
+      if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "community.invalidTopShelfQuery") });
       return reply.send(service.getTopShelf({ period: parsed.data.period, genre: parsed.data.genre || null, view: parsed.data.view }));
     });
     app.get("/top-shelf/recaps", async (_request, reply) => {
@@ -29,11 +30,11 @@ export function buildTopShelfRoutes(service: TopShelfService, recaps: TopShelfRe
     });
     app.get("/top-shelf/recaps/:month", async (request, reply) => {
       const parsed = monthSchema.safeParse((request.params as { month?: string }).month);
-      if (!parsed.success) return reply.code(400).send({ error: "Invalid month." });
+      if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "community.invalidMonth") });
       const query = recapQuerySchema.safeParse(request.query);
-      if (!query.success) return reply.code(400).send({ error: "Invalid query." });
+      if (!query.success) return reply.code(400).send({ error: t(localeOf(request), "community.invalidRecapQuery") });
       const recap = recaps.getRecap(parsed.data, { daily: query.data.daily === "1" });
-      if (!recap) return reply.code(404).send({ error: "No recap for that month." });
+      if (!recap) return reply.code(404).send({ error: t(localeOf(request), "community.noRecap") });
       return reply.send(recap);
     });
   };

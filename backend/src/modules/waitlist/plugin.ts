@@ -17,9 +17,9 @@ export async function waitlistPlugin(app: FastifyInstance, options: { sendEmail?
   const service = createWaitlistService(
     repo,
     sendEmail &&
-      ((email) => {
-        const mail = confirmationEmail(email, env.FRONTEND_URL);
-        sendEmail(email, confirmationSubject, mail.text, mail.html).catch((error) =>
+      ((email, locale) => {
+        const mail = confirmationEmail(email, env.FRONTEND_URL, locale);
+        sendEmail(email, confirmationSubject(locale), mail.text, mail.html).catch((error) =>
           app.log.error(error, "[waitlist] confirmation email failed")
         );
       })

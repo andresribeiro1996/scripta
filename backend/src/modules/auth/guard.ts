@@ -7,6 +7,7 @@
 
 import { normalizeIP } from "@fastify/rate-limit";
 import type { FastifyReply, FastifyRequest } from "fastify";
+import { localeOf, t } from "../../i18n/index.js";
 import type { AuthenticatedUser } from "./domain/types.js";
 
 
@@ -28,12 +29,12 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply): P
   const token = bearerToken(request);
 
   if (!token) {
-    return reply.code(401).send({ error: "Missing Authorization: Bearer <token> header." });
+    return reply.code(401).send({ error: t(localeOf(request), "auth.missingBearer") });
   }
 
   const user = request.server.authenticateAccessToken?.(token);
   if (!user) {
-    return reply.code(401).send({ error: "Access token is invalid or expired." });
+    return reply.code(401).send({ error: t(localeOf(request), "auth.accessTokenInvalid") });
   }
 
   request.user = user;
@@ -52,7 +53,7 @@ export function getOptionalAuthenticatedUser(request: FastifyRequest): Authentic
   const token = bearerToken(request);
   if (!token) return null;
   const user = request.server.authenticateAccessToken?.(token);
-  if (!user) throw Object.assign(new Error("Access token is invalid or expired."), { statusCode: 401 });
+  if (!user) throw Object.assign(new Error(t(localeOf(request), "auth.accessTokenInvalid")), { statusCode: 401 });
   return user;
 }
 

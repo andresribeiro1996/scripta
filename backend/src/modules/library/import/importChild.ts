@@ -61,7 +61,7 @@ function checkedRows(statement: ReturnType<DatabaseSync["prepare"]>, limit: numb
   if (rows.length > limit) fail("The import contains too many rows.");
   for (const row of rows) {
     byteState.value += Buffer.byteLength(JSON.stringify(row));
-    if (byteState.value > maxResultBytes) fail(importTooLargeMessage(maxResultBytes));
+    if (byteState.value > maxResultBytes) fail(importTooLargeMessage("en", maxResultBytes));
   }
   return rows.map((row) => ({ ...row }));
 }
@@ -144,7 +144,7 @@ async function parse(input: Input): Promise<LibraryData> {
   if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
   const data = await isSqlite(input.path) ? parseKobo(input) : await parseText(input);
   if (data.books.length > input.maxRows) fail("The import contains too many rows.");
-  if (Buffer.byteLength(JSON.stringify(data)) > input.maxResultBytes) fail(importTooLargeMessage(input.maxResultBytes));
+  if (Buffer.byteLength(JSON.stringify(data)) > input.maxResultBytes) fail(importTooLargeMessage("en", input.maxResultBytes));
   return data;
 }
 

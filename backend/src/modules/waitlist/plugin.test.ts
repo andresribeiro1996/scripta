@@ -174,3 +174,26 @@ test("a failed confirmation email still keeps the signup", async () => {
     await app.close();
   }
 });
+
+test("the confirmation email and the invalid-address error follow the request's language", async () => {
+  const { sent, sendEmail } = recordingSender();
+  const app = Fastify();
+  await app.register(waitlistPlugin, { sendEmail });
+  await app.ready();
+  try {
+    const headers = { "accept-language": "pt-PT" };
+    const joined = await app.inject({ method: "POST", url: "/waitlist", headers, payload: { email: "portuguese@example.com" } });
+    assert.equal(joined.statusCode, 204);
+    const [mail] = sent;
+    assert.equal(mail?.subject, "Está na lista de lançamento do Atmyshelf");
+    assert.match(mail?.text ?? "", /^Está na lista/);
+    assert.match(mail?.text ?? "", /Voltaremos a enviar-lhe um email para portuguese@example\.com/);
+    assert.match(mail?.html ?? "", /<html lang="pt-PT">/);
+    const invalid = await app.inject({ method: "POST", url: "/waitlist", headers, payload: { email: "nope" } });
+    assert.equal(invalid.json().error, "Introduza um endereço de email válido.");
+    const english = await app.inject({ method: "POST", url: "/waitlist", payload: { email: "nope" } });
+    assert.equal(english.json().error, "Enter a valid email address.");
+  } finally {
+    await app.close();
+  }
+});

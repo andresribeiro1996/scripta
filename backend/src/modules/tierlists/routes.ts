@@ -12,6 +12,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { BallotResponse, Tierlist as WireTierlist, TierlistData, VotingBoard } from "@scripta/shared";
 import { z } from "zod";
+import { localeOf, t, validationMessage } from "../../i18n/index.js";
 import { sendWorksError } from "../../worksErrors.js";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
 import { duplicateWorkMessage, firstKeyPerWork, knownWorkIds, UnknownWorkError } from "../library/index.js";
@@ -28,18 +29,18 @@ const worksTierSchema = z.object({ id: z.string().min(1), label: z.string().trim
 const worksBoardSchema = z.object({ tiers: z.array(worksTierSchema), pool: z.array(z.string().min(1)).max(500) });
 
 const createTierlistSchema = z.object({
-  name: z.string().trim().min(1, "name is required and must be non-empty.").max(200),
+  name: z.string().trim().min(1, "tierlists.nameRequired").max(200),
   data: worksBoardSchema.extend({ tiers: z.array(worksTierSchema).min(1) }).optional(),
   characters: z.object({ workId: z.string().min(1), characterIds: z.array(z.string().min(1)).min(4).max(500) }).optional(),
   access: z.enum(["anonymous", "members"]).optional(),
   ranksWorstFirst: z.boolean().optional()
-}).refine((body) => !(body.data && body.characters), { message: "Send either data or characters." });
+}).refine((body) => !(body.data && body.characters), { message: "tierlists.sendDataOrCharacters" });
 
 const listQuerySchema = z.object({ subjects: z.string().optional() });
 
 const updateTierlistSchema = z
   .object({ name: z.string().min(1).optional(), data: worksBoardSchema.optional() })
-  .refine((body) => body.name !== undefined || body.data !== undefined, { message: "At least one of name or data must be provided." });
+  .refine((body) => body.name !== undefined || body.data !== undefined, { message: "tierlists.updateNeedsField" });
 
 const voteAccessSchema = z.enum(["anonymous", "members"]);
 
@@ -48,7 +49,7 @@ const openVotingSchema = z.object({ access: voteAccessSchema });
 const votingStateSchema = z
   .object({ access: voteAccessSchema.optional(), open: z.boolean().optional() })
   .refine((body) => body.access !== undefined || body.open !== undefined, {
-    message: "At least one of access or open must be provided."
+    message: "tierlists.votingNeedsField"
   });
 
 const codeParamSchema = z.object({ code: z.string().min(1).max(64) });
@@ -70,9 +71,10 @@ function viewOf(subject: unknown, pool: string[]) {
   return subject ? characterView(pool) : canonicalFirst(pool);
 }
 
-function sendWriteFailure(reply: FastifyReply, outcome: Exclude<TierlistWriteOutcome, { ok: true }>) {
-  if (outcome.reason === "duplicate-work") return reply.code(409).send({ error: duplicateWorkMessage({ workId: null, title: outcome.title }) });
-  return reply.code(outcome.reason === "not-found" ? 404 : 400).send({ error: outcome.error });
+function sendWriteFailure(request: FastifyRequest, reply: FastifyReply, outcome: Exclude<TierlistWriteOutcome, { ok: true }>) {
+  const locale = localeOf(request);
+  if (outcome.reason === "duplicate-work") return reply.code(409).send({ error: duplicateWorkMessage(locale, { workId: null, title: outcome.title }) });
+  return reply.code(outcome.reason === "not-found" ? 404 : 400).send({ error: t(locale, outcome.error) });
 }
 
 export function buildTierlistRoutes(service: TierlistsService) {
@@ -89,24 +91,24 @@ export function buildTierlistRoutes(service: TierlistsService) {
 
     app.post("/tierlists", { preHandler: authGuard }, async (request, reply) => {
       const parsed = createTierlistSchema.safeParse(request.body);
-      if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request." });
+      if (!parsed.success) return reply.code(400).send({ error: validationMessage(localeOf(request), parsed.error) });
       try {
         const outcome = service.createTierlist(request.user.id, parsed.data);
-        if (!outcome.ok) return sendWriteFailure(reply, outcome);
+        if (!outcome.ok) return sendWriteFailure(request, reply, outcome);
         return reply.code(201).send({ ...outcome.tierlist, data: outcome.data } satisfies WireTierlist);
       } catch (err) {
-        return sendWorksError(reply, err);
+        return sendWorksError(request, reply, err);
       }
     });
 
     app.get("/tierlists/:id", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) {
-        return reply.code(400).send({ error: "Invalid tier list id." });
+        return reply.code(400).send({ error: t(localeOf(request), "tierlists.invalidId") });
       }
       const tierlist = service.getTierlist(request.user.id, params.data.id);
       if (!tierlist) {
-        return reply.code(404).send({ error: "No tier list with that id." });
+        return reply.code(404).send({ error: t(localeOf(request), "tierlists.notFound") });
       }
       return reply.send(answer(tierlist));
     });
@@ -114,27 +116,27 @@ export function buildTierlistRoutes(service: TierlistsService) {
     app.put("/tierlists/:id", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) {
-        return reply.code(400).send({ error: "Invalid tier list id." });
+        return reply.code(400).send({ error: t(localeOf(request), "tierlists.invalidId") });
       }
       const body = updateTierlistSchema.safeParse(request.body);
-      if (!body.success) return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
+      if (!body.success) return reply.code(400).send({ error: validationMessage(localeOf(request), body.error) });
       try {
         const outcome = service.updateTierlist(request.user.id, params.data.id, { ...(body.data.name !== undefined ? { name: body.data.name } : {}), ...(body.data.data !== undefined ? { data: body.data.data } : {}) });
-        if (!outcome.ok) return sendWriteFailure(reply, outcome);
+        if (!outcome.ok) return sendWriteFailure(request, reply, outcome);
         return reply.send({ ...outcome.tierlist, data: outcome.data } satisfies WireTierlist);
       } catch (err) {
-        return sendWorksError(reply, err);
+        return sendWorksError(request, reply, err);
       }
     });
 
     app.delete("/tierlists/:id", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) {
-        return reply.code(400).send({ error: "Invalid tier list id." });
+        return reply.code(400).send({ error: t(localeOf(request), "tierlists.invalidId") });
       }
       const deleted = service.deleteTierlist(request.user.id, params.data.id);
       if (!deleted) {
-        return reply.code(404).send({ error: "No tier list with that id." });
+        return reply.code(404).send({ error: t(localeOf(request), "tierlists.notFound") });
       }
       return reply.code(204).send();
     });
@@ -142,56 +144,56 @@ export function buildTierlistRoutes(service: TierlistsService) {
     app.post("/tierlists/:id/open-voting", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) {
-        return reply.code(400).send({ error: "Invalid tier list id." });
+        return reply.code(400).send({ error: t(localeOf(request), "tierlists.invalidId") });
       }
       const body = openVotingSchema.safeParse(request.body);
       if (!body.success) {
-        return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
+        return reply.code(400).send({ error: validationMessage(localeOf(request), body.error) });
       }
       try {
         const opened = service.openVoting(request.user.id, params.data.id, body.data.access);
-        if (!opened) return reply.code(404).send({ error: "No tier list with that id." });
+        if (!opened) return reply.code(404).send({ error: t(localeOf(request), "tierlists.notFound") });
         const { tierlist, known } = opened;
         return reply.code(201).send({ tierlist: { ...tierlist, data: tierlist.subject ? (tierlist.data as TierlistData) : canonicalBoard(tierlist.data, known) } satisfies WireTierlist, voteCode: tierlist.voteCode });
       } catch (err) {
-        return sendWorksError(reply, err);
+        return sendWorksError(request, reply, err);
       }
     });
 
     app.put("/tierlists/:id/voting", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) {
-        return reply.code(400).send({ error: "Invalid tier list id." });
+        return reply.code(400).send({ error: t(localeOf(request), "tierlists.invalidId") });
       }
       const body = votingStateSchema.safeParse(request.body);
       if (!body.success) {
-        return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
+        return reply.code(400).send({ error: validationMessage(localeOf(request), body.error) });
       }
       const owned = service.getTierlist(request.user.id, params.data.id);
-      if (!owned) return reply.code(404).send({ error: "No tier list with that id." });
+      if (!owned) return reply.code(404).send({ error: t(localeOf(request), "tierlists.notFound") });
       try {
         const data = owned.subject ? (owned.data as TierlistData) : canonicalBoard(owned.data);
         const tierlist = service.setVotingState(request.user.id, params.data.id, body.data);
         if (!tierlist) {
-          return reply.code(404).send({ error: "No tier list with that id." });
+          return reply.code(404).send({ error: t(localeOf(request), "tierlists.notFound") });
         }
         return reply.send({ tierlist: { ...tierlist, data } satisfies WireTierlist });
       } catch (err) {
-        return sendWorksError(reply, err);
+        return sendWorksError(request, reply, err);
       }
     });
 
     app.get("/tierlists/:id/results", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) {
-        return reply.code(400).send({ error: "Invalid tier list id." });
+        return reply.code(400).send({ error: t(localeOf(request), "tierlists.invalidId") });
       }
       // Ownership-checked BEFORE reading results: getResults takes a plain
       // tier list id, so without this an authenticated user could read any
       // poll's raw histogram by id.
       const owned = service.getTierlist(request.user.id, params.data.id);
       if (!owned) {
-        return reply.code(404).send({ error: "No tier list with that id." });
+        return reply.code(404).send({ error: t(localeOf(request), "tierlists.notFound") });
       }
       const results = service.getResults(params.data.id);
       const { canonical, first } = viewOf(owned.subject, boardWorks(owned.data));
@@ -204,22 +206,22 @@ export function buildTierlistShareVideoRoutes(service: TierlistsService) {
   return async function tierlistShareVideoRoutes(app: FastifyInstance) {
     app.post("/tierlists/:id/share-video", { preHandler: authGuard, bodyLimit: MAX_SHARE_IMAGE_BYTES + 2048 }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
-      if (!params.success) return reply.code(400).send({ error: "Invalid tier list id." });
+      if (!params.success) return reply.code(400).send({ error: t(localeOf(request), "tierlists.invalidId") });
       const tierlist = service.getTierlist(request.user.id, params.data.id);
-      if (!tierlist?.voteCode) return reply.code(404).send({ error: "No public tier list with that id." });
+      if (!tierlist?.voteCode) return reply.code(404).send({ error: t(localeOf(request), "tierlists.noPublicTierlist") });
 
       const upload = await request.file();
-      if (!upload || upload.fieldname !== "image") return reply.code(400).send({ error: "Upload a PNG in the image field." });
+      if (!upload || upload.fieldname !== "image") return reply.code(400).send({ error: t(localeOf(request), "tierlists.uploadPng") });
       const image = await upload.toBuffer();
       try {
         const video = await renderShareVideo(image);
         reply.header("Cache-Control", "no-store");
         return reply.send({ base64: video.toString("base64") });
       } catch (error) {
-        if (error instanceof InvalidShareImageError) return reply.code(400).send({ error: error.message });
+        if (error instanceof InvalidShareImageError) return reply.code(400).send({ error: t(localeOf(request), error.key, error.vars) });
         if (error instanceof ShareVideoRenderError) {
           request.log.error(error);
-          return reply.code(500).send({ error: error.message });
+          return reply.code(500).send({ error: t(localeOf(request), error.key, error.vars) });
         }
         throw error;
       }
@@ -241,7 +243,7 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
     app.get("/tierlists/public", async (request, reply) => {
       const query = listPublicQuerySchema.safeParse(request.query);
       if (!query.success) {
-        return reply.code(400).send({ error: "Invalid limit/offset." });
+        return reply.code(400).send({ error: t(localeOf(request), "tierlists.invalidLimitOffset") });
       }
       return reply.send({ tierlists: service.listPublicTierlists(query.data.limit, query.data.offset) });
     });
@@ -249,11 +251,11 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
     app.get("/tierlists/voting/:code", async (request, reply) => {
       const params = codeParamSchema.safeParse(request.params);
       if (!params.success) {
-        return reply.code(404).send({ error: "No tier list at that link." });
+        return reply.code(404).send({ error: t(localeOf(request), "tierlists.noTierlistAtLink") });
       }
       const board = service.getVotingBoard(params.data.code);
       if (!board) {
-        return reply.code(404).send({ error: "No tier list at that link." });
+        return reply.code(404).send({ error: t(localeOf(request), "tierlists.noTierlistAtLink") });
       }
 
       // Same privacy boundary the shared-mural route enforces: work ids
@@ -294,21 +296,21 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
       const params = codeParamSchema.safeParse(request.params);
       const body = placementsSchema.safeParse(request.body);
       if (!params.success || !body.success) {
-        return reply.code(400).send({ error: "Invalid ballot." });
+        return reply.code(400).send({ error: t(localeOf(request), "tierlists.invalidBallot") });
       }
       const board = service.getVotingBoard(params.data.code);
-      if (!board) return reply.code(404).send({ error: "No tier list at that link." });
+      if (!board) return reply.code(404).send({ error: t(localeOf(request), "tierlists.noTierlistAtLink") });
       try {
         const view = viewOf(board.subject, board.pool);
         const placements = board.subject
           ? body.data.placements
           : placementsFromWorks(body.data.placements, knownWorkIds(body.data.placements.map((placement) => placement.workId)), firstKeyPerWork(board.pool, view.canonical));
-        if (!placements) return reply.code(400).send({ error: "Those placements don't match this tier list." });
+        if (!placements) return reply.code(400).send({ error: t(localeOf(request), "tierlists.placementsMismatch") });
         const outcome = service.submitBallot(params.data.code, placements, voterFor(request, ballotId));
-        return sendBallotOutcome(reply, service, params.data.code, outcome, () => view);
+        return sendBallotOutcome(request, reply, service, params.data.code, outcome, () => view);
       } catch (err) {
-        if (err instanceof UnknownWorkError) return reply.code(400).send({ error: "Those placements don't match this tier list." });
-        return sendWorksError(reply, err);
+        if (err instanceof UnknownWorkError) return reply.code(400).send({ error: t(localeOf(request), "tierlists.placementsMismatch") });
+        return sendWorksError(request, reply, err);
       }
     };
 
@@ -326,10 +328,10 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
       const params = codeParamSchema.safeParse(request.params);
       const ballotId = (request.params as { ballotId?: string }).ballotId ?? null;
       if (!params.success) {
-        return reply.code(404).send({ error: "No ballot at that link." });
+        return reply.code(404).send({ error: t(localeOf(request), "tierlists.noBallot") });
       }
       const outcome = service.getBallot(params.data.code, voterFor(request, ballotId));
-      return sendBallotOutcome(reply, service, params.data.code, outcome, () => { const board = service.getVotingBoard(params.data.code); return viewOf(board?.subject, board?.pool ?? []); });
+      return sendBallotOutcome(request, reply, service, params.data.code, outcome, () => { const board = service.getVotingBoard(params.data.code); return viewOf(board?.subject, board?.pool ?? []); });
     };
     app.get("/tierlists/voting/:code/ballot", readBallot);
     app.get("/tierlists/voting/:code/ballot/:ballotId", readBallot);
@@ -344,12 +346,12 @@ function voterFor(request: FastifyRequest, ballotId: string | null): Voter {
   return user ? { kind: "user", userId: user.id } : { kind: "anonymous", ballotId };
 }
 
-function sendBallotOutcome(reply: FastifyReply, service: TierlistsService, code: string, outcome: BallotOutcome, view: () => ReturnType<typeof characterView>) {
+function sendBallotOutcome(request: FastifyRequest, reply: FastifyReply, service: TierlistsService, code: string, outcome: BallotOutcome, view: () => ReturnType<typeof characterView>) {
   if (!outcome.ok) {
-    if (outcome.reason === "not-found") return reply.code(404).send({ error: "No tier list at that link." });
-    if (outcome.reason === "closed") return reply.code(409).send({ error: "Voting is closed for this tier list." });
-    if (outcome.reason === "members-only") return reply.code(401).send({ error: "Sign in to vote on this tier list." });
-    return reply.code(400).send({ error: "Those placements don't match this tier list." });
+    if (outcome.reason === "not-found") return reply.code(404).send({ error: t(localeOf(request), "tierlists.noTierlistAtLink") });
+    if (outcome.reason === "closed") return reply.code(409).send({ error: t(localeOf(request), "tierlists.votingClosed") });
+    if (outcome.reason === "members-only") return reply.code(401).send({ error: t(localeOf(request), "tierlists.signInToVote") });
+    return reply.code(400).send({ error: t(localeOf(request), "tierlists.placementsMismatch") });
   }
   const board = service.getVotingBoard(code);
   const { canonical, first } = view();

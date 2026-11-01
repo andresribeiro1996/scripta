@@ -182,7 +182,7 @@ test("publish counts one book per work after two editions merge", () => {
   assert.equal(outcome.ok, false);
   if (!outcome.ok) {
     assert.equal(outcome.reason, "invalid");
-    assert.match((outcome as { error: string }).error, /at least 4 books/i);
+    assert.equal((outcome as { error: string }).error, "quizzes.needsFourBooks");
   }
 });
 
@@ -200,7 +200,7 @@ test("a create resolves books by work id or by title and keeps the first book pe
 test("a create with a book the catalog can't place is invalid: That book isn't in the catalog.", () => {
   const repo = createInMemoryRepo();
   const outcome = createQuizzesService(repo, fakeWorks()).createQuiz("u1", "Bad", input([{ title: "???", author: "A" }]));
-  assert.deepEqual(outcome, { ok: false, reason: "invalid", error: "That book isn't in the catalog." });
+  assert.deepEqual(outcome, { ok: false, reason: "invalid", error: "works.unknownBook" });
   assert.deepEqual(repo.listByUser("u1"), []);
 });
 
@@ -216,7 +216,7 @@ test("an update with two editions of one work is a duplicate-work outcome carryi
 test("an update of a published quiz is not-found", () => {
   const { service, quizId } = makeService();
   assert.ok(service.publishQuiz("u1", quizId).ok);
-  assert.deepEqual(service.updateQuiz("u1", quizId, { name: "Renamed" }), { ok: false, reason: "not-found", error: "No quiz with that id." });
+  assert.deepEqual(service.updateQuiz("u1", quizId, { name: "Renamed" }), { ok: false, reason: "not-found", error: "quizzes.notFound" });
   assert.equal(service.getQuiz("u1", quizId)!.name, "My quiz");
 });
 
@@ -254,7 +254,7 @@ test("publish rejects too few books", () => {
   assert.equal(outcome.ok, false);
   if (!outcome.ok) {
     assert.equal(outcome.reason, "invalid");
-    assert.match(outcome.error, /at least 4 books/i);
+    assert.equal(outcome.error, "quizzes.needsFourBooks");
   }
 });
 
@@ -599,7 +599,7 @@ test("publish error names characters", () => {
   const service = createQuizzesService(createInMemoryRepo(), fakeWorks());
   const id = charactersQuiz(service, [0, 1, 2, 3].map((i) => book(`b${i}`)));
   const outcome = service.publishQuiz("u1", id);
-  assert.deepEqual(outcome.ok ? null : outcome, { ok: false, reason: "invalid", error: "Not enough books have the covers, quotes, blurbs, or characters those question types need." });
+  assert.deepEqual(outcome.ok ? null : outcome, { ok: false, reason: "invalid", error: "quizzes.notEnoughMaterial" });
 });
 
 test("a stored draft without allowedTypes reads as the four original types", () => {

@@ -17,6 +17,7 @@ import { readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { env, googleOAuthConfigured } from "../../config/env.js";
+import { localeOf, t } from "../../i18n/index.js";
 import { createObjectStore } from "../../storage/createObjectStore.js";
 import { createSqliteAuthRepository } from "./adapters/sqlite/sqliteAuthRepository.js";
 import { openAuthDb } from "./adapters/sqlite/connection.js";
@@ -193,18 +194,18 @@ export async function authPlugin(app: FastifyInstance, options: { authRoot?: Fas
       const { token } = await app.googleOAuth2.getAccessTokenFromAuthorizationCodeFlow(request, reply);
       const flow = consumeGoogleOAuthFlow(queryParam(request, "state"));
       if (!flow) {
-        return reply.code(400).send({ error: "Google OAuth flow is missing, expired, or already used." });
+        return reply.code(400).send({ error: t(localeOf(request), "auth.googleFlowExpired") });
       }
 
       const profileResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
         headers: { Authorization: `Bearer ${token.access_token}` }
       });
       if (!profileResponse.ok) {
-        return reply.code(502).send({ error: "Could not fetch Google profile." });
+        return reply.code(502).send({ error: t(localeOf(request), "auth.googleProfileFailed") });
       }
       const profile = (await profileResponse.json()) as { id: string; email?: string; verified_email?: boolean };
       if (!profile.email || profile.verified_email !== true) {
-        return reply.code(400).send({ error: "Google account has no email to sign in with." });
+        return reply.code(400).send({ error: t(localeOf(request), "auth.googleNoEmail") });
       }
 
       const { user, tokens } = await authService.loginWithGoogle({ googleId: profile.id, email: profile.email });

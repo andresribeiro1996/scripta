@@ -243,3 +243,34 @@ test("GET /arenas/mine lists character tournaments only with subjects=characters
   assert.deepEqual(await names("/arenas/mine?subjects=characters"), ["HP", "Plain"]);
   await app.close();
 });
+
+test("arena errors and route messages come back in Portuguese for a Portuguese request", async () => {
+  const { app, id, headers } = await worksArena("owner");
+  const portuguese = { ...headers, "accept-language": "pt-PT" };
+  const malformed = await app.inject({ method: "POST", url: "/arenas", headers: portuguese, payload: {} });
+  assert.equal(malformed.statusCode, 400);
+  assert.deepEqual(malformed.json(), { error: "Esperado {name, bracketSize, roundDurationMinutes}." });
+  const incomplete = await app.inject({ method: "POST", url: `/arenas/${id}/start`, headers: portuguese });
+  assert.equal(incomplete.statusCode, 400);
+  assert.deepEqual(incomplete.json(), { error: "Esta chave precisa de 2 livros colocados antes de poder começar (neste momento, 0)." });
+  const english = await app.inject({ method: "POST", url: `/arenas/${id}/start`, headers });
+  assert.deepEqual(english.json(), { error: "This bracket needs 2 seeded books before it can start (currently 0)." });
+  const missing = await app.inject({ method: "GET", url: "/arenas/6b0c2c3a-6f0a-4c3e-9d1c-3a7a4e2b9f11", headers: { "accept-language": "pt-PT" } });
+  assert.equal(missing.statusCode, 404);
+  assert.deepEqual(missing.json(), { error: "Esse torneio não existe." });
+  await app.close();
+});
+
+test("work errors on slots come back in Portuguese for a Portuguese request", async () => {
+  const [old, target] = [work("Pt Edition One"), work("Pt Edition Two")];
+  openBooksDb().prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(target, old);
+  const { app, headers, seed } = await worksArena("a4");
+  const portuguese = { ...headers, "accept-language": "pt-PT" };
+  const unknown = await seed([{ workId: "not-a-work", title: "X" }, { workId: target, title: "Pt Edition Two" }], portuguese);
+  assert.equal(unknown.statusCode, 400);
+  assert.equal(unknown.json().error, "Esse livro não está no catálogo.");
+  const duplicate = await seed([{ workId: target, title: "Pt Edition Two" }, { workId: old, title: "Pt Edition One" }], portuguese);
+  assert.equal(duplicate.statusCode, 409);
+  assert.equal(duplicate.json().error, "Pt Edition One já está aqui como outra edição.");
+  await app.close();
+});

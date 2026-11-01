@@ -1,3 +1,6 @@
+import type { Locale } from "@scripta/shared/i18n";
+import { t } from "../../i18n/index.js";
+
 export type EmailContent = {
   heading: string;
   paragraphs: string[];
@@ -26,7 +29,7 @@ const DARK_STYLES = `@media (prefers-color-scheme: dark) {
   .em-mark-dark { display: block !important; }
 }`;
 
-export function renderEmail({ heading, paragraphs, button, footnote }: EmailContent, siteUrl: string): { text: string; html: string } {
+export function renderEmail({ heading, paragraphs, button, footnote }: EmailContent, siteUrl: string, locale: Locale): { text: string; html: string } {
   const host = new URL(siteUrl).host;
   const markUrl = (file: string) => escapeHtml(new URL(`/email/${file}`, siteUrl).href);
   const text = [heading, ...paragraphs, ...(button ? [button.url] : []), ...(footnote ? [footnote] : []), `Atmyshelf · ${host}`].join("\n\n");
@@ -35,12 +38,12 @@ export function renderEmail({ heading, paragraphs, button, footnote }: EmailCont
   const url = button ? escapeHtml(button.url) : "";
   const action = button
     ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 20px"><tr><td class="em-btn" style="background:${LIGHT.text};border-radius:8px"><a class="em-btn-text" href="${url}" style="display:inline-block;padding:13px 26px;font:600 16px ${FONT};color:${LIGHT.onText};text-decoration:none">${escapeHtml(button.label)}</a></td></tr></table>` +
-      `<p class="em-dim" style="margin:0 0 16px;font:13px/1.5 ${FONT};color:${LIGHT.dim}">Or paste this link into your browser:<br><a class="em-link" href="${url}" style="color:${LIGHT.text};word-break:break-all">${url}</a></p>`
+      `<p class="em-dim" style="margin:0 0 16px;font:13px/1.5 ${FONT};color:${LIGHT.dim}">${escapeHtml(t(locale, "email.pasteLink"))}<br><a class="em-link" href="${url}" style="color:${LIGHT.text};word-break:break-all">${url}</a></p>`
     : "";
   const note = footnote ? `<p class="em-dim" style="margin:0;font:14px/1.6 ${FONT};color:${LIGHT.dim}">${escapeHtml(footnote)}</p>` : "";
 
   const html = `<!doctype html>
-<html lang="en">
+<html lang="${locale}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
