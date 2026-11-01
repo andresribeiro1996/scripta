@@ -252,7 +252,7 @@ test("arena errors and route messages come back in Portuguese for a Portuguese r
   assert.deepEqual(malformed.json(), { error: "Esperado {name, bracketSize, roundDurationMinutes}." });
   const incomplete = await app.inject({ method: "POST", url: `/arenas/${id}/start`, headers: portuguese });
   assert.equal(incomplete.statusCode, 400);
-  assert.deepEqual(incomplete.json(), { error: "Este quadro precisa de 2 livros colocados antes de poder começar (neste momento, 0)." });
+  assert.deepEqual(incomplete.json(), { error: "Esta chave precisa de 2 livros colocados antes de poder começar (neste momento, 0)." });
   const english = await app.inject({ method: "POST", url: `/arenas/${id}/start`, headers });
   assert.deepEqual(english.json(), { error: "This bracket needs 2 seeded books before it can start (currently 0)." });
   const missing = await app.inject({ method: "GET", url: "/arenas/6b0c2c3a-6f0a-4c3e-9d1c-3a7a4e2b9f11", headers: { "accept-language": "pt-PT" } });
