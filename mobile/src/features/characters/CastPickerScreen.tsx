@@ -62,7 +62,7 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
         queryClient.setQueryData<Tierlist[]>(["tierlists"], (items = []) => [created, ...items]);
         router.navigate(`/(app)/(arena)/tierlist/${created.id}?rank=1` as never);
       } else {
-        const created = await createCharacterTournament({ name: title, bracketSize: size, roundDurationMinutes: roundMinutesFromHours(duration), characters });
+        const created = await createCharacterTournament({ name: title, bracketSize: size, roundDurationMinutes: roundMinutesFromHours(duration.replace(",", ".")), characters });
         void queryClient.invalidateQueries({ queryKey: ["arena", "mine"] });
         router.replace(`/arena/${created.id}` as never);
       }
