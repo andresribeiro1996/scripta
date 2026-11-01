@@ -1,4 +1,5 @@
 import { resolveTheme, themes } from "@scripta/shared/themes";
+import { useT } from "../../i18n";
 import { applyThemePreference, osScheme, useThemePreference } from "../../lib/theme";
 
 function SunIcon() {
@@ -39,13 +40,14 @@ function MoonIcon() {
 }
 
 export function ThemeToggle() {
+  const t = useT();
   const scheme = themes[resolveTheme(useThemePreference(), osScheme())].scheme;
 
   return (
     <button
       type="button"
       onClick={() => applyThemePreference(scheme === "dark" ? "light" : "dark")}
-      aria-label={scheme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+      aria-label={scheme === "dark" ? t("landing.switchToLight") : t("landing.switchToDark")}
       className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-(--color-text-dim) transition-colors hover:bg-(--color-surface-hover) hover:text-(--color-text)"
     >
       {scheme === "dark" ? <SunIcon /> : <MoonIcon />}

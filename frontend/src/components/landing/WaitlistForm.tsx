@@ -1,12 +1,16 @@
 import { useId, useState } from "react";
 import { ApiError } from "../../api/client";
 import { joinWaitlist } from "../../api/waitlist";
+import { useT, type WebMessages } from "../../i18n";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+type ErrorKey = keyof WebMessages & `landing.waitlist${string}`;
+
 export function WaitlistForm({ label }: { label: string }) {
+  const t = useT();
   const [email, setEmail] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorKey | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const inputId = useId();
@@ -33,7 +37,7 @@ export function WaitlistForm({ label }: { label: string }) {
           <path d="M5 12.5l4.5 4.5L19 7.5" />
         </svg>
         <span>
-          <span className="font-semibold">You’re on the list.</span> We’ll email {done} when Atmyshelf launches.
+          <span className="font-semibold">{t("landing.waitlistOnList")}</span> {t("landing.waitlistWillEmail", { email: done })}
         </span>
       </div>
     );
@@ -42,7 +46,7 @@ export function WaitlistForm({ label }: { label: string }) {
   async function submit() {
     const trimmed = email.trim();
     if (!EMAIL_RE.test(trimmed)) {
-      setError("Enter a valid email address.");
+      setError("landing.waitlistInvalidEmail");
       return;
     }
     setSubmitting(true);
@@ -50,11 +54,11 @@ export function WaitlistForm({ label }: { label: string }) {
       await joinWaitlist(trimmed);
       setDone(trimmed);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 400) setError("Enter a valid email address.");
-      else if (err instanceof ApiError && err.status === 429) setError("Too many tries. Wait a minute and try again.");
-      else if (err instanceof ApiError || err instanceof TypeError) setError("Couldn’t add you just now. Try again in a moment.");
+      if (err instanceof ApiError && err.status === 400) setError("landing.waitlistInvalidEmail");
+      else if (err instanceof ApiError && err.status === 429) setError("landing.waitlistTooMany");
+      else if (err instanceof ApiError || err instanceof TypeError) setError("landing.waitlistFailed");
       else {
-        setError("Couldn’t add you just now. Try again in a moment.");
+        setError("landing.waitlistFailed");
         throw err;
       }
     } finally {
@@ -81,7 +85,7 @@ export function WaitlistForm({ label }: { label: string }) {
           autoComplete="email"
           autoCapitalize="none"
           spellCheck={false}
-          placeholder="Email address"
+          placeholder={t("landing.emailAddress")}
           value={email}
           onChange={(e) => {
             setEmail(e.target.value);
@@ -94,8 +98,8 @@ export function WaitlistForm({ label }: { label: string }) {
         <button
           type="submit"
           disabled={submitting}
-          aria-label={submitting ? "Adding to the launch list" : "Notify me"}
-          title="Get notified at launch"
+          aria-label={submitting ? t("landing.waitlistAdding") : t("landing.waitlistNotify")}
+          title={t("landing.waitlistGetNotified")}
           className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-(--color-text) text-(--color-bg) motion-safe:transition-[opacity,box-shadow] motion-safe:duration-300 hover:opacity-85 group-focus-within:shadow-[0_0_16px_color-mix(in_srgb,var(--color-text)_15%,transparent)] disabled:opacity-60"
         >
           {submitting ? <span aria-hidden="true">…</span> : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -104,7 +108,7 @@ export function WaitlistForm({ label }: { label: string }) {
         </button>
       </div>
       {error && <p id={helpId} className="mt-2 text-center text-xs text-(--color-danger)">
-        {error}
+        {t(error)}
       </p>}
     </form>
   );
