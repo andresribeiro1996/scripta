@@ -1,4 +1,6 @@
+import { contentStatusBadge } from "@scripta/shared/community";
 import type { Quiz } from "../../api/quizzes";
+import { useLocale } from "../../i18n";
 
 /** A quiz's stage, as a coloured pill — the quiz counterpart to
  *  TournamentStatusBadge, same pill shape and same "colour is
@@ -19,16 +21,12 @@ export function QuizStatusBadge({ status, className = "" }: { status: "draft" | 
     open: "border-(--color-info) bg-(--color-info-soft) text-(--color-info)",
     closed: "border-(--color-success) bg-(--color-success-soft) text-(--color-success)"
   };
-  const labels: Record<"draft" | "open" | "closed", string> = {
-    draft: "Draft",
-    open: "Open",
-    closed: "Closed"
-  };
+  const locale = useLocale();
   return (
     <span
       className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-sm font-semibold ${styles[status]} ${className}`}
     >
-      {labels[status]}
+      {contentStatusBadge(status, locale).label}
     </span>
   );
 }

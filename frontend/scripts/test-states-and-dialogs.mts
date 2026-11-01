@@ -6,7 +6,7 @@ const src = (f: string) => readFileSync(new URL(`../src/${f}.tsx`, import.meta.u
 
 test("quiz cover options are named and sized so four fit on screen", () => {
   const play = src("pages/PlayQuizPage");
-  assert.match(play, /<button(?=(?:=>|[^>])*aria-label=\{`Cover option \$\{index \+ 1\} of \$\{question\.options\.length\}`\})(?:=>|[^>])*>/);
+  assert.match(play, /<button(?=(?:=>|[^>])*aria-label=\{t\("quizzes\.coverOption", \{ number: index \+ 1, total: question\.options\.length \}\)\})(?:=>|[^>])*>/);
   assert.match(play, /grid grid-cols-2 gap-3 sm:grid-cols-4/);
 });
 

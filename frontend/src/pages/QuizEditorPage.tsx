@@ -6,20 +6,21 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { QUIZ_QUESTION_TYPES, eligibleTypes, playerLabel, quizOptionLabel, quizQuestionLabel, type QuizData } from "@scripta/shared";
+import { QUIZ_QUESTION_TYPES, decimalText, eligibleTypes, playerLabel, quizOptionLabel, quizQuestionLabel, type QuizData } from "@scripta/shared";
 import { Page } from "../components/page/Page";
 import { BUTTON_DANGER_OUTLINE, BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
 import { ShareLinkRow } from "../components/ShareLinkRow";
 import { backTo } from "../lib/areas";
-import { QUIZ_TYPE_LABELS } from "../lib/quizTypeLabels";
+import { QUIZ_TYPE_LABEL_KEYS } from "../lib/quizTypeLabels";
 import { useConfirm } from "../components/ConfirmDialog";
 import { deleteQuizApi, fetchQuizResultsApi, publishQuizApi, setPlayStateApi, updateQuizApi, type Quiz } from "../api/quizzes";
 import { useQuizzes } from "../hooks/useQuizzes";
 import { CHECKBOX_CLASS } from "../components/Toolbar";
 import { useWorkCharacters } from "../hooks/useWorkCharacters";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
 export function QuizEditorPage() {
+  const t = useT();
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -62,7 +63,7 @@ export function QuizEditorPage() {
       try {
         await updateQuizApi(quiz.id, { data: next });
       } catch (reason) {
-        setError(reason instanceof Error ? reason.message : "Couldn't save.");
+        setError(reason instanceof Error ? reason.message : t("quizzes.saveFailed"));
       }
     });
   }
@@ -85,17 +86,17 @@ export function QuizEditorPage() {
       await publishQuizApi(quiz.id);
       await queryClient.invalidateQueries({ queryKey: ["quizzes"] });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Couldn't publish.");
+      setError(reason instanceof Error ? reason.message : t("quizzes.publishFailed"));
     } finally {
       setBusy(false);
     }
   }
 
-  if (isLoading) return <Page width="narrow" title="Quiz" back={backTo("quiz")}><p className="text-(--color-text-dim)">Loading…</p></Page>;
+  if (isLoading) return <Page width="narrow" title={t("quizzes.title")} back={backTo("quiz")}><p className="text-(--color-text-dim)">{t("library.loadingEllipsis")}</p></Page>;
   if (!quiz) {
     return (
-      <Page width="narrow" title="Quiz" back={backTo("quiz")}>
-        <p className="text-(--color-text-dim)">No quiz with that id.</p>
+      <Page width="narrow" title={t("quizzes.title")} back={backTo("quiz")}>
+        <p className="text-(--color-text-dim)">{t("quizzes.noQuizWithId")}</p>
       </Page>
     );
   }
@@ -105,7 +106,7 @@ export function QuizEditorPage() {
   if (!data) {
     return (
       <Page width="narrow" title={quiz.name} back={backTo("quiz")}>
-        <p className="text-(--color-text-dim)">Loading…</p>
+        <p className="text-(--color-text-dim)">{t("library.loadingEllipsis")}</p>
       </Page>
     );
   }
@@ -115,15 +116,15 @@ export function QuizEditorPage() {
       width="narrow"
       title={quiz.name}
       back={backTo("quiz")}
-      subtitle={quiz.voteCode === null && data.books.length < 4 ? "A quiz needs at least 4 books." : undefined}
+      subtitle={quiz.voteCode === null && data.books.length < 4 ? t("quizzes.needFourBooks") : undefined}
       actions={quiz.voteCode === null ? (
         <>
           <button
             type="button"
-            onClick={() => { void confirm({ title: `Delete "${quiz.name}"?`, body: "This can't be undone." }).then(async (yes) => { if (yes) { await deleteQuizApi(quiz.id); await queryClient.invalidateQueries({ queryKey: ["quizzes"] }); navigate("/dashboard/arena?tab=quizzes"); } }); }}
+            onClick={() => { void confirm({ title: t("arena.deleteTitle", { name: quiz.name }), body: t("library.cannotUndo") }).then(async (yes) => { if (yes) { await deleteQuizApi(quiz.id); await queryClient.invalidateQueries({ queryKey: ["quizzes"] }); navigate("/dashboard/arena?tab=quizzes"); } }); }}
             className={BUTTON_DANGER_OUTLINE}
           >
-            Delete
+            {t("shell.delete")}
           </button>
           <button
             type="button"
@@ -131,7 +132,7 @@ export function QuizEditorPage() {
             onClick={() => void publish(quiz)}
             className={BUTTON_PRIMARY}
           >
-            {busy ? "Publishing…" : "Publish quiz"}
+            {busy ? t("quizzes.publishing") : t("quizzes.publishQuiz")}
           </button>
         </>
       ) : undefined}
@@ -143,7 +144,7 @@ export function QuizEditorPage() {
           <section className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <label className="flex items-center gap-2 text-sm font-semibold">
-                Questions
+                {t("quizzes.questions")}
                 <select
                   value={data.questionCount}
                   onChange={(event) => updateDraft((current) => ({ ...current, questionCount: Number(event.target.value) }))}
@@ -172,12 +173,12 @@ export function QuizEditorPage() {
                           }))
                         }
                       />
-                      {QUIZ_TYPE_LABELS[type]}
+                      {t(QUIZ_TYPE_LABEL_KEYS[type])}
                     </label>
                   );
                 })}
               </div>
-              {charactersFailed && <p className="text-sm text-(--color-text-dim)">Characters couldn't be checked</p>}
+              {charactersFailed && <p className="text-sm text-(--color-text-dim)">{t("quizzes.charactersUnchecked")}</p>}
             </div>
 
             {data.books.map((book) => (
@@ -192,15 +193,15 @@ export function QuizEditorPage() {
                     onClick={() => updateDraft((current) => ({ ...current, books: current.books.filter((entry) => entry.workId !== book.workId) }))}
                     className={BUTTON_SECONDARY}
                   >
-                    Remove
+                    {t("arena.remove")}
                   </button>
                 </div>
                 <label className="mt-2 flex flex-col gap-1 text-sm">
-                  Quote (optional)
+                  {t("quizzes.quoteOptional")}
                   <textarea
                     rows={2}
                     defaultValue={book.quote ?? ""}
-                    placeholder="Paste a line from this book…"
+                    placeholder={t("quizzes.quotePlaceholder")}
                     onBlur={(event) => {
                       const value = event.target.value.trim();
                       if (value !== (book.quote ?? "")) patchBook(book.workId, { quote: value || null });
@@ -209,7 +210,7 @@ export function QuizEditorPage() {
                   />
                 </label>
                 <label className="mt-2 flex flex-col gap-1 text-sm">
-                  Blurb (optional)
+                  {t("quizzes.blurbOptional")}
                   <textarea
                     rows={2}
                     defaultValue={book.blurb ?? ""}
@@ -232,6 +233,7 @@ export function QuizEditorPage() {
 }
 
 function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; shareLink: string; copied: boolean; setCopied: (value: boolean) => void }) {
+  const t = useT();
   const locale = useLocale();
   const queryClient = useQueryClient();
   const results = useQuery({ queryKey: ["quizResults", quiz.id], queryFn: () => fetchQuizResultsApi(quiz.id) });
@@ -256,18 +258,18 @@ function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; 
         />
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => void toggleOpen(!quiz.playOpen)} className={BUTTON_SECONDARY}>
-            {quiz.playOpen ? "Close for play" : "Open for play"}
+            {quiz.playOpen ? t("quizzes.closeForPlay") : t("quizzes.openForPlay")}
           </button>
         </div>
       </div>
 
-      <h2 className="text-lg font-bold">Questions ({ownerQuestions.length})</h2>
+      <h2 className="text-lg font-bold">{t("quizzes.questionsHeading", { count: ownerQuestions.length })}</h2>
       <ol className="flex flex-col gap-2">
         {ownerQuestions.map((question, index) => (
           <li key={question.id} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-3 text-sm">
-            <span className="text-(--color-text-dim)">{index + 1}. {QUIZ_TYPE_LABELS[question.type]}</span>
+            <span className="text-(--color-text-dim)">{index + 1}. {t(QUIZ_TYPE_LABEL_KEYS[question.type])}</span>
             {question.type === "title_cover" ? (
-              <img src={String(question.options[question.answerIndex])} alt="Answer cover" className="ml-2 inline-block h-10 w-7 rounded object-cover align-middle" />
+              <img src={String(question.options[question.answerIndex])} alt={t("quizzes.answerCover")} className="ml-2 inline-block h-10 w-7 rounded object-cover align-middle" />
             ) : (
               <span className="ml-2 font-semibold">{String(question.options[question.answerIndex])}</span>
             )}
@@ -275,16 +277,16 @@ function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; 
         ))}
       </ol>
 
-      <h2 className="text-lg font-bold">Results</h2>
-      {results.data && results.data.plays.length === 0 && <p className="text-sm text-(--color-text-dim)">No one has played yet.</p>}
+      <h2 className="text-lg font-bold">{t("quizzes.results")}</h2>
+      {results.data && results.data.plays.length === 0 && <p className="text-sm text-(--color-text-dim)">{t("quizzes.noOnePlayed")}</p>}
       {results.data && results.data.plays.length > 0 && (
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-(--color-text-dim)">
               <th className="py-1 pr-3 font-medium">#</th>
-              <th className="py-1 pr-3 font-medium">Player</th>
-              <th className="py-1 pr-3 font-medium">Score</th>
-              <th className="py-1 font-medium">Time</th>
+              <th className="py-1 pr-3 font-medium">{t("quizzes.player")}</th>
+              <th className="py-1 pr-3 font-medium">{t("quizzes.score")}</th>
+              <th className="py-1 font-medium">{t("quizzes.time")}</th>
             </tr>
           </thead>
           <tbody>
@@ -293,10 +295,10 @@ function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; 
                 <td className="py-1.5 pr-3">{index + 1}</td>
                 <td className="py-1.5 pr-3">
                   {playerLabel(play, locale).name}
-                  {playerLabel(play, locale).guest && <span className="ml-2 text-xs text-(--color-text-dim)">guest</span>}
+                  {playerLabel(play, locale).guest && <span className="ml-2 text-xs text-(--color-text-dim)">{t("quizzes.guestLower")}</span>}
                 </td>
                 <td className="py-1.5 pr-3">{play.score}/{results.data!.questionCount}</td>
-                <td className="py-1.5">{(play.durationMs / 1000).toFixed(1)}s</td>
+                <td className="py-1.5">{t("quizzes.seconds", { value: decimalText(play.durationMs / 1000, locale, 1) })}</td>
               </tr>
             ))}
           </tbody>
@@ -305,14 +307,14 @@ function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; 
 
       {results.data && results.data.stats.length > 0 && (
         <div className="flex flex-col gap-3">
-          <h2 className="text-lg font-bold">Per-question stats</h2>
+          <h2 className="text-lg font-bold">{t("quizzes.perQuestionStats")}</h2>
           {results.data.stats.map((stat) => {
             const index = ownerQuestions.findIndex((item) => item.id === stat.questionId);
             const asked = ownerQuestions[index];
             return (
             <div key={stat.questionId} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-3">
               <p className="text-sm font-semibold">
-                {asked ? quizQuestionLabel(asked, index, quiz.data.books, locale) : stat.questionId} · {stat.correctCount}/{stat.answerCount} correct
+                {t("quizzes.questionCorrect", { label: asked ? quizQuestionLabel(asked, index, quiz.data.books, locale) : stat.questionId, correct: stat.correctCount, answered: stat.answerCount })}
               </p>
               <div className="mt-2 flex flex-col gap-1">
                 {stat.picks.map((pick) => (

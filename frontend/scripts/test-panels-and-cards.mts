@@ -7,7 +7,8 @@ import { MemoryRouter } from "react-router-dom";
 import type { Duel } from "@scripta/shared";
 import { DuelCard } from "../src/components/arena/DuelCard";
 import { MuralThumb } from "../src/components/murals/MuralThumb";
-import { QUIZ_TYPE_LABELS } from "../src/lib/quizTypeLabels";
+import { QUIZ_TYPE_LABEL_KEYS } from "../src/lib/quizTypeLabels";
+import { t } from "../src/i18n";
 import { PANEL_HEADER } from "../src/components/page/surfaceClasses";
 
 const src = (f: string) => readFileSync(new URL(`../src/${f}.tsx`, import.meta.url), "utf8");
@@ -108,14 +109,14 @@ test("Delete account names quizzes and comments", () => {
 test("destructive buttons are danger buttons", () => {
   assert.match(src("pages/LibraryPage"), /className=\{BUTTON_DANGER\}\s*>\s*\{t\("library\.deleteSelected"\)\}/);
   assert.match(src("pages/GroupsPage"), /className=\{BUTTON_DANGER\}\s*>\s*\{t\("library\.deleteSelected"\)\}/);
-  assert.match(src("pages/QuizEditorPage"), /className=\{BUTTON_DANGER_OUTLINE\}\s*>\s*Delete\s*</);
+  assert.match(src("pages/QuizEditorPage"), /className=\{BUTTON_DANGER_OUTLINE\}\s*>\s*\{t\("shell\.delete"\)\}/);
 });
 
 test("the quiz editor and the wizard name question types the same way", () => {
-  assert.equal(QUIZ_TYPE_LABELS.cover_title, "Guess the title from a blurred cover");
+  assert.equal(t(QUIZ_TYPE_LABEL_KEYS.cover_title), "Guess the title from a blurred cover");
   for (const f of ["pages/QuizEditorPage", "pages/QuizCreatePage"]) {
     const s = src(f);
-    assert.match(s, /import \{ QUIZ_TYPE_LABELS \} from "\.\.\/lib\/quizTypeLabels"/, f);
+    assert.match(s, /import \{ QUIZ_TYPE_LABEL_KEYS \} from "\.\.\/lib\/quizTypeLabels"/, f);
     assert.doesNotMatch(s, /const TYPE_LABELS/, f);
   }
   assert.doesNotMatch(src("pages/QuizEditorPage"), /Blurred cover →/);
@@ -133,7 +134,7 @@ test("the new series / collection field: danger frame on error, Add and Cancel b
 
 test("section headings: Published, day groups, Your chapters use SECTION_HEADING; the Admin panels use PANEL_HEADING", () => {
   assert.match(src("pages/CommunityProfilePage"), /<h2 className=\{`\$\{SECTION_HEADING\} mb-3`\}>\{t\("community\.published"\)\}<\/h2>/);
-  assert.match(src("pages/DailyChapterPage"), /<h2 id="daily-history" className=\{SECTION_HEADING\}>Your chapters<\/h2>/);
+  assert.match(src("pages/DailyChapterPage"), /<h2 id="daily-history" className=\{SECTION_HEADING\}>\{t\("daily\.yourChapters"\)\}<\/h2>/);
   const admin = src("pages/AdminDailyChapterPage");
   assert.equal(admin.match(/<h2 className=\{PANEL_HEADING\}>/g)?.length, 6);
   assert.doesNotMatch(admin, /SECTION_HEADING/);

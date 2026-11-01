@@ -1,11 +1,13 @@
 import type { PublicQuizQuestion } from "@scripta/shared";
 import { CoverImage } from "../BookCard";
+import { useT } from "../../i18n";
 
 export function QuizPrompt({ question }: { question: PublicQuizQuestion }) {
+  const t = useT();
   if (question.type === "cover_title") {
     return (
       <div className="relative mx-auto h-56 w-40 overflow-hidden rounded-lg bg-(--color-border) blur-md">
-        <CoverImage book={{ Title: "Cover unavailable", _coverUrl: question.prompt }} alt="Which book is this?" />
+        <CoverImage book={{ Title: t("quizzes.coverUnavailable"), _coverUrl: question.prompt }} alt={t("quizzes.whichBookIsThis")} />
       </div>
     );
   }
@@ -15,7 +17,7 @@ export function QuizPrompt({ question }: { question: PublicQuizQuestion }) {
   if (question.type === "characters_title") {
     return (
       <div className="text-center">
-        <p className="text-sm text-(--color-text-dim)">Who's in this book?</p>
+        <p className="text-sm text-(--color-text-dim)">{t("quizzes.whoIsInThisBook")}</p>
         <p className="mt-1 text-xl font-bold">{question.prompt}</p>
       </div>
     );

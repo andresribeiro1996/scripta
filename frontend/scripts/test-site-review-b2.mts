@@ -102,8 +102,8 @@ test("Disclosure draws the shared plus icon instead of the browser triangle", ()
 test("the Daily Chapter page links back Home and lights the Home area", () => {
   assert.equal(areaIdForPath("/daily"), "home");
   const page = src("pages/DailyChapterPage.tsx");
-  assert.match(page, /back=\{\{ to: session\?\.user\.username \? "\/dashboard" : "\/", label: "Home" \}\}/);
-  assert.match(page, /<Disclosure title="Past results">/);
+  assert.match(page, /back=\{\{ to: session\?\.user\.username \? "\/dashboard" : "\/", label: t\("shell\.areaHome"\) \}\}/);
+  assert.match(page, /<Disclosure title=\{t\("daily\.pastResults"\)\}>/);
   assert.doesNotMatch(page, /<details>/);
 });
 

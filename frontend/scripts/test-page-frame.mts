@@ -270,8 +270,8 @@ test("the Games tournament search is the shared SearchField", () => {
 
 test("the quiz editor says why Publish is off next to the header, and play and results get the Games back link", () => {
   const editor = src("pages/QuizEditorPage");
-  assert.equal(editor.match(/A quiz needs at least 4 books\./g)?.length, 1);
-  assert.match(editor, /<Page\b(?:=>|[^>])*subtitle=\{[^}]*data\.books\.length < 4[^}]*A quiz needs at least 4 books\./);
+  assert.equal(editor.match(/quizzes\.needFourBooks/g)?.length, 1);
+  assert.match(editor, /<Page\b(?:=>|[^>])*subtitle=\{[^}]*data\.books\.length < 4[^}]*quizzes\.needFourBooks/);
   const play = src("pages/PlayQuizPage");
   assert.match(play, /session\?\.user\.username \? backTo\("quiz"\) : undefined/);
   const tags = play.match(/<Page\b(?:=>|[^>])*>/g) ?? [];
