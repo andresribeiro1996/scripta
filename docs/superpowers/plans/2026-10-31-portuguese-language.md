@@ -1112,6 +1112,7 @@ Domain errors extend `LocalizedError`. Route literals use `t(localeOf(request), 
 - Test: `backend/src/modules/tierlists/routes.test.ts`
 - Test: `backend/src/modules/arena/routes.test.ts`
 - Test: `backend/src/worksErrors.test.ts`
+- Test: `backend/src/modules/auth/emailLayout.test.ts`
 - Modify: `backend/package.json`
 
 Admin routes in `books` and the editor-only Daily Chapter files stay English. `WorkResolutionError` is translated in `app.ts`.
