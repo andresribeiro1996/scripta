@@ -310,7 +310,7 @@ test("public payload carries the mural's theme", async () => {
   const service = makeService();
   const mural = service.createMural("u1", "Shared", null, "synthwave");
   const row = { id: mural.id, user_id: "u1", name: "Shared", theme: "synthwave", blocks: "[]", cover_image_id: null, cover_image_url: null, share_token: null, folder_id: null, created_at: "", updated_at: "" };
-  assert.equal(resolveMuralPublicPayload(row, []).mural.theme, "synthwave");
+  assert.equal(resolveMuralPublicPayload(row, [], "en").mural.theme, "synthwave");
 });
 
 test("the mural summary reads the owned row only and builds the cover like the public payload", async () => {

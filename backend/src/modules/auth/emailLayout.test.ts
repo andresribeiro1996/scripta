@@ -9,7 +9,7 @@ test("heading, paragraphs, button label and URL are HTML-escaped", () => {
     heading: "<b>Hi</b>",
     paragraphs: ["a & b <script>alert(1)</script>"],
     button: { label: "Go <now>", url: "https://atmyshelf.com/x?a=1&b=\"2\"" }
-  }, site);
+  }, site, "en");
   assert.ok(!html.includes("<script>"));
   assert.ok(!html.includes("<b>Hi</b>"));
   assert.ok(html.includes("&lt;b&gt;Hi&lt;/b&gt;"));
@@ -20,7 +20,7 @@ test("heading, paragraphs, button label and URL are HTML-escaped", () => {
 
 test("the link appears unchanged in the text part and as an href in the html part", () => {
   const url = "https://atmyshelf.com/reset-password#token=abc123";
-  const { text, html } = renderEmail({ heading: "Reset", paragraphs: ["Body"], button: { label: "Reset password", url }, footnote: "Expires soon." }, site);
+  const { text, html } = renderEmail({ heading: "Reset", paragraphs: ["Body"], button: { label: "Reset password", url }, footnote: "Expires soon." }, site, "en");
   assert.ok(text.includes(`\n${url}\n`));
   assert.ok(text.includes("Reset\n\nBody"));
   assert.ok(text.includes("Expires soon."));
@@ -28,14 +28,14 @@ test("the link appears unchanged in the text part and as an href in the html par
 });
 
 test("without a button there is no link or button markup", () => {
-  const { text, html } = renderEmail({ heading: "Deleted", paragraphs: ["Gone."] }, site);
+  const { text, html } = renderEmail({ heading: "Deleted", paragraphs: ["Gone."] }, site, "en");
   assert.ok(!html.includes("<a "));
   assert.ok(!html.includes("em-btn\""));
   assert.ok(!text.includes("https://atmyshelf.com/"));
 });
 
 test("the palette is black and white: no accent or danger colours remain", () => {
-  const { html } = renderEmail({ heading: "H", paragraphs: [], button: { label: "Go", url: `${site}/x` } }, site);
+  const { html } = renderEmail({ heading: "H", paragraphs: [], button: { label: "Go", url: `${site}/x` } }, site, "en");
   for (const colour of ["#97532d", "#e08a52", "#ae412e", "#e08072"]) assert.ok(!html.includes(colour));
   assert.ok(html.includes("border-top:4px solid #201e1c"));
   assert.ok(html.includes("background:#201e1c;border-radius:8px"));
@@ -43,11 +43,24 @@ test("the palette is black and white: no accent or danger colours remain", () =>
 });
 
 test("dark mode adds a media query and both marks with absolute URLs", () => {
-  const { html } = renderEmail({ heading: "H", paragraphs: [] }, "https://app.example.com/ignored/path");
+  const { html } = renderEmail({ heading: "H", paragraphs: [] }, "https://app.example.com/ignored/path", "en");
   assert.ok(html.includes("@media (prefers-color-scheme: dark)"));
   assert.ok(html.includes('<meta name="color-scheme" content="light dark">'));
   assert.ok(html.includes('src="https://app.example.com/email/mark.png"'));
   assert.ok(html.includes('src="https://app.example.com/email/mark-dark.png"'));
   assert.ok(/class="em-mark-dark"[^>]*style="display:none"/.test(html));
   assert.ok(html.includes("Atmyshelf · app.example.com"));
+});
+
+test("a Portuguese locale sets the html lang and translates the paste-link line", () => {
+  const { html } = renderEmail({ heading: "Olá", paragraphs: ["Corpo"], button: { label: "Ir", url: "https://atmyshelf.com/x" } }, site, "pt-PT");
+  assert.ok(html.includes('<html lang="pt-PT">'));
+  assert.ok(html.includes("Ou cole esta ligação no seu navegador:"));
+  assert.ok(!html.includes("Or paste this link"));
+});
+
+test("English is the default locale", () => {
+  const { html } = renderEmail({ heading: "Hi", paragraphs: ["Body"], button: { label: "Go", url: "https://atmyshelf.com/x" } }, site, "en");
+  assert.ok(html.includes('<html lang="en">'));
+  assert.ok(html.includes("Or paste this link into your browser:"));
 });

@@ -510,3 +510,23 @@ test("a client-sent characters field is stripped", async () => {
   assert.equal("characters" in books[0]!, false);
   await app.close();
 });
+
+test("quiz errors answer in Portuguese for a pt-PT request", async () => {
+  const [b, old] = [named("Pt Quiz B"), named("Pt Quiz B old edition")];
+  openBooksDb().prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(b, old);
+  const { app } = await quizApp();
+  const pt = (method: "GET" | "POST" | "PUT", url: string, payload?: Record<string, unknown>) =>
+    app.inject({ method, url, headers: { authorization: "Bearer q31", "accept-language": "pt-PT" }, ...(payload ? { payload } : {}) });
+  const unresolved = await pt("POST", "/quizzes", { name: "Bad", data: { books: [worksBook("???")] } });
+  assert.equal(unresolved.statusCode, 400);
+  assert.equal(unresolved.json().error, "Esse livro não está no catálogo.");
+  const nameless = await pt("POST", "/quizzes", { name: "", data: { books: [] } });
+  assert.equal(nameless.json().error, "O nome é obrigatório e não pode estar vazio.");
+  assert.equal((await pt("GET", "/quizzes/7f3c1f4e-3f55-4e3b-9a3e-2f0a5e8f0a11")).json().error, "Não existe nenhum quiz com esse identificador.");
+  const draft = await pt("POST", "/quizzes", { name: "Draft", data: { books: [worksBook("Pt Quiz B", b)] } });
+  const duplicate = await pt("PUT", `/quizzes/${draft.json().id}`, { data: { books: [worksBook("Pt Quiz B", b), worksBook("Pt Quiz B old edition", old)] } });
+  assert.equal(duplicate.statusCode, 409);
+  assert.equal(duplicate.json().error, "Pt Quiz B old edition já está aqui como outra edição.");
+  assert.equal((await pt("GET", "/quizzes/voting/nope")).json().error, "Não existe nenhum quiz nessa ligação.");
+  await app.close();
+});

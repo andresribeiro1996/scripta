@@ -24,6 +24,7 @@ import type { FastifyInstance } from "fastify";
 import { blockReferences, type ResolvedTierlist, type SharedMuralPayload } from "@scripta/shared";
 import { THEME_IDS } from "@scripta/shared/themes";
 import { z } from "zod";
+import { localeOf, t, validationMessage } from "../../i18n/index.js";
 import { authGuard } from "../auth/index.js";
 import { resolveEntryWorks, workIdsByKey, WorkResolutionError } from "../library/index.js";
 import { FolderCycleError, InvalidFolderReferenceError, MuralConflictError, MuralNameTooLongError } from "./domain/errors.js";
@@ -33,7 +34,7 @@ import type { MuralsService } from "./service.js";
 const idParamSchema = z.object({ id: z.string().uuid() });
 
 const createMuralSchema = z.object({
-  name: z.string().min(1, "name is required and must be non-empty.").max(200, "Names can be at most 200 characters."),
+  name: z.string().min(1, "murals.nameRequired").max(200, "murals.nameTooLong"),
   folderId: z.string().uuid().nullable().optional(),
   theme: z.enum(THEME_IDS).optional()
 });
@@ -50,7 +51,7 @@ const updateMuralSchema = z
     updatedAt: z.string().datetime().optional()
   })
   .refine((body) => body.name !== undefined || body.theme !== undefined || body.blocks !== undefined || body.folderId !== undefined, {
-    message: "At least one of name, theme, blocks, or folderId must be provided."
+    message: "murals.updateNeedsField"
   });
 
 const setCoverSchema = z.object({
@@ -59,7 +60,7 @@ const setCoverSchema = z.object({
 });
 
 const createFolderSchema = z.object({
-  name: z.string().min(1, "name is required and must be non-empty.").max(200, "Names can be at most 200 characters."),
+  name: z.string().min(1, "murals.nameRequired").max(200, "murals.nameTooLong"),
   parentId: z.string().uuid().nullable().optional()
 });
 
@@ -69,7 +70,7 @@ const updateFolderSchema = z
     parentId: z.string().uuid().nullable().optional()
   })
   .refine((body) => body.name !== undefined || body.parentId !== undefined, {
-    message: "At least one of name or parentId must be provided."
+    message: "murals.folderUpdateNeedsField"
   });
 
 /** The authenticated CRUD + share/unshare surface — everything that needs
@@ -86,13 +87,13 @@ export function buildMuralRoutes(service: MuralsService, resolveWorks: typeof re
     app.post("/murals", { preHandler: authGuard }, async (request, reply) => {
       const parsed = createMuralSchema.safeParse(request.body);
       if (!parsed.success) {
-        return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request." });
+        return reply.code(400).send({ error: validationMessage(localeOf(request), parsed.error) });
       }
       try {
         const mural = service.createMural(request.user.id, parsed.data.name, parsed.data.folderId ?? null, parsed.data.theme);
         return reply.code(201).send(mural);
       } catch (err) {
-        if (err instanceof InvalidFolderReferenceError) return reply.code(400).send({ error: err.message });
+        if (err instanceof InvalidFolderReferenceError) return reply.code(400).send({ error: t(localeOf(request), err.key, err.vars) });
         throw err;
       }
     });
@@ -100,11 +101,11 @@ export function buildMuralRoutes(service: MuralsService, resolveWorks: typeof re
     app.get("/murals/:id", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) {
-        return reply.code(400).send({ error: "Invalid mural id." });
+        return reply.code(400).send({ error: t(localeOf(request), "murals.invalidId") });
       }
       const mural = service.getMural(request.user.id, params.data.id);
       if (!mural) {
-        return reply.code(404).send({ error: "No mural with that id." });
+        return reply.code(404).send({ error: t(localeOf(request), "murals.notFound") });
       }
       return reply.send(mural);
     });
@@ -112,11 +113,11 @@ export function buildMuralRoutes(service: MuralsService, resolveWorks: typeof re
     app.put("/murals/:id", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) {
-        return reply.code(400).send({ error: "Invalid mural id." });
+        return reply.code(400).send({ error: t(localeOf(request), "murals.invalidId") });
       }
       const body = updateMuralSchema.safeParse(request.body);
       if (!body.success) {
-        return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
+        return reply.code(400).send({ error: validationMessage(localeOf(request), body.error) });
       }
       try {
         const mural = service.updateMural(request.user.id, params.data.id, body.data, (blocks) => {
@@ -124,15 +125,15 @@ export function buildMuralRoutes(service: MuralsService, resolveWorks: typeof re
           return workIdsByKey(keys, resolveWorks(request.user.id, keys.map((key) => ({ key }))));
         });
         if (!mural) {
-          return reply.code(404).send({ error: "No mural with that id." });
+          return reply.code(404).send({ error: t(localeOf(request), "murals.notFound") });
         }
         return reply.send(mural);
       } catch (err) {
         if (err instanceof MuralConflictError) {
-          return reply.code(409).send({ error: err.message, current: service.getMural(request.user.id, params.data.id) });
+          return reply.code(409).send({ error: t(localeOf(request), err.key, err.vars), current: service.getMural(request.user.id, params.data.id) });
         }
-        if (err instanceof InvalidFolderReferenceError || err instanceof MuralNameTooLongError) return reply.code(400).send({ error: err.message });
-        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });
+        if (err instanceof InvalidFolderReferenceError || err instanceof MuralNameTooLongError) return reply.code(400).send({ error: t(localeOf(request), err.key, err.vars) });
+        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: t(localeOf(request), err.key, err.vars) });
         throw err;
       }
     });
@@ -140,11 +141,11 @@ export function buildMuralRoutes(service: MuralsService, resolveWorks: typeof re
     app.delete("/murals/:id", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) {
-        return reply.code(400).send({ error: "Invalid mural id." });
+        return reply.code(400).send({ error: t(localeOf(request), "murals.invalidId") });
       }
       const deleted = service.deleteMural(request.user.id, params.data.id);
       if (!deleted) {
-        return reply.code(404).send({ error: "No mural with that id." });
+        return reply.code(404).send({ error: t(localeOf(request), "murals.notFound") });
       }
       return reply.code(204).send();
     });
@@ -152,15 +153,15 @@ export function buildMuralRoutes(service: MuralsService, resolveWorks: typeof re
     app.put("/murals/:id/cover", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) {
-        return reply.code(400).send({ error: "Invalid mural id." });
+        return reply.code(400).send({ error: t(localeOf(request), "murals.invalidId") });
       }
       const body = setCoverSchema.safeParse(request.body);
       if (!body.success) {
-        return reply.code(400).send({ error: 'Expected {"imageId": string, "url": string}.' });
+        return reply.code(400).send({ error: t(localeOf(request), "murals.expectedCover") });
       }
       const mural = service.setCover(request.user.id, params.data.id, body.data.imageId, body.data.url);
       if (!mural) {
-        return reply.code(404).send({ error: "No mural with that id." });
+        return reply.code(404).send({ error: t(localeOf(request), "murals.notFound") });
       }
       return reply.send(mural);
     });
@@ -168,11 +169,11 @@ export function buildMuralRoutes(service: MuralsService, resolveWorks: typeof re
     app.delete("/murals/:id/cover", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) {
-        return reply.code(400).send({ error: "Invalid mural id." });
+        return reply.code(400).send({ error: t(localeOf(request), "murals.invalidId") });
       }
       const mural = service.clearCover(request.user.id, params.data.id);
       if (!mural) {
-        return reply.code(404).send({ error: "No mural with that id." });
+        return reply.code(404).send({ error: t(localeOf(request), "murals.notFound") });
       }
       return reply.send(mural);
     });
@@ -180,11 +181,11 @@ export function buildMuralRoutes(service: MuralsService, resolveWorks: typeof re
     app.post("/murals/:id/share", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) {
-        return reply.code(400).send({ error: "Invalid mural id." });
+        return reply.code(400).send({ error: t(localeOf(request), "murals.invalidId") });
       }
       const mural = service.share(request.user.id, params.data.id);
       if (!mural) {
-        return reply.code(404).send({ error: "No mural with that id." });
+        return reply.code(404).send({ error: t(localeOf(request), "murals.notFound") });
       }
       return reply.send(mural);
     });
@@ -192,11 +193,11 @@ export function buildMuralRoutes(service: MuralsService, resolveWorks: typeof re
     app.post("/murals/:id/unshare", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) {
-        return reply.code(400).send({ error: "Invalid mural id." });
+        return reply.code(400).send({ error: t(localeOf(request), "murals.invalidId") });
       }
       const mural = service.unshare(request.user.id, params.data.id);
       if (!mural) {
-        return reply.code(404).send({ error: "No mural with that id." });
+        return reply.code(404).send({ error: t(localeOf(request), "murals.notFound") });
       }
       return reply.send(mural);
     });
@@ -208,13 +209,13 @@ export function buildMuralRoutes(service: MuralsService, resolveWorks: typeof re
     app.post("/murals/folders", { preHandler: authGuard }, async (request, reply) => {
       const parsed = createFolderSchema.safeParse(request.body);
       if (!parsed.success) {
-        return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request." });
+        return reply.code(400).send({ error: validationMessage(localeOf(request), parsed.error) });
       }
       try {
         const folder = service.createFolder(request.user.id, parsed.data.name, parsed.data.parentId ?? null);
         return reply.code(201).send(folder);
       } catch (err) {
-        if (err instanceof InvalidFolderReferenceError) return reply.code(400).send({ error: err.message });
+        if (err instanceof InvalidFolderReferenceError) return reply.code(400).send({ error: t(localeOf(request), err.key, err.vars) });
         throw err;
       }
     });
@@ -222,11 +223,11 @@ export function buildMuralRoutes(service: MuralsService, resolveWorks: typeof re
     app.put("/murals/folders/:id", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) {
-        return reply.code(400).send({ error: "Invalid folder id." });
+        return reply.code(400).send({ error: t(localeOf(request), "murals.invalidFolderId") });
       }
       const body = updateFolderSchema.safeParse(request.body);
       if (!body.success) {
-        return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
+        return reply.code(400).send({ error: validationMessage(localeOf(request), body.error) });
       }
       let folder;
       try {
@@ -238,12 +239,12 @@ export function buildMuralRoutes(service: MuralsService, resolveWorks: typeof re
         }
       } catch (err) {
         if (err instanceof InvalidFolderReferenceError || err instanceof FolderCycleError || err instanceof MuralNameTooLongError) {
-          return reply.code(400).send({ error: err.message });
+          return reply.code(400).send({ error: t(localeOf(request), err.key, err.vars) });
         }
         throw err;
       }
       if (!folder) {
-        return reply.code(404).send({ error: "No folder with that id." });
+        return reply.code(404).send({ error: t(localeOf(request), "murals.folderNotFound") });
       }
       return reply.send(folder);
     });
@@ -251,11 +252,11 @@ export function buildMuralRoutes(service: MuralsService, resolveWorks: typeof re
     app.delete("/murals/folders/:id", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
       if (!params.success) {
-        return reply.code(400).send({ error: "Invalid folder id." });
+        return reply.code(400).send({ error: t(localeOf(request), "murals.invalidFolderId") });
       }
       const deleted = service.deleteFolder(request.user.id, params.data.id);
       if (!deleted) {
-        return reply.code(404).send({ error: "No folder with that id." });
+        return reply.code(404).send({ error: t(localeOf(request), "murals.folderNotFound") });
       }
       return reply.code(204).send();
     });
@@ -285,7 +286,7 @@ export function buildPublicMuralRoutes(service: MuralsService, getTierlistData?:
     app.get<{ Params: { token: string } }>("/murals/shared/:token", async (request, reply) => {
       const row = service.getRowByShareToken(request.params.token);
       if (!row) {
-        return reply.code(404).send({ error: "No shared mural at that link." });
+        return reply.code(404).send({ error: t(localeOf(request), "murals.noSharedMural") });
       }
 
       // A corrupted/malformed row (shouldn't happen via normal writes,
@@ -295,14 +296,14 @@ export function buildPublicMuralRoutes(service: MuralsService, getTierlistData?:
       try {
         blocks = JSON.parse(row.blocks);
       } catch {
-        return reply.code(404).send({ error: "No shared mural at that link." });
+        return reply.code(404).send({ error: t(localeOf(request), "murals.noSharedMural") });
       }
 
       // blockReferences (@scripta/shared) and resolvePublicLibraryData below
       // are the whole privacy boundary this route exists to enforce — see
       // resolvePublicLibraryData's top comment (modules/library/publicResolver.ts)
       // for exactly what is and isn't safe to include in the response built from them.
-      const payload = resolveMuralPublicPayload(row, blocks, getTierlistData);
+      const payload = resolveMuralPublicPayload(row, blocks, localeOf(request), getTierlistData);
       reply.header("Cache-Control", "no-store");
       return reply.send({
         mural: payload.mural,

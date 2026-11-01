@@ -477,3 +477,19 @@ test("pick everyone from the admin sets the catalog cover", async () => {
   const resolved = await call(service, { method: "GET", url: `/covers/resolve?${orlandoQuery}` }, "u1");
   assert.deepEqual(resolved.json(), res.json());
 });
+
+test("reader-facing book errors come back in Portuguese for a Portuguese request and admin ones stay English", async () => {
+  const { service, repo } = pickerService();
+  orlandoBook(repo);
+  await listCandidates(service, "u1");
+  const portuguese = { "accept-language": "pt-PT" };
+  const body = (options: InjectOptions) => call(service, { ...options, headers: portuguese }, "u1").then((res) => res.json());
+  assert.deepEqual(await body({ method: "GET", url: "/books/search/external" }), { error: "Envie uma pesquisa em q." });
+  assert.deepEqual(await body({ method: "GET", url: "/covers/resolve" }), { error: "Envie um ISBN ou um título (autor opcional)." });
+  assert.deepEqual(await body({ method: "GET", url: "/covers/candidates?isbn=abc" }), { error: "Esse livro não existe." });
+  assert.deepEqual(await body({ method: "POST", url: "/covers/pick", payload: { ...orlando, url: "https://o/never" } }), { error: "Essa proposta de capa expirou. Volte a abrir o seletor." });
+  assert.deepEqual(await body({ method: "POST", url: "/covers/pick", payload: { ...orlando, url: "https://o/missing" } }), { error: "Essa imagem não pode ser usada como capa." });
+  assert.deepEqual(await body({ method: "POST", url: "/covers/pick", payload: { ...orlando, url: "https://o/down" } }), { error: "Não foi possível transferir essa capa. Tente novamente." });
+  const admin = await call(service, { method: "POST", url: "/books/works/group", headers: portuguese }, "u1");
+  assert.deepEqual(admin.json(), { error: "Only the admin can change works." });
+});

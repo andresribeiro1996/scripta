@@ -1088,6 +1088,7 @@ Domain errors extend `LocalizedError`. Route literals use `t(localeOf(request), 
 - Test: `backend/src/modules/tierlists/`
 - Test: `backend/src/modules/murals/`
 - Test: `backend/src/modules/gallery/`
+- Modify: `backend/src/modules/community/`
 - Modify: `backend/package.json`
 
 - [ ] Steps 1–5 as Task 33
@@ -1102,11 +1103,20 @@ Domain errors extend `LocalizedError`. Route literals use `t(localeOf(request), 
 - Modify: `backend/src/modules/works/`
 - Modify: `backend/src/modules/quizzes/`
 - Modify: `backend/src/worksErrors.ts`
+- Modify: `backend/src/modules/arena/routes.ts`
+- Modify: `backend/src/modules/murals/routes.ts`
+- Modify: `backend/src/modules/tierlists/routes.ts`
+- Modify: `backend/src/modules/arena/domain/errors.ts`
+- Modify: `backend/src/modules/auth/emailLayout.ts`
 - Modify: `backend/src/app.ts`
 - Test: `backend/src/modules/library/`
 - Test: `backend/src/modules/books/`
 - Test: `backend/src/modules/works/`
 - Test: `backend/src/modules/quizzes/`
+- Test: `backend/src/modules/tierlists/routes.test.ts`
+- Test: `backend/src/modules/arena/routes.test.ts`
+- Test: `backend/src/worksErrors.test.ts`
+- Test: `backend/src/modules/auth/emailLayout.test.ts`
 - Modify: `backend/package.json`
 
 Admin routes in `books` and the editor-only Daily Chapter files stay English. `WorkResolutionError` is translated in `app.ts`.

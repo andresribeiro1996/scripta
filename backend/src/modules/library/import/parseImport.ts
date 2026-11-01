@@ -1,7 +1,8 @@
 import type { LibraryData } from "@scripta/shared";
-import { bookCsvErrors } from "@scripta/shared";
+import { sharedT, type Locale } from "@scripta/shared/i18n";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { t, type BackendKey } from "../../../i18n/index.js";
 import { importTooLargeMessage } from "../domain/sizeLimit.js";
 
 const MAX_IMPORT_ROWS = 100_000;
@@ -17,40 +18,56 @@ export interface ImportPreview {
   warnings: string[];
 }
 
-const SAFE_IMPORT_ERRORS = new Set([
-  ...bookCsvErrors("en"),
-  "The import contains too many rows.",
-  "`content` table has none of the required Kobo columns.",
-  "Couldn't decode that file as text, and it isn't a SQLite database.",
-  'That JSON is missing a "books" array.',
-  "Didn't recognize that file as Kobo SQLite, library JSON, Goodreads CSV, or StoryGraph CSV.",
-  "Didn't recognize that file — choose Kobo SQLite, library JSON, Goodreads, StoryGraph, Calibre, or a book CSV with Title and Author columns.",
-  "Didn't recognize that file — choose Kobo SQLite, library JSON, Goodreads, StoryGraph, Calibre, LibraryThing TSV, or a book CSV with Title and Author columns.",
-  "Didn't recognize that file — choose Kobo SQLite, library JSON, Goodreads, StoryGraph, Calibre, LibraryThing TSV, BookWyrm CSV, or a book CSV with Title and Author columns.",
-  "Couldn't parse that CSV export.",
-  "That Goodreads CSV doesn't have any books in it.",
-  "That StoryGraph CSV doesn't have any books in it.",
-  "The import file took too long to parse.",
-  "The import parser stopped before completing."
-]);
+const SHARED_IMPORT_ERRORS = [
+  "shared.csv.invalidQuoting",
+  "shared.csv.noBooks",
+  "shared.csv.duplicateColumns",
+  "shared.csv.fieldCount",
+  "shared.csv.titleAuthor",
+  "shared.csv.isbn",
+  "shared.csv.status",
+  "shared.csv.rating",
+  "shared.csv.seriesNumber",
+  "shared.csv.date",
+  "shared.csv.decode",
+  "shared.csv.goodreadsEmpty",
+  "shared.csv.storygraphEmpty"
+] as const;
+
+const SAFE_IMPORT_ERRORS = [
+  "library.importTooManyRows",
+  "library.importKoboColumns",
+  "library.importJsonNoBooks",
+  "library.importUnrecognizedFile",
+  "library.importUnrecognizedCalibre",
+  "library.importUnrecognizedTsv",
+  "library.importUnrecognizedBookwyrm",
+  "library.importCsvFailed",
+  "library.importTimeout",
+  "library.importStopped"
+] as const satisfies readonly BackendKey[];
 
 const SAFE_TABLE_ERROR = /^`(content|Bookmark)` must be a real SQLite table\.$/;
 
-export function sanitizeImportError(raw: string | undefined, maxResultBytes: number): string {
-  if (!raw) return "Couldn't parse that import file.";
-  if (SAFE_IMPORT_ERRORS.has(raw)) return raw;
-  if (SAFE_TABLE_ERROR.test(raw)) return raw;
-  if (raw === importTooLargeMessage(maxResultBytes)) return raw;
-  return "Couldn't parse that import file.";
+export function sanitizeImportError(raw: string | undefined, maxResultBytes: number, locale: Locale): string {
+  if (!raw) return t(locale, "library.importFailed");
+  const shared = SHARED_IMPORT_ERRORS.find((key) => sharedT("en")(key) === raw);
+  if (shared) return sharedT(locale)(shared);
+  const safe = SAFE_IMPORT_ERRORS.find((key) => t("en", key) === raw);
+  if (safe) return t(locale, safe);
+  const table = SAFE_TABLE_ERROR.exec(raw)?.[1];
+  if (table) return t(locale, "library.importNotTable", { table });
+  if (raw === importTooLargeMessage("en", maxResultBytes)) return importTooLargeMessage(locale, maxResultBytes);
+  return t(locale, "library.importFailed");
 }
 
 let inFlight = 0;
 
 type ImportLogger = { warn(...args: unknown[]): void };
 
-export function parseImport(path: string, timeoutMs: number, maxResultBytes: number, logger: ImportLogger = console): Promise<ImportPreview> {
+export function parseImport(path: string, timeoutMs: number, maxResultBytes: number, locale: Locale, logger: ImportLogger = console): Promise<ImportPreview> {
   if (inFlight >= MAX_PARALLEL_IMPORTS) {
-    return Promise.reject(new ImportBusyError("Import parser is busy — try again in a moment."));
+    return Promise.reject(new ImportBusyError(t(locale, "library.importBusy")));
   }
   inFlight++;
   return new Promise((resolve, reject) => {
@@ -98,18 +115,18 @@ export function parseImport(path: string, timeoutMs: number, maxResultBytes: num
       if (timedOut) return;
       finish(() => message.data
         ? resolve({ data: message.data, warnings: [] })
-        : reject(new InvalidImportError(sanitizeImportError(message.error, maxResultBytes))));
+        : reject(new InvalidImportError(sanitizeImportError(message.error, maxResultBytes, locale))));
     });
     child.once("error", (error) => {
       if (!settled) logger.warn({ err: error }, "import parser child failed to spawn");
-      if (!timedOut) finish(() => reject(new InvalidImportError("Couldn't parse that import file.")));
+      if (!timedOut) finish(() => reject(new InvalidImportError(t(locale, "library.importFailed"))));
     });
     child.once("exit", (code, signal) => {
       if (!settled) logger.warn({ code, signal }, "import parser child exited before sending a result");
       if (timedOut && signal === "SIGKILL") {
-        finish(() => reject(new ImportTimeoutError("The import file took too long to parse.")));
+        finish(() => reject(new ImportTimeoutError(t(locale, "library.importTimeout"))));
       } else {
-        finish(() => reject(new InvalidImportError("The import parser stopped before completing.")));
+        finish(() => reject(new InvalidImportError(t(locale, "library.importStopped"))));
       }
     });
   });

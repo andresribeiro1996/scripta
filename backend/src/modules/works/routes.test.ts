@@ -139,3 +139,15 @@ test("GET /works/:id/cast: 404 for an unknown work, the cast otherwise, never ca
   assert.equal(found.headers["cache-control"], "no-store");
   await app.close();
 });
+
+test("work route errors come back in Portuguese for a Portuguese request", async () => {
+  const app = appWith(() => undefined);
+  const headers = { "accept-language": "pt-PT" };
+  assert.deepEqual((await app.inject({ url: "/works/nope", headers })).json(), { error: "Não existe nenhum livro com esse identificador." });
+  assert.deepEqual((await app.inject({ url: "/works/nope/cast", headers })).json(), { error: "Não existe nenhum livro com esse identificador." });
+  assert.deepEqual((await app.inject({ url: "/works/nope/stats", headers })).json(), { error: "Não existe nenhum livro com esse identificador." });
+  const characters = await app.inject({ method: "POST", url: "/works/characters", headers, payload: {} });
+  assert.equal(characters.statusCode, 400);
+  assert.deepEqual(characters.json(), { error: "Esperado {workIds} com, no máximo, 500 identificadores." });
+  await app.close();
+});

@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { DAILY_CHAPTER_QUOTE_RIGHTS, DAILY_CHAPTER_THEMES, dailyChapterCoverage, dailyChapterStats, dailyChapterSummary, gradeAnswers, type DailyChapterBoard, type DailyChapterBook, type DailyChapterEditionInput, type DailyChapterMonthFacts, type DailyChapterPerson, type DailyChapterQuestionInput, type DailyChapterResult, type SubmittedAnswer } from "@scripta/shared";
+import { t, type BackendKey } from "../../i18n/index.js";
 import { DailyChapterError, NO_DAILY_PEOPLE, type DailyChapterPeople, type DailyChapterRepository, type StoredDailyChapter } from "./domain/dailyChapter.js";
 import type { QuizzesRepository } from "./domain/ports.js";
 import type { PlayRow } from "./domain/types.js";
@@ -7,6 +8,7 @@ import { dailyBankSchema, dailyBookSchema, dailyEditionSchema, dailyImportSchema
 
 export const dailyGuestKey = (id: string) => "daily-guest:" + id;
 const fail = (status: number, message: string): never => { throw new DailyChapterError(status, message); };
+const failKey = (status: number, key: BackendKey): never => { throw new DailyChapterError(status, t("en", key), key); };
 const normalized = (value: string) => value.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g, " ").trim();
 const bookIdentity = (book: DailyChapterBook) => [normalized(book.title), normalized(book.author), book.language].join("\0");
 const passageKey = (question: Pick<DailyChapterQuestionInput, "bookId" | "type" | "prompt">) => [question.bookId, question.type, normalized(question.prompt)].join("\0");
@@ -37,8 +39,8 @@ export function createDailyChapterService(repo: DailyChapterRepository, plays: Q
     history,
     people(editionId: string, viewerId: string): DailyChapterPerson[] {
       const edition = repo.edition(editionId);
-      if (!edition?.publishedAt || edition.date > today()) return fail(404, "No daily edition at that link.");
-      if (!plays.getPlayByVoter(editionId, viewerId)) return fail(403, "Play this chapter to see how others did.");
+      if (!edition?.publishedAt || edition.date > today()) return failKey(404, "quizzes.dailyNoEdition");
+      if (!plays.getPlayByVoter(editionId, viewerId)) return failKey(403, "quizzes.dailyPlayFirst");
       const followees = people.followees(viewerId).filter((id) => id !== viewerId);
       const visible = people.published(followees);
       const ids = [viewerId, ...new Set(followees.filter((id) => visible.has(id)))];
@@ -90,13 +92,13 @@ export function createDailyChapterService(repo: DailyChapterRepository, plays: Q
       const acceptedAt = clock();
       const date = acceptedAt.toISOString().slice(0, 10);
       const edition = repo.edition(id);
-      if (!edition?.publishedAt || edition.date > date) return fail(404, "No daily edition at that link.");
+      if (!edition?.publishedAt || edition.date > date) return failKey(404, "quizzes.dailyNoEdition");
       const existing = plays.getPlayByVoter(id, playerId);
       if (existing) return editionResult(edition, existing);
-      if (edition.date !== date) return fail(403, "This daily edition has closed. Come back for today's chapter.");
+      if (edition.date !== date) return failKey(403, "quizzes.dailyClosed");
       const questions = edition.snapshot!;
       const choices = new Map(submitted.map((answer) => [answer.questionId, answer.choiceIndex]));
-      if (submitted.length !== 5 || choices.size !== 5 || questions.some((q) => !Number.isInteger(choices.get(q.id)) || choices.get(q.id)! < 0 || choices.get(q.id)! >= q.options.length)) return fail(400, "Answer each of the five questions exactly once.");
+      if (submitted.length !== 5 || choices.size !== 5 || questions.some((q) => !Number.isInteger(choices.get(q.id)) || choices.get(q.id)! < 0 || choices.get(q.id)! >= q.options.length)) return failKey(400, "quizzes.dailyAnswerAll");
       const graded = gradeAnswers(questions, submitted);
       const at = acceptedAt.toISOString();
       const play: PlayRow = { id: randomUUID(), quiz_id: id, voter_user_id: playerId, player_name: null, score: graded.score, duration_ms: 0, created_at: at, updated_at: at };

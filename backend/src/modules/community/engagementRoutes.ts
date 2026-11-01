@@ -1,8 +1,9 @@
 import fastifyRateLimit from "@fastify/rate-limit";
-import type { FastifyInstance, FastifyReply } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
+import { localeOf, t } from "../../i18n/index.js";
 import { authGuard, rateLimitKey } from "../auth/index.js";
-import { CommunityError, ProfileNotFoundError } from "./domain/errors.js";
+import { CommunityError, ProfileNotFoundError, communityErrorMessage } from "./domain/errors.js";
 import type { EngagementService } from "./engagement.js";
 
 const id = z.string().min(1).max(100);
@@ -15,10 +16,10 @@ const like = z.object({ liked: z.boolean() });
 const comment = z.object({ text: z.string().trim().min(1).max(1500) });
 const saved = z.object({ ref, saved: z.boolean() });
 
-function guarded(reply: FastifyReply, work: () => unknown) {
+function guarded(request: FastifyRequest, reply: FastifyReply, work: () => unknown) {
   try { return work(); }
   catch (error) {
-    if (error instanceof CommunityError) return reply.code(error instanceof ProfileNotFoundError ? 404 : 400).send({ error: error instanceof ProfileNotFoundError ? "This activity is unavailable." : error.message });
+    if (error instanceof CommunityError) return reply.code(error instanceof ProfileNotFoundError ? 404 : 400).send({ error: error instanceof ProfileNotFoundError ? t(localeOf(request), "community.activityUnavailable") : communityErrorMessage(localeOf(request), error) });
     throw error;
   }
 }
@@ -30,46 +31,46 @@ export function buildEngagementRoutes(service: EngagementService) {
     app.addHook("onRequest", (_request, reply, done) => { reply.header("Cache-Control", "no-store"); done(); });
     app.post("/community/activity/engagement", async (request, reply) => {
       const input = ids.safeParse(request.body);
-      if (!input.success) return reply.code(400).send({ error: "Expected 1–50 activity IDs." });
-      return guarded(reply, () => service.getEngagement(request.user.id, input.data.ids));
+      if (!input.success) return reply.code(400).send({ error: t(localeOf(request), "community.expectedActivityIds") });
+      return guarded(request, reply, () => service.getEngagement(request.user.id, input.data.ids));
     });
     app.put("/community/activity/:id/like", async (request, reply) => {
       const input = like.safeParse(request.body);
       const target = params.safeParse(request.params);
-      if (!input.success || !target.success) return reply.code(400).send({ error: "Expected an activity ID and {liked}." });
-      return guarded(reply, () => service.setLiked(request.user.id, target.data.id, input.data.liked));
+      if (!input.success || !target.success) return reply.code(400).send({ error: t(localeOf(request), "community.expectedLike") });
+      return guarded(request, reply, () => service.setLiked(request.user.id, target.data.id, input.data.liked));
     });
     app.get("/community/activity/:id/comments", async (request, reply) => {
       const query = page.safeParse(request.query);
       const target = params.safeParse(request.params);
-      if (!query.success || !target.success) return reply.code(400).send({ error: "Invalid activity ID or page." });
-      return guarded(reply, () => service.getComments(request.user.id, target.data.id, query.data.cursor, query.data.limit));
+      if (!query.success || !target.success) return reply.code(400).send({ error: t(localeOf(request), "community.invalidActivityPage") });
+      return guarded(request, reply, () => service.getComments(request.user.id, target.data.id, query.data.cursor, query.data.limit));
     });
     app.post("/community/activity/:id/comments", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request, reply) => {
       const input = comment.safeParse(request.body);
       const target = params.safeParse(request.params);
-      if (!input.success || !target.success) return reply.code(400).send({ error: "Write a comment of 1–1500 characters." });
-      return guarded(reply, () => { service.addComment(request.user.id, target.data.id, input.data.text); return reply.code(204).send(); });
+      if (!input.success || !target.success) return reply.code(400).send({ error: t(localeOf(request), "community.commentLength") });
+      return guarded(request, reply, () => { service.addComment(request.user.id, target.data.id, input.data.text); return reply.code(204).send(); });
     });
     app.delete("/community/activity/comments/:id", async (request, reply) => {
       const target = params.safeParse(request.params);
-      if (!target.success) return reply.code(400).send({ error: "Invalid comment ID." });
-      return guarded(reply, () => { service.deleteComment(request.user.id, target.data.id); return reply.code(204).send(); });
+      if (!target.success) return reply.code(400).send({ error: t(localeOf(request), "community.invalidCommentId") });
+      return guarded(request, reply, () => { service.deleteComment(request.user.id, target.data.id); return reply.code(204).send(); });
     });
     app.post("/community/saved/state", async (request, reply) => {
       const input = refs.safeParse(request.body);
-      if (!input.success) return reply.code(400).send({ error: "Expected 1–50 content references." });
-      return guarded(reply, () => service.getSavedState(request.user.id, input.data.refs));
+      if (!input.success) return reply.code(400).send({ error: t(localeOf(request), "community.expectedRefs") });
+      return guarded(request, reply, () => service.getSavedState(request.user.id, input.data.refs));
     });
     app.put("/community/saved", async (request, reply) => {
       const input = saved.safeParse(request.body);
-      if (!input.success) return reply.code(400).send({ error: "Expected {ref, saved}." });
-      return guarded(reply, () => { service.setSaved(request.user.id, input.data.ref, input.data.saved); return reply.code(204).send(); });
+      if (!input.success) return reply.code(400).send({ error: t(localeOf(request), "community.expectedSaved") });
+      return guarded(request, reply, () => { service.setSaved(request.user.id, input.data.ref, input.data.saved); return reply.code(204).send(); });
     });
     app.get("/community/saved", async (request, reply) => {
       const query = page.safeParse(request.query);
-      if (!query.success) return reply.code(400).send({ error: "Invalid saved content page." });
-      return guarded(reply, () => service.getSaved(request.user.id, query.data.cursor, query.data.limit));
+      if (!query.success) return reply.code(400).send({ error: t(localeOf(request), "community.invalidSavedPage") });
+      return guarded(request, reply, () => service.getSaved(request.user.id, query.data.cursor, query.data.limit));
     });
   };
 }

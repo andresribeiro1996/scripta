@@ -1,3 +1,4 @@
+import type { BackendKey } from "../../../i18n/index.js";
 import type { DailyChapterBook, DailyChapterEdition, DailyChapterQuestion, ReaderProfile } from "@scripta/shared";
 import type { PlayRow } from "./types.js";
 
@@ -29,5 +30,5 @@ export interface DailyChapterPeople {
 export const NO_DAILY_PEOPLE: DailyChapterPeople = { followees: () => [], published: () => new Set(), profiles: () => new Map() };
 
 export class DailyChapterError extends Error {
-  constructor(public readonly status: number, message: string) { super(message); }
+  constructor(public readonly status: number, message: string, public readonly key?: BackendKey) { super(message); }
 }

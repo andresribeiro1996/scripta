@@ -29,7 +29,7 @@ test("an unknown code is rejected", () => {
 
 test("exchange failures use one indistinguishable error message", () => {
   const reasons = ["not_found", "expired", "verifier_mismatch", "verifier_not_expected"] as const;
-  assert.equal(new Set(reasons.map(authorizationCodeErrorMessage)).size, 1);
+  assert.equal(new Set(reasons.map((reason) => authorizationCodeErrorMessage(reason, "en"))).size, 1);
 });
 
 test("a code is single-use: a second exchange attempt fails even with the right verifier", () => {

@@ -190,3 +190,21 @@ test("a mural with an old 300-character name keeps saving when the name is resen
   assert.equal(changed.statusCode, 400);
   await app.close();
 });
+
+test("mural errors come back in Portuguese for a Portuguese request and stay English otherwise", async () => {
+  const { app, service } = await muralApp();
+  const headers = { authorization: "Bearer u-pt" };
+  const portuguese = { ...headers, "accept-language": "pt-PT" };
+  const missing = await app.inject({ method: "GET", url: "/murals/6b0c2c3a-6f0a-4c3e-9d1c-3a7a4e2b9f11", headers: portuguese });
+  assert.equal(missing.statusCode, 404);
+  assert.deepEqual(missing.json(), { error: "Não existe nenhum mural com esse identificador." });
+  assert.deepEqual((await app.inject({ method: "GET", url: "/murals/6b0c2c3a-6f0a-4c3e-9d1c-3a7a4e2b9f11", headers })).json(), { error: "No mural with that id." });
+  const unnamed = await app.inject({ method: "POST", url: "/murals", headers: portuguese, payload: { name: "" } });
+  assert.deepEqual(unnamed.json(), { error: "O nome é obrigatório e não pode estar vazio." });
+  const mural = service.createMural("u-pt", "Short");
+  const tooLong = await app.inject({ method: "PUT", url: `/murals/${mural.id}`, headers: portuguese, payload: { name: "x".repeat(201) } });
+  assert.deepEqual(tooLong.json(), { error: "Os nomes podem ter, no máximo, 200 caracteres." });
+  const badFolder = await app.inject({ method: "POST", url: "/murals", headers: portuguese, payload: { name: "A", folderId: "6b0c2c3a-6f0a-4c3e-9d1c-3a7a4e2b9f11" } });
+  assert.deepEqual(badFolder.json(), { error: "Essa pasta não existe." });
+  await app.close();
+});

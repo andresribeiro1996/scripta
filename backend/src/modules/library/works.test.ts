@@ -69,8 +69,10 @@ test("a catalog failure becomes WorkResolutionError", () => {
 test("workIdsByKey skips empty keys and duplicateWorkMessage names the book", () => {
   const works = new Map([["a", { workId: "w1", title: "A" }]]);
   assert.deepEqual([...workIdsByKey(["a", "", "z"], works)], [["a", "w1"], ["z", null]]);
-  assert.equal(duplicateWorkMessage({ workId: "w1", title: "Dune" }), "Dune is already here as another edition.");
-  assert.equal(duplicateWorkMessage({ workId: "w1", title: null }), "That book is already here as another edition.");
+  assert.equal(duplicateWorkMessage("en", { workId: "w1", title: "Dune" }), "Dune is already here as another edition.");
+  assert.equal(duplicateWorkMessage("en", { workId: "w1", title: null }), "That book is already here as another edition.");
+  assert.equal(duplicateWorkMessage("pt-PT", { workId: "w1", title: "Dune" }), "Dune já está aqui como outra edição.");
+  assert.equal(duplicateWorkMessage("pt-PT", { workId: "w1", title: null }), "Esse livro já está aqui como outra edição.");
 });
 
 test("canonicalWorkIds dedupes, skips the catalog for no ids, and wraps catalog errors", () => {

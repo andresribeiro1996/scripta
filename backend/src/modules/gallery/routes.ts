@@ -6,6 +6,7 @@
 
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { localeOf, t } from "../../i18n/index.js";
 import { authGuard } from "../auth/index.js";
 import { FileTooLargeError, GalleryError, ImageDimensionsTooLargeError, InvalidImageError, QuotaExceededError } from "./domain/errors.js";
 import { MAX_UPLOAD_BYTES } from "./service.js";
@@ -41,7 +42,7 @@ export function buildGalleryRoutes(service: GalleryService, publicUrlFor: (id: s
       async (request, reply) => {
         const upload = await request.file();
         if (!upload) {
-          return reply.code(400).send({ error: "No file uploaded — send a multipart/form-data request with an \"image\" field." });
+          return reply.code(400).send({ error: t(localeOf(request), "auth.noFile") });
         }
         const buffer = await upload.toBuffer();
         try {
@@ -49,7 +50,7 @@ export function buildGalleryRoutes(service: GalleryService, publicUrlFor: (id: s
           return reply.code(201).send({ image });
         } catch (err) {
           if (err instanceof GalleryError) {
-            return reply.code(statusForGalleryError(err)).send({ error: err.message });
+            return reply.code(statusForGalleryError(err)).send({ error: t(localeOf(request), err.key, err.vars) });
           }
           throw err;
         }
@@ -59,11 +60,11 @@ export function buildGalleryRoutes(service: GalleryService, publicUrlFor: (id: s
     app.delete("/gallery/:id", { preHandler: authGuard }, async (request, reply) => {
       const parsed = idParamSchema.safeParse(request.params);
       if (!parsed.success) {
-        return reply.code(400).send({ error: "Invalid image id." });
+        return reply.code(400).send({ error: t(localeOf(request), "gallery.invalidId") });
       }
       const deleted = await service.deleteImage(request.user.id, parsed.data.id);
       if (!deleted) {
-        return reply.code(404).send({ error: "No image with that id in your gallery." });
+        return reply.code(404).send({ error: t(localeOf(request), "gallery.notFound") });
       }
       return reply.code(204).send();
     });
@@ -71,7 +72,7 @@ export function buildGalleryRoutes(service: GalleryService, publicUrlFor: (id: s
     app.get("/gallery/:id/file", async (request, reply) => {
       const parsed = idParamSchema.safeParse(request.params);
       if (!parsed.success) {
-        return reply.code(400).send({ error: "Invalid image id." });
+        return reply.code(400).send({ error: t(localeOf(request), "gallery.invalidId") });
       }
       return reply.redirect(publicUrlFor(parsed.data.id), 301);
     });
