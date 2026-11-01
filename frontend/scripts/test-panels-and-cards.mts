@@ -39,10 +39,10 @@ test("the feed card's footer is one row: like and comments left, Save, Want to r
   const card = src("components/home/FeedCard");
   assert.doesNotMatch(card, /BUTTON_SECONDARY/);
   const footer = card.slice(card.indexOf("{threaded || ref || wantable || shareable"));
-  assert.match(footer, /ml-auto flex items-center gap-1[\s\S]*aria-label="Save"[\s\S]*Want to read[\s\S]*Share \$\{title/);
-  assert.equal(card.match(/aria-label="Save"/g)?.length, 1);
+  assert.match(footer, /ml-auto flex items-center gap-1[\s\S]*aria-label=\{t\("book\.save"\)\}[\s\S]*book\.wantToRead[\s\S]*book\.shareAria/);
+  assert.equal(card.match(/aria-label=\{t\("book\.save"\)\}/g)?.length, 1);
   const header = card.slice(card.indexOf("<article"), card.indexOf("{item.kind === \"follow\" ? null"));
-  assert.doesNotMatch(header, /aria-label="Save"/);
+  assert.doesNotMatch(header, /book\.save/);
 });
 
 test("a mural card shows its title and a preview in the mural's own theme", () => {

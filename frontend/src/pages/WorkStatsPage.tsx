@@ -8,10 +8,11 @@ import { backTo } from "../lib/areas";
 import { Page } from "../components/page/Page";
 import { useWork } from "../hooks/useWork";
 import { useWorkStats } from "../hooks/useWorkStats";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
 export function WorkStatsView({ id }: { id: string | undefined }) {
   const locale = useLocale();
+  const t = useT();
   const navigate = useNavigate();
   const { session } = useAuth();
   const back = session ? backTo("book") : undefined;
@@ -24,14 +25,14 @@ export function WorkStatsView({ id }: { id: string | undefined }) {
 
   const retry = (onRetry: () => void) => (
     <EmptyState
-      title="Couldn't load these stats."
-      action={<button type="button" onClick={onRetry} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">Retry</button>}
+      title={t("book.statsLoadFailed")}
+      action={<button type="button" onClick={onRetry} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">{t("library.retry")}</button>}
     />
   );
 
-  if (!work.page && work.isNotFound) return <Page title="Stats" back={back}><p className="text-sm text-(--color-text-dim)">No book with that id.</p></Page>;
-  if (!work.page && !work.isLoading) return <Page title="Stats" back={back}>{retry(() => void work.refetch())}</Page>;
-  if (!work.page || work.page.work.id !== id || stats.isPending) return <Page title="Stats" back={back}><p className="text-sm text-(--color-text-dim)">Loading…</p></Page>;
+  if (!work.page && work.isNotFound) return <Page title={t("book.statsTitle")} back={back}><p className="text-sm text-(--color-text-dim)">{t("book.noBookWithId")}</p></Page>;
+  if (!work.page && !work.isLoading) return <Page title={t("book.statsTitle")} back={back}>{retry(() => void work.refetch())}</Page>;
+  if (!work.page || work.page.work.id !== id || stats.isPending) return <Page title={t("book.statsTitle")} back={back}><p className="text-sm text-(--color-text-dim)">{t("library.loadingEllipsis")}</p></Page>;
   if (stats.isError && !stats.data) return <Page title={work.page.work.title} back={back}>{retry(() => void stats.refetch())}</Page>;
 
   return (

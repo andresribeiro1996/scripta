@@ -22,11 +22,13 @@ import { useCircleFeed } from "../hooks/useDashboard";
 import { useFeedActions } from "../hooks/useFeedActions";
 import { useLibrary } from "../hooks/useLibrary";
 import { homeGames } from "../lib/homeGames";
+import { useT } from "../i18n";
 
 const SECTION_LINK = "inline-flex min-h-11 shrink-0 items-center font-semibold text-(--color-accent)";
 const GROUP_LABEL = "mb-3 font-semibold text-(--color-text-dim)";
 
 export function HomePage() {
+  const t = useT();
   const { session } = useAuth();
   const library = useLibrary();
   const circle = useCircleFeed();
@@ -54,30 +56,30 @@ export function HomePage() {
   }, [circleItems.length, circle.hasNextPage, circle.isFetchingNextPage, circle.isError, fetchNextPage]);
 
   const saved = (
-    <Link to="/dashboard/saved" aria-label="Saved" className={toolbarIconClass()}>
+    <Link to="/dashboard/saved" aria-label={t("library.savedTitle")} className={toolbarIconClass()}>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 3.5h12v17l-6-4-6 4Z" /></svg>
     </Link>
   );
 
-  return <Page title="Home" actions={saved}>
+  return <Page title={t("shell.areaHome")} actions={saved}>
     <div className="grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-[auto_1fr]">
       <div className="flex min-w-0 flex-col gap-10 lg:col-start-1 lg:row-start-1">
         <DailyChapterCard />
         {awards.data ? <AwardsCard announcements={awards.data.announcements} library={library.data ?? null} /> : null}
         <section aria-labelledby="home-games">
           <div className="mb-3.5 flex items-baseline justify-between gap-3">
-            <h2 id="home-games" className={SECTION_HEADING}>Games</h2>
-            <Link to="/community/discover" className={SECTION_LINK}>Browse all →</Link>
+            <h2 id="home-games" className={SECTION_HEADING}>{t("shell.areaGames")}</h2>
+            <Link to="/community/discover" className={SECTION_LINK}>{t("book.browseAll")}</Link>
           </div>
-          {loadingGames ? <p role="status">Loading games…</p> : gamesFailed ? (
+          {loadingGames ? <p role="status">{t("book.loadingGames")}</p> : gamesFailed ? (
             <div role="alert" className="space-y-3">
-              <p>Couldn't load games.</p>
-              <button type="button" className={BUTTON_SECONDARY} onClick={() => { void circle.refetch(); void shelf.refetch(); void newest.refetch(); }}>Retry</button>
+              <p>{t("book.gamesLoadFailed")}</p>
+              <button type="button" className={BUTTON_SECONDARY} onClick={() => { void circle.refetch(); void shelf.refetch(); void newest.refetch(); }}>{t("library.retry")}</button>
             </div>
-          ) : noGames ? <p className="text-(--color-text-dim)">Nothing published yet. Games from readers show up here.</p> : (
+          ) : noGames ? <p className="text-(--color-text-dim)">{t("book.noGamesYet")}</p> : (
             <div className="space-y-6">
               {games.followed.length > 0 ? <div>
-                <p className={GROUP_LABEL}>From people you follow</p>
+                <p className={GROUP_LABEL}>{t("book.fromFollowed")}</p>
                 <ul className="game-ticket-grid">{games.followed.map((item) => <DiscoverTicket key={`${item.content.kind}:${item.content.id}`} item={item} />)}</ul>
               </div> : null}
               {games.others.length > 0 ? <div>
@@ -90,37 +92,37 @@ export function HomePage() {
       </div>
       <div className="flex min-w-0 flex-col gap-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start">
         <ForYouPanel />
-        {library.isPending ? <p role="status">Loading your reading…</p> : library.isError ? (
-          <div role="alert" className="space-y-3"><p>Couldn't load your library.</p><button type="button" className={BUTTON_SECONDARY} onClick={() => void library.refetch()}>Retry</button></div>
+        {library.isPending ? <p role="status">{t("book.loadingReading")}</p> : library.isError ? (
+          <div role="alert" className="space-y-3"><p>{t("library.libraryLoadFailedOwn")}</p><button type="button" className={BUTTON_SECONDARY} onClick={() => void library.refetch()}>{t("library.retry")}</button></div>
         ) : books.length === 0 ? (
-          <EmptyState title="Start your library" body="Import your existing collection, or add your first book manually." action={<div className="flex flex-wrap justify-center gap-2"><Link className={BUTTON_PRIMARY} to="/dashboard/library?action=import">Import library</Link><Link className={BUTTON_SECONDARY} to="/dashboard/library?action=add">Add a book</Link></div>} />
+          <EmptyState title={t("library.startLibraryTitle")} body={t("library.startLibraryBody")} action={<div className="flex flex-wrap justify-center gap-2"><Link className={BUTTON_PRIMARY} to="/dashboard/library?action=import">{t("library.importHeading")}</Link><Link className={BUTTON_SECONDARY} to="/dashboard/library?action=add">{t("library.addBook")}</Link></div>} />
         ) : <ReadingStrip books={reading} works={library.data?.works} />}
         <SuggestedReaders />
       </div>
       <section aria-labelledby="home-circle" className="min-w-0 lg:col-start-1 lg:row-start-2">
         <div className="mb-3.5 flex items-baseline justify-between gap-3">
-          <h2 id="home-circle" className={SECTION_HEADING}>Your reading circle</h2>
-          <Link to="/community/people" className={SECTION_LINK}>Find people →</Link>
+          <h2 id="home-circle" className={SECTION_HEADING}>{t("book.readingCircle")}</h2>
+          <Link to="/community/people" className={SECTION_LINK}>{t("book.findPeopleArrow")}</Link>
         </div>
         {actions.loadError ? (
           <div role="alert" className="mb-4 space-y-1">
             <p>{actions.loadError}</p>
-            <button type="button" className={BUTTON_SECONDARY} onClick={actions.retryLoad}>Retry</button>
+            <button type="button" className={BUTTON_SECONDARY} onClick={actions.retryLoad}>{t("library.retry")}</button>
           </div>
         ) : null}
         {circleItems.length > 0 ? <div className="flex flex-col gap-4">{circleItems.map((item) => <FeedCard key={`${item.kind}:${item.id}`} item={item} actions={actions} books={books} works={library.data?.works} />)}</div> : null}
-        {circleLoading ? <p role="status">Loading your reading circle…</p> : null}
+        {circleLoading ? <p role="status">{t("book.loadingCircle")}</p> : null}
         {circle.isError ? (
           <div role="alert" className="mt-4 space-y-3">
-            <p>Couldn't load your reading circle.</p>
-            <button type="button" className={BUTTON_SECONDARY} onClick={() => void circle.refetch()}>Retry</button>
+            <p>{t("book.circleLoadFailed")}</p>
+            <button type="button" className={BUTTON_SECONDARY} onClick={() => void circle.refetch()}>{t("library.retry")}</button>
           </div>
         ) : null}
         {!circleLoading && !circle.isError && circleItems.length === 0 && circle.hasNextPage === false ? (
-          <EmptyState icon={CommunityIcon} title="Your circle starts here" body="Follow readers to see their books, games and murals." action={<Link className={BUTTON_SECONDARY} to="/community/people">Find people</Link>} />
+          <EmptyState icon={CommunityIcon} title={t("book.circleEmptyTitle")} body={t("book.circleEmptyBody")} action={<Link className={BUTTON_SECONDARY} to="/community/people">{t("book.findPeople")}</Link>} />
         ) : null}
         {circleItems.length > 0 && circle.hasNextPage ? (
-          <div className="mt-4 flex justify-center"><button type="button" className={BUTTON_SECONDARY} disabled={circle.isFetchingNextPage} onClick={() => void circle.fetchNextPage()}>Load more</button></div>
+          <div className="mt-4 flex justify-center"><button type="button" className={BUTTON_SECONDARY} disabled={circle.isFetchingNextPage} onClick={() => void circle.fetchNextPage()}>{t("library.loadMore")}</button></div>
         ) : null}
       </section>
     </div>

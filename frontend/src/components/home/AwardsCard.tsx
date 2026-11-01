@@ -5,7 +5,7 @@ import type { LibraryDocument } from "../../api/library";
 import { BookCover } from "../book/BookCover";
 import { CARD } from "../page/surfaceClasses";
 import { CloseIcon } from "../Toolbar";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 const STORAGE_KEY = "dismissedAwards";
 
@@ -29,6 +29,7 @@ function writeDismissed(keys: Set<string>) {
 
 export function AwardsCard({ announcements, library }: { announcements: readonly AwardAnnouncement[]; library: LibraryDocument | null }) {
   const locale = useLocale();
+  const t = useT();
   const [dismissed, setDismissed] = useState(readDismissed);
   const announcement = firstUndismissed(announcements, dismissed);
   const model = announcement ? awardCardModel(announcement, library, locale) : null;
@@ -58,7 +59,7 @@ export function AwardsCard({ announcements, library }: { announcements: readonly
       ) : (
         <div className={bodyClass}>{content}</div>
       )}
-      <button type="button" aria-label="Dismiss" onClick={dismiss} className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)">
+      <button type="button" aria-label={t("shell.dismiss")} onClick={dismiss} className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)">
         <CloseIcon size={16} />
       </button>
     </div>

@@ -5,8 +5,10 @@ import { EmptyState } from "../components/EmptyState";
 import { Page } from "../components/page/Page";
 import { useLibrary } from "../hooks/useLibrary";
 import { backTo } from "../lib/areas";
+import { useT } from "../i18n";
 
 export function BookKeyPage() {
+  const t = useT();
   const { key = "" } = useParams<{ key: string }>();
   const library = useLibrary();
   const workId = library.data?.works?.[key];
@@ -27,16 +29,16 @@ export function BookKeyPage() {
       />
     );
   }
-  if (library.isFetching) return <Page title="Book" back={back}><p className="text-sm text-(--color-text-dim)">Loading…</p></Page>;
+  if (library.isFetching) return <Page title={t("book.pageTitle")} back={back}><p className="text-sm text-(--color-text-dim)">{t("library.loadingEllipsis")}</p></Page>;
   if (library.isError) {
     return (
-      <Page title="Book" back={back}>
+      <Page title={t("book.pageTitle")} back={back}>
         <EmptyState
-          title="Couldn't load your library."
-          action={<button type="button" onClick={() => void library.refetch()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">Retry</button>}
+          title={t("library.libraryLoadFailedOwn")}
+          action={<button type="button" onClick={() => void library.refetch()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">{t("library.retry")}</button>}
         />
       </Page>
     );
   }
-  return <Page title="Book" back={back}><EmptyState title="Book not found" /></Page>;
+  return <Page title={t("book.pageTitle")} back={back}><EmptyState title={t("book.bookNotFound")} /></Page>;
 }

@@ -1,6 +1,6 @@
 import { useMemo, useState, type ComponentType } from "react";
 import { Link } from "react-router-dom";
-import { bookKey, digestTarget, participationLead, plural, savedContentRef, type DigestItem } from "@scripta/shared";
+import { bookKey, digestTarget, participationLead, savedContentRef, type DigestItem } from "@scripta/shared";
 import { contentDetail, feedEventLabel, feedPrimaryLabel, feedRowAccessibilityLabel, feedRowModel, feedShareTarget, hasActivityThread, reactionCount, readingShelfBook, relativeTime, type FeedIconName } from "@scripta/shared/community";
 import type { FeedActions } from "../../hooks/useFeedActions";
 import { bookHref } from "../../lib/libraryView";
@@ -12,7 +12,7 @@ import { CARD } from "../page/surfaceClasses";
 import { ArenaIcon, CollectionsIcon, CommunityIcon, LibraryIcon, MuralsIcon } from "../NavIcons";
 import { MuralThumb } from "../murals/MuralThumb";
 import { ShareIcon } from "../Toolbar";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 const ICONS: Record<FeedIconName, ComponentType<{ size?: number }>> = {
   tierlist: CollectionsIcon,
@@ -84,6 +84,7 @@ function Preview({ item, covers }: { item: DigestItem; covers: string[] }) {
 
 export function FeedCard({ item, actions, books, works, isSaved }: { item: DigestItem; actions: FeedActions; books: Array<Record<string, unknown>>; works: Record<string, string> | undefined; isSaved?: boolean }) {
   const locale = useLocale();
+  const t = useT();
   const [commentsOpen, setCommentsOpen] = useState(false);
   const row = feedRowModel(item, locale);
   const target = digestTarget(item);
@@ -139,7 +140,7 @@ export function FeedCard({ item, actions, books, works, isSaved }: { item: Diges
             {title ? <Link to={target} className="flex min-h-11 items-center font-display text-[22px] leading-7 font-bold break-words hover:text-(--color-accent)">{title}</Link> : null}
             {detail ? <span className="text-(--color-text-dim)">{detail}</span> : null}
             {action}
-            {owned ? <Link to={bookHref(bookKey(owned), works)} className={link}>Open in your shelf →</Link> : null}
+            {owned ? <Link to={bookHref(bookKey(owned), works)} className={link}>{t("book.openInShelf")}</Link> : null}
           </span>
         </div>
       )}
@@ -148,11 +149,11 @@ export function FeedCard({ item, actions, books, works, isSaved }: { item: Diges
         <div className="-mx-3 mt-1 flex flex-wrap items-center gap-1">
           {threaded ? (
             <>
-              <button type="button" aria-label={engagement ? `Like, ${plural(engagement.likes, "like", "likes")}` : "Like"} aria-pressed={engagement?.liked ?? false} disabled={!engagement || actions.busy.like} onClick={() => actions.like(item)} className={`${ACTION} ${engagement?.liked ? ACTIVE : MUTED}`}>
+              <button type="button" aria-label={engagement ? t("book.likeAria", { count: engagement.likes }) : t("book.like")} aria-pressed={engagement?.liked ?? false} disabled={!engagement || actions.busy.like} onClick={() => actions.like(item)} className={`${ACTION} ${engagement?.liked ? ACTIVE : MUTED}`}>
                 <GlyphIcon path={HEART} filled={engagement?.liked} />
                 {likes ? <span className="tabular-nums">{likes}</span> : null}
               </button>
-              <button type="button" aria-label={engagement ? `Comments, ${engagement.comments}` : "Comments"} aria-haspopup="dialog" onClick={() => setCommentsOpen(true)} className={`${ACTION} ${MUTED}`}>
+              <button type="button" aria-label={engagement ? t("book.commentsAria", { count: engagement.comments }) : t("book.comments")} aria-haspopup="dialog" onClick={() => setCommentsOpen(true)} className={`${ACTION} ${MUTED}`}>
                 <GlyphIcon path={BUBBLE} />
                 {comments ? <span className="tabular-nums">{comments}</span> : null}
               </button>
@@ -160,16 +161,16 @@ export function FeedCard({ item, actions, books, works, isSaved }: { item: Diges
           ) : null}
           <div className="ml-auto flex items-center gap-1">
             {ref ? (
-              <button type="button" aria-label="Save" aria-pressed={saved} disabled={actions.busy.save || (isSaved === undefined && !actions.savedReady)} onClick={() => actions.save(item, !saved)} className={`${ACTION} ${saved ? ACTIVE : MUTED}`}>
+              <button type="button" aria-label={t("book.save")} aria-pressed={saved} disabled={actions.busy.save || (isSaved === undefined && !actions.savedReady)} onClick={() => actions.save(item, !saved)} className={`${ACTION} ${saved ? ACTIVE : MUTED}`}>
                 <GlyphIcon path={BOOKMARK} filled={saved} />
               </button>
             ) : null}
             {wantable ? (
-              <button type="button" className={`${ACTION} ${MUTED}`} disabled={actions.wanting !== null} onClick={() => actions.wantToRead(item)}>{actions.wanting === item.id ? "Adding…" : "Want to read"}</button>
+              <button type="button" className={`${ACTION} ${MUTED}`} disabled={actions.wanting !== null} onClick={() => actions.wantToRead(item)}>{actions.wanting === item.id ? t("library.adding") : t("book.wantToRead")}</button>
             ) : null}
             {shareable ? (
-              <button type="button" aria-label={`Share ${title || "reader"}`} onClick={() => actions.share(item)} className={`${ACTION} ${MUTED}`}>
-                <ShareIcon />Share
+              <button type="button" aria-label={t("book.shareAria", { title: title || t("book.reader") })} onClick={() => actions.share(item)} className={`${ACTION} ${MUTED}`}>
+                <ShareIcon />{t("library.actionShare")}
               </button>
             ) : null}
           </div>

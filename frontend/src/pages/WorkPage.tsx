@@ -12,8 +12,10 @@ import { useLibrary } from "../hooks/useLibrary";
 import { useWork } from "../hooks/useWork";
 import { backTo } from "../lib/areas";
 import { shareLink } from "../lib/shareLink";
+import { useT } from "../i18n";
 
 export function WorkPage() {
+  const t = useT();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { session } = useAuth();
@@ -32,14 +34,14 @@ export function WorkPage() {
   const mineKey = page?.mine?.bookKey;
   const book = mineKey ? libraryQuery.data?.data.books.find((b) => bookKey(b) === mineKey) ?? null : null;
 
-  if (isLoading || (mineKey && !book && libraryQuery.isFetching)) return <Page title="Book" back={back}><p className="text-sm text-(--color-text-dim)">Loading…</p></Page>;
-  if (!page && isNotFound) return <Page title="Book" back={back}><p className="text-sm text-(--color-text-dim)">No book with that id.</p></Page>;
+  if (isLoading || (mineKey && !book && libraryQuery.isFetching)) return <Page title={t("book.pageTitle")} back={back}><p className="text-sm text-(--color-text-dim)">{t("library.loadingEllipsis")}</p></Page>;
+  if (!page && isNotFound) return <Page title={t("book.pageTitle")} back={back}><p className="text-sm text-(--color-text-dim)">{t("book.noBookWithId")}</p></Page>;
   if (!page) {
     return (
-      <Page title="Book" back={back}>
+      <Page title={t("book.pageTitle")} back={back}>
         <EmptyState
-          title="Couldn't load this book."
-          action={<button type="button" onClick={() => void refetch()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">Retry</button>}
+          title={t("book.bookLoadFailed")}
+          action={<button type="button" onClick={() => void refetch()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">{t("library.retry")}</button>}
         />
       </Page>
     );
@@ -49,8 +51,8 @@ export function WorkPage() {
     return (
       <Page title={page.work.title} back={back}>
         <EmptyState
-          title="Couldn't load your library."
-          action={<button type="button" onClick={() => void libraryQuery.refetch()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">Retry</button>}
+          title={t("library.libraryLoadFailedOwn")}
+          action={<button type="button" onClick={() => void libraryQuery.refetch()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">{t("library.retry")}</button>}
         />
       </Page>
     );
