@@ -1,7 +1,7 @@
 import { RankingMethodSelector } from "./RankingMethodSelector";
 import { useEffect, useMemo, useState } from "react";
 import { Stack, router } from "expo-router";
-import { ballotBoard, booksByWork, characterBooks, createTier, filterBooks, itemNoun, workIdOf, type AggregationMode, type TierlistData } from "@scripta/shared";
+import { ballotBoard, booksByWork, characterBooks, createTier, filterBooks, workIdOf, type AggregationMode, type TierlistData } from "@scripta/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
@@ -17,14 +17,12 @@ import { TierlistShareImage } from "./TierlistShareImage";
 import { CharacterHeader } from "../characters/CharacterHeader";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import { publicContentUrl } from "../sharing/links";
-import { useLocale } from "../../i18n";
+import { useT } from "../../i18n";
 
 type EditorView = "sort" | "board" | "results";
 
-const VOTE_VIEWS = [{ value: "board", label: "My board" }, { value: "results", label: "Community" }] as const;
-
 export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false }: { tierlist: Tierlist; onUpdated: (tierlist: Tierlist) => void; startInRank?: boolean }) {
-  const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const queryClient = useQueryClient();
   const [current, setCurrent] = useState(tierlist);
@@ -64,7 +62,7 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
   useEffect(() => {
     if (!sharing || !current.voteCode) return;
     let active = true;
-    void publicContentUrl(`/vote/${current.voteCode}`).then((url) => { if (active) { setShareUrl(url); setLinkError(null); } }).catch((reason) => { if (active) setLinkError(reason instanceof Error ? reason.message : "Couldn't create a public link."); });
+    void publicContentUrl(`/vote/${current.voteCode}`).then((url) => { if (active) { setShareUrl(url); setLinkError(null); } }).catch((reason) => { if (active) setLinkError(reason instanceof Error ? reason.message : t("sharing.publicLinkFailed")); });
     return () => { active = false; };
   }, [sharing, current.voteCode, linkAttempt]);
 
@@ -80,7 +78,7 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
       await queryClient.invalidateQueries({ queryKey: ["tierlists"] });
       return true;
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Couldn't save changes.");
+      setError(reason instanceof Error ? reason.message : t("tierlists.saveFailed"));
       return false;
     } finally {
       setBusy(false);
@@ -105,12 +103,13 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
       setSharing(true);
       await queryClient.invalidateQueries({ queryKey: ["tierlists"] });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Couldn't open voting.");
+      setError(reason instanceof Error ? reason.message : t("tierlists.openVotingFailed"));
     } finally {
       setBusy(false);
     }
   }
 
+  const voteViews = [{ value: "board", label: t("tierlists.myBoard") }, { value: "results", label: t("tierlists.community") }] as const;
   const frozen = current.voteCode !== null;
   const votingBookList = useMemo(() => votingBooks(board.data?.books ?? []), [board.data?.books]);
   const subject = current.subject;
@@ -131,16 +130,16 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
   const showShare = () => { setShareUrl(null); setLinkError(null); setImageReady(false); setShareView(view === "results" ? "results" : "board"); setSharing(true); };
   const actionGroups: ActionItem[][] = frozen
     ? [
-      [{ label: current.votingOpen ? "Close voting" : "Reopen voting", icon: current.votingOpen ? "lock" : "vote", onPress: () => void run(() => setVotingState(current.id, { open: !current.votingOpen })) }],
-      [{ label: current.voteAccess === "anonymous" ? "Require members" : "Allow anyone", icon: current.voteAccess === "anonymous" ? "community" : "public", onPress: () => void run(() => setVotingState(current.id, { access: current.voteAccess === "anonymous" ? "members" : "anonymous" })) }],
+      [{ label: t(current.votingOpen ? "tierlists.closeVoting" : "tierlists.reopenVoting"), icon: current.votingOpen ? "lock" : "vote", onPress: () => void run(() => setVotingState(current.id, { open: !current.votingOpen })) }],
+      [{ label: t(current.voteAccess === "anonymous" ? "tierlists.requireMembers" : "tierlists.allowAnyone"), icon: current.voteAccess === "anonymous" ? "community" : "public", onPress: () => void run(() => setVotingState(current.id, { access: current.voteAccess === "anonymous" ? "members" : "anonymous" })) }],
     ]
     : [
-      [{ label: "Rename", icon: "edit", onPress: () => setRenaming(true) }],
+      [{ label: t("arena.rename"), icon: "edit", onPress: () => setRenaming(true) }],
       [
-        ...(subject ? [] : [{ label: "Add books", icon: "add" as const, onPress: () => setAdding(true) }]),
-        { label: "Add tier", icon: "tierlist", onPress: () => setData((value) => ({ ...value, tiers: [...value.tiers, createTier("New tier", "#8a8580")] })) },
+        ...(subject ? [] : [{ label: t("tierlists.addBooks"), icon: "add" as const, onPress: () => setAdding(true) }]),
+        { label: t("tierlists.addTier"), icon: "tierlist", onPress: () => setData((value) => ({ ...value, tiers: [...value.tiers, createTier(t("tierlists.newTier"), "#8a8580")] })) },
       ],
-      [{ label: "Open voting", icon: "vote", onPress: () => setConfirmingVoting(true) }],
+      [{ label: t("tierlists.openVoting"), icon: "vote", onPress: () => setConfirmingVoting(true) }],
     ];
 
   return <Screen top={false} style={styles.screen}>
@@ -151,32 +150,32 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
       headerLargeTitleEnabled: false,
       headerRight: () => <HeaderActions>
         {!frozen ? <SaveStateButton busy={busy} unsaved={dirty} onPress={() => void save()} /> : null}
-        <IconButton accessibilityLabel="Share tier list" name="share" onPress={showShare} />
-        <ActionSheet title={current.name} groups={actionGroups}>{(open) => <IconButton accessibilityLabel="Tier list actions" name="more" onPress={open} />}</ActionSheet>
+        <IconButton accessibilityLabel={t("tierlists.shareTierlist")} name="share" onPress={showShare} />
+        <ActionSheet title={current.name} groups={actionGroups}>{(open) => <IconButton accessibilityLabel={t("tierlists.tierlistActions")} name="more" onPress={open} />}</ActionSheet>
       </HeaderActions>,
     }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
-    <EditorHeading name={current.name} accessibilityLabel={`Rename tier list, ${current.name}`} onRename={frozen ? undefined : () => setRenaming(true)} />
+    <EditorHeading name={current.name} accessibilityLabel={t("tierlists.renameTierlistLabel", { name: current.name })} onRename={frozen ? undefined : () => setRenaming(true)} />
     {subject ? <CharacterHeader subject={subject} /> : null}
-    {!frozen ? view === "sort" ? <Pressable accessibilityRole="button" accessibilityLabel="Back to board" onPress={() => { setSelectedWorkId(null); setView("board"); }}><Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>‹ Board</Text></Pressable> : <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{placed} of {placed + data.pool.length} ranked · {busy ? "Saving…" : dirty ? "Unsaved changes" : "Saved"}</Text> : null}
-    {frozen ? board.isPending || myBallot.isPending ? <Skeleton height={180} /> : board.isError ? <ErrorState title="Board unavailable" actionLabel="Retry" onAction={() => void board.refetch()} /> : myBallot.isError ? <ErrorState title="Your votes unavailable" actionLabel="Retry" onAction={() => void myBallot.refetch()} /> : <SwipeableTabs accessibilityLabel="Tier list view" options={VOTE_VIEWS} value={view === "results" ? "results" : "board"} onChange={setView} renderPage={(page, active) => page === "results" ? results.isPending ? <View style={styles.tabPage}><Skeleton height={140} /></View> : results.isError ? <ErrorState title="Results unavailable" actionLabel="Retry" onAction={() => void results.refetch()} /> : <TierlistResults histogram={results.data.histogram} tiers={board.data.board.tiers} pool={board.data.board.pool} books={books} ballotCount={results.data.ballotCount} eligibleVoteCount={board.data.board.eligibleVoteCount} votingOpen={current.votingOpen} promoted={Boolean(current.promotedAt)} ownPlacements={myPlacements ?? []} active={active} mode={resultMode} onModeChange={setResultMode} /> : <View style={styles.boardPage}><TierHead><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{current.promotedAt ? "Permanent reference" : current.votingOpen ? "Voting open" : "Voting closed"}</Text><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{boardData.tiers.reduce((sum, tier) => sum + tier.workIds.length, 0)} of {boardData.tiers.reduce((sum, tier) => sum + tier.workIds.length, 0) + boardData.pool.length} ranked</Text></TierHead><TierBoard data={boardData} books={books} onChange={() => {}} structureEditable={false} poolLabel="Unranked" bottomClearance={76} /></View>} /> : !characterList && library.isPending ? <Skeleton height={180} /> : !characterList && library.isError ? <ErrorState body="Your library couldn't be loaded." actionLabel="Retry" onAction={() => void library.refetch()} /> : view === "sort" ? <TierSortDeck data={data} books={books} selectedWorkId={selectedWorkId} onAssign={(workId, tierId) => { changeData(moveBookTo(data, workId, tierId)); if (selectedWorkId || (data.pool.length === 1 && data.pool.includes(workId))) { setSelectedWorkId(null); setView("board"); } }} /> : <TierBoard data={data} books={books} onChange={changeData} structureEditable poolLabel="Pool" bottomClearance={76} onReassign={(workId) => { setSelectedWorkId(workId); setView("sort"); }} />}
-    {!frozen && view === "board" && data.pool.length === 0 ? <View style={styles.complete}><Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>All {itemNoun(subject, 2, locale)} ranked</Text><Button label={dirty ? "Save board" : "Saved"} disabled={!dirty} loading={busy} onPress={() => void save()} /></View> : null}
-    {view === "board" && (frozen ? current.votingOpen && !current.promotedAt && !board.isPending && !myBallot.isPending && !board.isError && !myBallot.isError : data.pool.length > 0) ? <Fab icon="tierlist" label={frozen ? myPlacements?.length ? boardData.pool.length ? "Continue ranking" : "Edit votes" : "Rank your votes" : `Rank · ${data.pool.length} left`} onPress={frozen ? () => router.push(`/vote/${current.voteCode}?rank=1` as never) : () => setView("sort")} /> : null}
-    <Sheet visible={adding} title="Add books" onClose={() => setAdding(false)}>
-      <Input label="Search books" value={bookSearch} onChangeText={setBookSearch} placeholder="Title or author" autoCapitalize="none" autoCorrect={false} returnKeyType="search" />
-      <FlatList data={availableBooks} keyExtractor={(book) => workIdOf(book) ?? ""} style={styles.picker} ListEmptyComponent={<EmptyState title={bookSearch ? "Nothing matches" : "No books to add"} />} renderItem={({ item }) => <Pressable accessibilityRole="button" accessibilityLabel={`Add ${String(item.Title ?? "Untitled")}`} onPress={() => { const workId = workIdOf(item); if (workId) setData((value) => ({ ...value, pool: [...value.pool, workId] })); }} style={styles.bookRow}><Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.text }]}>{String(item.Title ?? "Untitled")}</Text></Pressable>} />
+    {!frozen ? view === "sort" ? <Pressable accessibilityRole="button" accessibilityLabel={t("tierlists.backToBoard")} onPress={() => { setSelectedWorkId(null); setView("board"); }}><Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>{t("tierlists.boardLink")}</Text></Pressable> : <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t(busy ? "tierlists.rankedSaving" : dirty ? "tierlists.rankedUnsaved" : "tierlists.rankedSaved", { ranked: placed, total: placed + data.pool.length })}</Text> : null}
+    {frozen ? board.isPending || myBallot.isPending ? <Skeleton height={180} /> : board.isError ? <ErrorState title={t("tierlists.boardUnavailable")} actionLabel={t("shell.retry")} onAction={() => void board.refetch()} /> : myBallot.isError ? <ErrorState title={t("tierlists.votesUnavailable")} actionLabel={t("shell.retry")} onAction={() => void myBallot.refetch()} /> : <SwipeableTabs accessibilityLabel={t("tierlists.tierlistView")} options={voteViews} value={view === "results" ? "results" : "board"} onChange={setView} renderPage={(page, active) => page === "results" ? results.isPending ? <View style={styles.tabPage}><Skeleton height={140} /></View> : results.isError ? <ErrorState title={t("tierlists.resultsUnavailable")} actionLabel={t("shell.retry")} onAction={() => void results.refetch()} /> : <TierlistResults histogram={results.data.histogram} tiers={board.data.board.tiers} pool={board.data.board.pool} books={books} ballotCount={results.data.ballotCount} eligibleVoteCount={board.data.board.eligibleVoteCount} votingOpen={current.votingOpen} promoted={Boolean(current.promotedAt)} ownPlacements={myPlacements ?? []} active={active} mode={resultMode} onModeChange={setResultMode} /> : <View style={styles.boardPage}><TierHead><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t(current.promotedAt ? "tierlists.statusPermanent" : current.votingOpen ? "tierlists.votingOpen" : "tierlists.votingClosed")}</Text><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("tierlists.rankedOf", { ranked: boardData.tiers.reduce((sum, tier) => sum + tier.workIds.length, 0), total: boardData.tiers.reduce((sum, tier) => sum + tier.workIds.length, 0) + boardData.pool.length })}</Text></TierHead><TierBoard data={boardData} books={books} onChange={() => {}} structureEditable={false} poolLabel={t("tierlists.unranked")} bottomClearance={76} /></View>} /> : !characterList && library.isPending ? <Skeleton height={180} /> : !characterList && library.isError ? <ErrorState body={t("arena.libraryLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void library.refetch()} /> : view === "sort" ? <TierSortDeck data={data} books={books} selectedWorkId={selectedWorkId} onAssign={(workId, tierId) => { changeData(moveBookTo(data, workId, tierId)); if (selectedWorkId || (data.pool.length === 1 && data.pool.includes(workId))) { setSelectedWorkId(null); setView("board"); } }} /> : <TierBoard data={data} books={books} onChange={changeData} structureEditable poolLabel={t("tierlists.pool")} bottomClearance={76} onReassign={(workId) => { setSelectedWorkId(workId); setView("sort"); }} />}
+    {!frozen && view === "board" && data.pool.length === 0 ? <View style={styles.complete}><Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{t(subject ? "tierlists.allCharactersRanked" : "tierlists.allBooksRanked")}</Text><Button label={dirty ? t("tierlists.saveBoard") : t("shell.saved")} disabled={!dirty} loading={busy} onPress={() => void save()} /></View> : null}
+    {view === "board" && (frozen ? current.votingOpen && !current.promotedAt && !board.isPending && !myBallot.isPending && !board.isError && !myBallot.isError : data.pool.length > 0) ? <Fab icon="tierlist" label={frozen ? myPlacements?.length ? boardData.pool.length ? t("tierlists.continueRanking") : t("tierlists.editVotes") : t("tierlists.rankYourVotes") : t("tierlists.rankLeft", { count: data.pool.length })} onPress={frozen ? () => router.push(`/vote/${current.voteCode}?rank=1` as never) : () => setView("sort")} /> : null}
+    <Sheet visible={adding} title={t("tierlists.addBooks")} onClose={() => setAdding(false)}>
+      <Input label={t("arena.searchBooks")} value={bookSearch} onChangeText={setBookSearch} placeholder={t("arena.titleOrAuthor")} autoCapitalize="none" autoCorrect={false} returnKeyType="search" />
+      <FlatList data={availableBooks} keyExtractor={(book) => workIdOf(book) ?? ""} style={styles.picker} ListEmptyComponent={<EmptyState title={bookSearch ? t("arena.nothingMatches") : t("tierlists.noBooksToAdd")} />} renderItem={({ item }) => <Pressable accessibilityRole="button" accessibilityLabel={t("tierlists.addBook", { title: String(item.Title ?? t("library.untitled")) })} onPress={() => { const workId = workIdOf(item); if (workId) setData((value) => ({ ...value, pool: [...value.pool, workId] })); }} style={styles.bookRow}><Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.text }]}>{String(item.Title ?? t("library.untitled"))}</Text></Pressable>} />
     </Sheet>
-    <Dialog visible={renaming} title="Rename tier list" onClose={() => setRenaming(false)}>
-      <View style={styles.dialog}><Input label="Tier list name" value={name} onChangeText={setName} maxLength={200} /><Button label="Save name" loading={busy} onPress={() => void run(() => updateTierlist(current.id, { name: name.trim() || current.name })).then((okay) => { if (okay) setRenaming(false); })} /></View>
+    <Dialog visible={renaming} title={t("tierlists.renameTierlist")} onClose={() => setRenaming(false)}>
+      <View style={styles.dialog}><Input label={t("tierlists.name")} value={name} onChangeText={setName} maxLength={200} /><Button label={t("arena.saveName")} loading={busy} onPress={() => void run(() => updateTierlist(current.id, { name: name.trim() || current.name })).then((okay) => { if (okay) setRenaming(false); })} /></View>
     </Dialog>
-    <Dialog visible={confirmingVoting} title="Open voting" onClose={() => setConfirmingVoting(false)}>
+    <Dialog visible={confirmingVoting} title={t("tierlists.openVoting")} onClose={() => setConfirmingVoting(false)}>
       <View style={styles.dialog}>
-        <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>This makes “{current.name}” public and locks its name, {subject ? "characters" : "books"}, and tiers. At 100 distinct signed-in voters, it becomes an app-owned reference.</Text>
-        <Button label="Open to anyone" loading={busy} onPress={() => void openCommunityVoting("anonymous")} />
-        <Button label="Members only" variant="secondary" loading={busy} onPress={() => void openCommunityVoting("members")} />
+        <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t(subject ? "tierlists.openVotingBodyCharacters" : "tierlists.openVotingBodyBooks", { name: current.name })}</Text>
+        <Button label={t("tierlists.openToAnyone")} loading={busy} onPress={() => void openCommunityVoting("anonymous")} />
+        <Button label={t("tierlists.membersOnly")} variant="secondary" loading={busy} onPress={() => void openCommunityVoting("members")} />
       </View>
     </Dialog>
-    <ContentShareSheet visible={sharing} onClose={() => setSharing(false)} title={current.name} description={dirty ? "Image includes unsaved changes. Sharing it won't save or publish them." : undefined} url={shareUrl} linkError={linkError} onRetryLink={() => setLinkAttempt((value) => value + 1)} onEnableLink={!frozen ? async () => { setSharing(false); setConfirmingVoting(true); } : undefined} enableLinkLabel="Open voting" imageReady={imageReady && shareDataReady && !shareDataError} onExportVideo={frozen ? (pngUri) => renderTierlistShareVideo(current.id, pngUri) : undefined} previewControls={<>{shareDataError ? <ErrorState body={shareDataError.message} actionLabel="Retry preview" onAction={() => { void (frozen ? board.refetch() : library.refetch()); if (frozen) { void results.refetch(); void myBallot.refetch(); } }} /> : frozen && results.data?.ballotCount ? <View style={styles.shareOptions}><Button label="My ranking" variant={shareView === "board" ? "primary" : "secondary"} onPress={() => { if (shareView !== "board") { setImageReady(false); setShareView("board"); } }} /><Button label="Community" variant={shareView === "results" ? "primary" : "secondary"} onPress={() => { if (shareView !== "results") { setImageReady(false); setShareView("results"); } }} /></View> : undefined}{shareView === "results" ? <View style={{ flexDirection: "row" }}><RankingMethodSelector mode={resultMode} onChange={(next) => { if (next !== resultMode) { setImageReady(false); setResultMode(next); } }} /></View> : null}</>}>
+    <ContentShareSheet visible={sharing} onClose={() => setSharing(false)} title={current.name} description={dirty ? t("tierlists.unsavedShare") : undefined} url={shareUrl} linkError={linkError} onRetryLink={() => setLinkAttempt((value) => value + 1)} onEnableLink={!frozen ? async () => { setSharing(false); setConfirmingVoting(true); } : undefined} enableLinkLabel={t("tierlists.openVoting")} imageReady={imageReady && shareDataReady && !shareDataError} onExportVideo={frozen ? (pngUri) => renderTierlistShareVideo(current.id, pngUri) : undefined} previewControls={<>{shareDataError ? <ErrorState body={shareDataError.message} actionLabel={t("tierlists.retryPreview")} onAction={() => { void (frozen ? board.refetch() : library.refetch()); if (frozen) { void results.refetch(); void myBallot.refetch(); } }} /> : frozen && results.data?.ballotCount ? <View style={styles.shareOptions}><Button label={t("tierlists.myRanking")} variant={shareView === "board" ? "primary" : "secondary"} onPress={() => { if (shareView !== "board") { setImageReady(false); setShareView("board"); } }} /><Button label={t("tierlists.community")} variant={shareView === "results" ? "primary" : "secondary"} onPress={() => { if (shareView !== "results") { setImageReady(false); setShareView("results"); } }} /></View> : undefined}{shareView === "results" ? <View style={{ flexDirection: "row" }}><RankingMethodSelector mode={resultMode} onChange={(next) => { if (next !== resultMode) { setImageReady(false); setResultMode(next); } }} /></View> : null}</>}>
       <TierlistShareImage key={`${shareView}:${resultMode}`} title={current.name} subject={subject} data={shareView === "results" && board.data ? { tiers: board.data.board.tiers.map((tier) => ({ ...tier, workIds: [] })), pool: board.data.board.pool } : boardData} books={books} community={shareView === "results"} histogram={results.data?.histogram} ballotCount={results.data?.ballotCount} mode={resultMode} onReadyChange={setImageReady} />
     </ContentShareSheet>
   </Screen>;

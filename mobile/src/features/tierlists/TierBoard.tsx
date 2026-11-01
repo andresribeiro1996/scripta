@@ -1,30 +1,24 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { booksByWork, isCharacterBook, workIdOf, type TierDefinition, type TierlistData } from "@scripta/shared";
+import { booksByWork, isCharacterBook, type TierDefinition, type TierlistData } from "@scripta/shared";
 import { Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { Text } from "../../ui/Text";
 import { ActionSheet, Button, Dialog, IconButton, Input, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { CoverImage } from "../library/components/CoverImage";
-
-export type TierBook = Record<string, unknown>;
-
-export function titleOf(book: TierBook) { return String(book.Title ?? book.title ?? "Untitled"); }
-export function authorOf(book: TierBook) { return isCharacterBook(book) ? "" : String(book.Attribution ?? book.author ?? "Unknown author"); }
-export function labelOf(book: TierBook) { return isCharacterBook(book) ? titleOf(book) : `${titleOf(book)} by ${authorOf(book)}`; }
-export function workOf(book: TierBook): string | undefined {
-  return workIdOf(book);
-}
+import { useLocale, useT } from "../../i18n";
+import { authorOf, labelOf, titleOf, type TierBook } from "./tierBook";
 
 export function TierCover({ book, style, onLoadEnd }: { book: TierBook; style?: StyleProp<ViewStyle>; onLoadEnd?: () => void }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const [hasCover, setHasCover] = useState(false);
   const character = isCharacterBook(book);
   useEffect(() => { if (character) onLoadEnd?.(); }, [character]);
   if (character) return <View style={[styles.cover, style]}>
-    <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.characterTile, { backgroundColor: colors.accentSoft }]}>{titleOf(book).split(/\s+/).slice(0, 4).map((word, index) => <Text key={index} numberOfLines={1} {...dynamicType} style={[styles.fallbackTitle, styles.center, styles.word, { color: colors.accent }]}>{word}</Text>)}</View>
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.characterTile, { backgroundColor: colors.accentSoft }]}>{titleOf(book, locale).split(/\s+/).slice(0, 4).map((word, index) => <Text key={index} numberOfLines={1} {...dynamicType} style={[styles.fallbackTitle, styles.center, styles.word, { color: colors.accent }]}>{word}</Text>)}</View>
   </View>;
   return <View style={[styles.cover, style]}>
     <CoverImage book={book} onHasCoverChange={setHasCover} onLoadEnd={onLoadEnd} />
-    {!hasCover ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.fallback, { backgroundColor: colors.accentSoft }]}><Text numberOfLines={3} {...dynamicType} style={[styles.fallbackTitle, { color: colors.accent }]}>{titleOf(book)}</Text><Text numberOfLines={1} {...dynamicType} style={[styles.fallbackAuthor, { color: colors.textDim }]}>{authorOf(book)}</Text></View> : null}
+    {!hasCover ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.fallback, { backgroundColor: colors.accentSoft }]}><Text numberOfLines={3} {...dynamicType} style={[styles.fallbackTitle, { color: colors.accent }]}>{titleOf(book, locale)}</Text><Text numberOfLines={1} {...dynamicType} style={[styles.fallbackAuthor, { color: colors.textDim }]}>{authorOf(book, locale)}</Text></View> : null}
   </View>;
 }
 
@@ -35,8 +29,10 @@ export function TierRowScroll({ style, contentContainerStyle, children }: { styl
 }
 
 function BookChip({ book, onReassign }: { book: TierBook; onReassign?: () => void }) {
+  const locale = useLocale();
+  const t = useT();
   return (
-    <Pressable disabled={!onReassign} accessibilityRole={onReassign ? "button" : undefined} accessibilityLabel={labelOf(book)} accessibilityHint={onReassign ? `Opens the tier ring to reassign this ${isCharacterBook(book) ? "character" : "book"}` : undefined} onPress={onReassign} onLongPress={onReassign} style={styles.chipWrap}>
+    <Pressable disabled={!onReassign} accessibilityRole={onReassign ? "button" : undefined} accessibilityLabel={labelOf(book, locale)} accessibilityHint={onReassign ? t(isCharacterBook(book) ? "tierlists.reassignCharacterHint" : "tierlists.reassignBookHint") : undefined} onPress={onReassign} onLongPress={onReassign} style={styles.chipWrap}>
       <TierCover book={book} />
     </Pressable>
   );
@@ -46,12 +42,15 @@ export function TierHead({ children }: { children: ReactNode }) {
   return <View style={styles.head}>{children}</View>;
 }
 
-export function TierBoard({ data, books, onChange, structureEditable, poolLabel = "Pool", onReassign, bottomClearance = 0 }: { data: TierlistData; books: TierBook[]; onChange: (data: TierlistData) => void; structureEditable: boolean; poolLabel?: string; onReassign?: (workId: string) => void; bottomClearance?: number }) {
+export function TierBoard({ data, books, onChange, structureEditable, poolLabel, onReassign, bottomClearance = 0 }: { data: TierlistData; books: TierBook[]; onChange: (data: TierlistData) => void; structureEditable: boolean; poolLabel?: string; onReassign?: (workId: string) => void; bottomClearance?: number }) {
+  const t = useT();
   const { colors } = useTheme();
   const [editing, setEditing] = useState<TierDefinition | null>(null);
   const [label, setLabel] = useState("");
   const [color, setColor] = useState("");
   const byWork = booksByWork(books);
+  const pool = poolLabel ?? t("tierlists.pool");
+  const untitled = t("library.untitled");
 
   function idsFor(section: string) { return section === "pool" ? data.pool : data.tiers.find((tier) => tier.id === section)?.workIds ?? []; }
   function moveTier(index: number, direction: -1 | 1) {
@@ -61,7 +60,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel 
   }
   function renderBooks(section: string) {
     const ids = idsFor(section).filter((id) => byWork.has(id));
-    if (!ids.length) return <Text {...dynamicType} style={[typography.caption, styles.empty, { color: colors.textDim }]}>{section === "pool" ? `${books.some(isCharacterBook) ? "Characters" : "Books"} unavailable` : "–"}</Text>;
+    if (!ids.length) return <Text {...dynamicType} style={[typography.caption, styles.empty, { color: colors.textDim }]}>{section === "pool" ? t(books.some(isCharacterBook) ? "tierlists.charactersUnavailable" : "tierlists.booksUnavailable") : "–"}</Text>;
     return <TierRowScroll style={section === "pool" ? styles.poolBooks : styles.booksScroll} contentContainerStyle={styles.books}>{ids.map((id) => <BookChip key={id} book={byWork.get(id)!} onReassign={onReassign ? () => onReassign(id) : undefined} />)}</TierRowScroll>;
   }
 
@@ -72,27 +71,27 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel 
       contentContainerStyle={[styles.board, { paddingBottom: bottomClearance }]}
     >
       {data.tiers.map((tier, index) => <View key={tier.id} style={[styles.tier, { backgroundColor: colors.surface }, index === 0 && styles.topCorners, index === data.tiers.length - 1 && styles.bottomCorners]}>
-        <View style={[styles.tierLabel, { backgroundColor: tier.color }]}><Text numberOfLines={3} {...dynamicType} style={[typography.caption, styles.strong, styles.center, { color: "#fff" }]}>{tier.label || "Untitled"}</Text></View>
+        <View style={[styles.tierLabel, { backgroundColor: tier.color }]}><Text numberOfLines={3} {...dynamicType} style={[typography.caption, styles.strong, styles.center, { color: "#fff" }]}>{tier.label || untitled}</Text></View>
         <View style={styles.grow}>{renderBooks(tier.id)}</View>
         {structureEditable ? <View style={styles.tierActions}>
-          <ActionSheet title={tier.label || "Untitled"} groups={[
-            [{ label: "Edit tier", icon: "edit", onPress: () => { setEditing(tier); setLabel(tier.label); setColor(tier.color); } }],
+          <ActionSheet title={tier.label || untitled} groups={[
+            [{ label: t("tierlists.editTier"), icon: "edit", onPress: () => { setEditing(tier); setLabel(tier.label); setColor(tier.color); } }],
             [
-              ...(index > 0 ? [{ label: "Move up", icon: "expandVertical" as const, onPress: () => moveTier(index, -1) }] : []),
-              ...(index < data.tiers.length - 1 ? [{ label: "Move down", icon: "expandVertical" as const, onPress: () => moveTier(index, 1) }] : []),
+              ...(index > 0 ? [{ label: t("tierlists.moveUp"), icon: "expandVertical" as const, onPress: () => moveTier(index, -1) }] : []),
+              ...(index < data.tiers.length - 1 ? [{ label: t("tierlists.moveDown"), icon: "expandVertical" as const, onPress: () => moveTier(index, 1) }] : []),
             ],
           ]}>
-            {(open) => <IconButton accessibilityLabel={`Actions for ${tier.label || "Untitled"} tier`} name="more" onPress={open} />}
+            {(open) => <IconButton accessibilityLabel={t("tierlists.tierActions", { label: tier.label || untitled })} name="more" onPress={open} />}
           </ActionSheet>
         </View> : null}
       </View>)}
       {data.pool.length ? <View style={styles.footer}>
-        <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.textDim }]}>{poolLabel} · {data.pool.length}</Text>
+        <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.textDim }]}>{t("tierlists.poolCount", { label: pool, count: data.pool.length })}</Text>
         {renderBooks("pool")}
       </View> : null}
     </ScrollView>
-    <Dialog visible={editing !== null} title="Edit tier" onClose={() => setEditing(null)}>
-      <View style={styles.dialog}><Input label="Label" value={label} onChangeText={setLabel} /><Input label="Color" value={color} onChangeText={setColor} autoCapitalize="none" /><Button label="Save tier" onPress={() => { if (!editing) return; onChange({ ...data, tiers: data.tiers.map((tier) => tier.id === editing.id ? { ...tier, label: label.trim() || "Untitled", color: /^#[0-9a-f]{6}$/i.test(color) ? color : tier.color } : tier) }); setEditing(null); }} /><Button label="Delete tier" variant="destructive" onPress={() => { if (!editing) return; onChange({ tiers: data.tiers.filter((tier) => tier.id !== editing.id), pool: [...data.pool, ...editing.workIds] }); setEditing(null); }} /></View>
+    <Dialog visible={editing !== null} title={t("tierlists.editTier")} onClose={() => setEditing(null)}>
+      <View style={styles.dialog}><Input label={t("tierlists.label")} value={label} onChangeText={setLabel} /><Input label={t("tierlists.color")} value={color} onChangeText={setColor} autoCapitalize="none" /><Button label={t("tierlists.saveTier")} onPress={() => { if (!editing) return; onChange({ ...data, tiers: data.tiers.map((tier) => tier.id === editing.id ? { ...tier, label: label.trim() || untitled, color: /^#[0-9a-f]{6}$/i.test(color) ? color : tier.color } : tier) }); setEditing(null); }} /><Button label={t("tierlists.deleteTier")} variant="destructive" onPress={() => { if (!editing) return; onChange({ tiers: data.tiers.filter((tier) => tier.id !== editing.id), pool: [...data.pool, ...editing.workIds] }); setEditing(null); }} /></View>
     </Dialog>
     </>
   );

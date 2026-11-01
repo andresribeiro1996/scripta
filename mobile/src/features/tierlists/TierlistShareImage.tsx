@@ -4,9 +4,11 @@ import { View } from "react-native";
 import { Text } from "../../ui/Text";
 import { radii, spacing, typography, useTheme } from "../../ui";
 import { CharacterHeader } from "../characters/CharacterHeader";
-import { TierCover, type TierBook } from "./TierBoard";
+import { TierCover } from "./TierBoard";
+import type { TierBook } from "./tierBook";
 import { tierlistShareRows } from "./tierlistShareData";
-import { useLocale } from "../../i18n";
+import { intlLocale } from "@scripta/shared/i18n";
+import { useLocale, useT } from "../../i18n";
 
 export function TierlistShareImage({ title, subject, data, books, community, histogram, ballotCount, mode = "average", onReadyChange }: {
   title: string;
@@ -20,13 +22,15 @@ export function TierlistShareImage({ title, subject, data, books, community, his
   onReadyChange?: (ready: boolean) => void;
 }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const [loaded, setLoaded] = useState<Set<string>>(() => new Set());
+  const modes = aggregationModes(locale);
   const byWork = booksByWork(books);
   const { tiers: rows, extra } = tierlistShareRows(data, community ? histogram : undefined, mode);
   const expected = new Set([...rows.flatMap((row) => row.workIds), ...extra].filter((id) => byWork.has(id)));
   useEffect(() => { onReadyChange?.([...expected].every((id) => loaded.has(id))); }, [loaded, onReadyChange, [...expected].join("|")]);
-  const cover = (id: string) => byWork.has(id) ? <TierCover key={id} book={byWork.get(id)!} style={{ width: 56, height: 84 }} onLoadEnd={() => setLoaded((current) => current.has(id) ? current : new Set(current).add(id))} /> : <View key={id} style={{ width: 56, height: 84, justifyContent: "center", backgroundColor: colors.accentSoft, padding: 2 }}><Text style={{ color: colors.textDim, fontSize: 8, textAlign: "center" }}>Book unavailable</Text></View>;
+  const cover = (id: string) => byWork.has(id) ? <TierCover key={id} book={byWork.get(id)!} style={{ width: 56, height: 84 }} onLoadEnd={() => setLoaded((current) => current.has(id) ? current : new Set(current).add(id))} /> : <View key={id} style={{ width: 56, height: 84, justifyContent: "center", backgroundColor: colors.accentSoft, padding: 2 }}><Text style={{ color: colors.textDim, fontSize: 8, textAlign: "center" }}>{t("tierlists.bookUnavailable")}</Text></View>;
 
   return <View style={{ width: "100%", padding: spacing.md, gap: spacing.md, backgroundColor: colors.background }}>
     <View style={{ gap: spacing.xs }}>
@@ -34,17 +38,17 @@ export function TierlistShareImage({ title, subject, data, books, community, his
       {subject ? <CharacterHeader subject={subject} /> : null}
       {community ? <>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: spacing.sm }}>
-          <Text style={[typography.caption, { color: colors.textDim }]}>Community ranking</Text>
-          <Text style={[typography.caption, { color: colors.textDim, marginLeft: "auto", textAlign: "right" }]}>{new Date().toLocaleDateString()}</Text>
+          <Text style={[typography.caption, { color: colors.textDim }]}>{t("tierlists.communityRanking")}</Text>
+          <Text style={[typography.caption, { color: colors.textDim, marginLeft: "auto", textAlign: "right" }]}>{new Date().toLocaleDateString(intlLocale(locale))}</Text>
         </View>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm }}>
           <View style={{ flexGrow: 1, padding: spacing.md, borderRadius: radii.lg, backgroundColor: colors.accentSoft, gap: spacing.xs }}>
             <Text display={false} style={[typography.heading, { color: colors.text, fontWeight: "700", fontVariant: ["tabular-nums"] }]}>{ballotCount ?? 0}</Text>
-            <Text style={[typography.caption, { color: colors.textDim }]}>{ballotCount === 1 ? "vote cast" : "votes cast"}</Text>
+            <Text style={[typography.caption, { color: colors.textDim }]}>{t("tierlists.voteCast", { count: ballotCount ?? 0 })}</Text>
           </View>
           <View style={{ flexGrow: 1, padding: spacing.md, borderRadius: radii.lg, backgroundColor: colors.surface, gap: spacing.xs, justifyContent: "center", borderLeftWidth: 3, borderLeftColor: colors.accent }}>
-            <Text display={false} style={[typography.title, { color: colors.text, fontWeight: "600" }]}>{aggregationModes(locale).find((item) => item.mode === mode)?.label ?? "Average"}</Text>
-            <Text style={[typography.caption, { color: colors.textDim }]}>Ranking method</Text>
+            <Text display={false} style={[typography.title, { color: colors.text, fontWeight: "600" }]}>{modes.find((item) => item.mode === mode)?.label ?? modes[0]!.label}</Text>
+            <Text style={[typography.caption, { color: colors.textDim }]}>{t("tierlists.rankingMethod")}</Text>
           </View>
         </View>
       </> : null}
@@ -56,11 +60,11 @@ export function TierlistShareImage({ title, subject, data, books, community, his
       </View>)}
     </View>
     {extra.length ? <View style={{ gap: spacing.xs }}>
-      <Text style={[typography.caption, { color: colors.textDim }]}>{community ? "No votes" : "Unranked"} · {extra.length}</Text>
+      <Text style={[typography.caption, { color: colors.textDim }]}>{t(community ? "tierlists.noVotesCount" : "tierlists.unrankedCount", { count: extra.length })}</Text>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 2 }}>{extra.map(cover)}</View>
     </View> : null}
     <View style={{ borderTopWidth: 1, borderColor: colors.border, paddingTop: spacing.md }}>
-      <Text style={[typography.caption, { color: colors.textDim, textAlign: "right" }]}>Created with: <Text style={{ color: colors.text, fontWeight: "600" }}>Atmyshelf</Text></Text>
+      <Text style={[typography.caption, { color: colors.textDim, textAlign: "right" }]}>{t("tierlists.createdWith")} <Text style={{ color: colors.text, fontWeight: "600" }}>Atmyshelf</Text></Text>
     </View>
   </View>;
 }

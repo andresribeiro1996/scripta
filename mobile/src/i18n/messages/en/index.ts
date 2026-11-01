@@ -8,6 +8,7 @@ import { library } from "./library";
 import { settings } from "./settings";
 import { sharing } from "./sharing";
 import { shell } from "./shell";
+import { tierlists } from "./tierlists";
 
-export const en = { ...addBook, ...arena, ...book, ...community, ...errors, ...library, ...settings, ...sharing, ...shell } satisfies Messages;
+export const en = { ...addBook, ...arena, ...book, ...community, ...errors, ...library, ...settings, ...sharing, ...shell, ...tierlists } satisfies Messages;
 export type MobileMessages = typeof en;

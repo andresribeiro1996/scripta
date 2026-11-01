@@ -9,5 +9,6 @@ import { library } from "./library";
 import { settings } from "./settings";
 import { sharing } from "./sharing";
 import { shell } from "./shell";
+import { tierlists } from "./tierlists";
 
-export const ptPT: CatalogOf<typeof en> = { ...addBook, ...arena, ...book, ...community, ...errors, ...library, ...settings, ...sharing, ...shell };
+export const ptPT: CatalogOf<typeof en> = { ...addBook, ...arena, ...book, ...community, ...errors, ...library, ...settings, ...sharing, ...shell, ...tierlists };
