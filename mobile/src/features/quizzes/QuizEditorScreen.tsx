@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Stack } from "expo-router";
 import { Image } from "expo-image";
-import { QUIZ_QUESTION_TYPES, eligibleTypes, playerLabel, quizOptionLabel, quizQuestionLabel, type QuizData, type QuizQuestionType } from "@scripta/shared";
+import { QUIZ_QUESTION_TYPES, eligibleTypes, playerLabel, quizOptionLabel, quizQuestionLabel, type QuizData } from "@scripta/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
@@ -11,23 +11,17 @@ import { coverUrlForApi } from "../library/lib/coverUrl";
 import { publicContentUrl } from "../sharing/links";
 import { fetchQuizResults, publishQuiz, setPlayState, updateQuiz, type Quiz } from "./api";
 import { useWorkCharacters } from "./useWorkCharacters";
-import { useLocale } from "../../i18n";
+import { quizTypeLabel } from "./quizTypeLabel";
+import { useLocale, useT } from "../../i18n";
 
 type EditorView = "setup" | "results";
 
-const PUBLISHED_VIEWS = [{ value: "setup", label: "Questions" }, { value: "results", label: "Results" }] as const;
-
-const TYPE_LABELS: Record<QuizQuestionType, string> = {
-  cover_title: "Blurred cover → title",
-  title_cover: "Title → cover",
-  quote_title: "Quote → title",
-  blurb_title: "Blurb → title",
-  characters_title: "Characters → title",
-};
+const PUBLISHED_VIEWS = [{ value: "setup", label: "quizzes.questions" }, { value: "results", label: "quizzes.results" }] as const;
 
 const uriFor = (url: string): string => coverUrlForApi(url, API_URL);
 
 export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz; onUpdated: (quiz: Quiz) => void; initialView?: EditorView }) {
+  const t = useT();
   const locale = useLocale();
   const { colors } = useTheme();
   const queryClient = useQueryClient();
@@ -62,7 +56,7 @@ export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz;
       await queryClient.invalidateQueries({ queryKey: ["quizzes"] });
       return true;
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Couldn't save changes.");
+      setError(reason instanceof Error ? reason.message : t("quizzes.saveFailed"));
       return false;
     } finally {
       setBusy(false);
@@ -83,7 +77,7 @@ export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz;
       setConfirmingPublish(false);
       await queryClient.invalidateQueries({ queryKey: ["quizzes"] });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Couldn't publish.");
+      setError(reason instanceof Error ? reason.message : t("quizzes.publishFailed"));
     } finally {
       setPublishing(false);
     }
@@ -94,7 +88,7 @@ export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz;
     try {
       await Share.share({ message: await publicContentUrl(`/play/${current.voteCode}`) });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Couldn't create a public link.");
+      setError(reason instanceof Error ? reason.message : t("quizzes.publicLinkFailed"));
     }
   }
 
@@ -104,10 +98,10 @@ export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz;
   const lockEdits = publishing;
   const actionGroups: ActionItem[][] = frozen
     ? [
-      [{ label: "Share challenge link", icon: "share", onPress: () => void shareChallengeLink() }],
-      [{ label: current.playOpen ? "Close for play" : "Open for play", icon: current.playOpen ? "lock" : "public", onPress: () => void run(() => setPlayState(current.id, !current.playOpen)) }],
+      [{ label: t("quizzes.shareChallengeLink"), icon: "share", onPress: () => void shareChallengeLink() }],
+      [{ label: current.playOpen ? t("quizzes.closeForPlay") : t("quizzes.openForPlay"), icon: current.playOpen ? "lock" : "public", onPress: () => void run(() => setPlayState(current.id, !current.playOpen)) }],
     ]
-    : [[{ label: "Publish", icon: "public", onPress: () => setConfirmingPublish(true) }]];
+    : [[{ label: t("quizzes.publish"), icon: "public", onPress: () => setConfirmingPublish(true) }]];
 
   return <Screen top={false}>
     {discardDialog}
@@ -117,14 +111,14 @@ export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz;
       headerLargeTitleEnabled: false,
       headerRight: () => <HeaderActions>
         {!frozen ? <SaveStateButton busy={busy || publishing} unsaved={dirty} onPress={() => void run(() => updateQuiz(current.id, { data: dataRef.current }))} /> : null}
-        <ActionSheet title={current.name} groups={actionGroups}>{(open) => <IconButton accessibilityLabel="Quiz actions" name="more" onPress={open} />}</ActionSheet>
+        <ActionSheet title={current.name} groups={actionGroups}>{(open) => <IconButton accessibilityLabel={t("quizzes.quizActions")} name="more" onPress={open} />}</ActionSheet>
       </HeaderActions>,
     }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     {!frozen ? <FormScroll contentContainerStyle={styles.screen}>
       <EditorHeading name={current.name} />
-      <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{data.books.length} books · {publishing ? "Publishing…" : busy ? "Saving…" : dirty ? "Unsaved changes" : "Saved"}</Text>
-      <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Questions</Text>
+      <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.bookCountStatus", { count: data.books.length, status: publishing ? t("quizzes.publishing") : busy ? t("shell.saving") : dirty ? t("tierlists.stateUnsaved") : t("shell.saved") })}</Text>
+      <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("quizzes.questions")}</Text>
       <View style={styles.lengths}>
         {[4, 5, 10, 15, 20].filter((count) => count <= data.books.length).map((count) => (
           <Pressable key={count} accessibilityRole="radio" accessibilityState={{ selected: data.questionCount === count, disabled: lockEdits }} disabled={lockEdits} onPress={() => setData((value) => ({ ...value, questionCount: count }))} style={[styles.length, { borderColor: data.questionCount === count ? colors.accent : colors.border, backgroundColor: data.questionCount === count ? colors.accentSoft : colors.surface }]}>
@@ -136,27 +130,27 @@ export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz;
         const offered = data.books.some((book) => eligibleTypes({ ...book, characters: characters[book.workId] ?? book.characters }).includes(type));
         const checked = offered && data.allowedTypes.includes(type);
         return <Pressable key={type} accessibilityRole="checkbox" accessibilityState={{ checked, disabled: !offered || lockEdits }} disabled={!offered || lockEdits} onPress={() => setData((value) => ({ ...value, allowedTypes: checked ? value.allowedTypes.filter((entry) => entry !== type) : [...value.allowedTypes, type] }))} style={[styles.row, offered ? null : styles.offered, { borderColor: colors.border }]}>
-          <Text {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{TYPE_LABELS[type]}</Text>
-          {!offered ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>no book has this data</Text> : <Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>{checked ? "✓" : ""}</Text>}
+          <Text {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{quizTypeLabel(type, locale)}</Text>
+          {!offered ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.noBookHasData")}</Text> : <Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>{checked ? "✓" : ""}</Text>}
         </Pressable>;
       })}
-      {charactersFailed ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Characters couldn't be checked</Text> : null}
+      {charactersFailed ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.charactersUnchecked")}</Text> : null}
       {data.books.map((book) => <View key={book.workId} style={[styles.book, { borderColor: colors.border, backgroundColor: colors.surface }]}>
         <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{book.title}</Text>
-        <Input label="Quote (optional)" value={book.quote ?? ""} editable={!lockEdits} onChangeText={(quote) => setData((value) => ({ ...value, books: value.books.map((entry) => entry.workId === book.workId ? { ...entry, quote } : entry) }))} placeholder="Paste a line from this book…" multiline />
-        <Input label="Blurb (optional)" value={book.blurb ?? ""} editable={!lockEdits} onChangeText={(blurb) => setData((value) => ({ ...value, books: value.books.map((entry) => entry.workId === book.workId ? { ...entry, blurb } : entry) }))} multiline />
+        <Input label={t("quizzes.quoteOptional")} value={book.quote ?? ""} editable={!lockEdits} onChangeText={(quote) => setData((value) => ({ ...value, books: value.books.map((entry) => entry.workId === book.workId ? { ...entry, quote } : entry) }))} placeholder={t("quizzes.quotePlaceholder")} multiline />
+        <Input label={t("quizzes.blurbOptional")} value={book.blurb ?? ""} editable={!lockEdits} onChangeText={(blurb) => setData((value) => ({ ...value, books: value.books.map((entry) => entry.workId === book.workId ? { ...entry, blurb } : entry) }))} multiline />
       </View>)}
-      <Button label="Publish quiz" loading={publishing} disabled={data.books.length < 4 || busy} onPress={() => setConfirmingPublish(true)} />
-      {data.books.length < 4 ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>A quiz needs at least 4 books.</Text> : null}
-    </FormScroll> : frozen ? results.isPending ? <Skeleton height={180} /> : <View style={styles.grow}><View style={styles.frozenHeading}><EditorHeading name={current.name} /></View><SwipeableTabs accessibilityLabel="Quiz editor view" options={PUBLISHED_VIEWS} value={view} onChange={setView} renderPage={(page) => page === "results" ? results.isError ? <ErrorState body="Couldn't load results." actionLabel="Retry" onAction={() => void results.refetch()} /> : <ScrollView contentContainerStyle={styles.screen}>
+      <Button label={t("quizzes.publishQuiz")} loading={publishing} disabled={data.books.length < 4 || busy} onPress={() => setConfirmingPublish(true)} />
+      {data.books.length < 4 ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.needsFourBooks")}</Text> : null}
+    </FormScroll> : frozen ? results.isPending ? <Skeleton height={180} /> : <View style={styles.grow}><View style={styles.frozenHeading}><EditorHeading name={current.name} /></View><SwipeableTabs accessibilityLabel={t("quizzes.editorView")} options={PUBLISHED_VIEWS.map(({ value, label }) => ({ value, label: t(label) }))} value={view} onChange={setView} renderPage={(page) => page === "results" ? results.isError ? <ErrorState body={t("quizzes.resultsLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void results.refetch()} /> : <ScrollView contentContainerStyle={styles.screen}>
       {(results.data?.plays ?? []).map((play, i) => <View key={`${play.playerName ?? "Guest"}-${i}`} style={[styles.leaderRow, { borderColor: colors.border }]}>
         <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{i + 1}</Text>
         <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{playerLabel(play, locale).name}</Text>
-        {playerLabel(play, locale).guest ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>guest</Text> : null}
+        {playerLabel(play, locale).guest ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.guestLower")}</Text> : null}
         <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{play.score}/{results.data!.questionCount}</Text>
       </View>)}
       {(results.data?.stats ?? []).map((stat) => { const index = (current.data.questions ?? []).findIndex((item) => item.id === stat.questionId); const asked = current.data.questions?.[index]; return <View key={stat.questionId} style={styles.stat}>
-        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{asked ? quizQuestionLabel(asked, index, current.data.books, locale) : stat.questionId} · {stat.correctCount}/{stat.answerCount} correct</Text>
+        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.statLine", { label: asked ? quizQuestionLabel(asked, index, current.data.books, locale) : stat.questionId, correct: stat.correctCount, total: stat.answerCount })}</Text>
         {stat.picks.map((pick) => <View key={pick.choiceIndex} style={styles.pick}>
           <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.pickLabel, { color: colors.textDim }]}>{asked ? quizOptionLabel(asked.type, asked.options[pick.choiceIndex], current.data.books, locale) : `#${pick.choiceIndex + 1}`}</Text>
           <View style={[styles.pickTrack, { backgroundColor: colors.border }]}><View style={[styles.pickFill, { backgroundColor: colors.accent, width: `${Math.round((pick.count / stat.answerCount) * 100)}%` }]} /></View>
@@ -165,16 +159,16 @@ export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz;
       </View>; })}
     </ScrollView> : <ScrollView contentContainerStyle={styles.screen}>
       {(current.data.questions ?? []).map((question, index) => <View key={question.id} style={[styles.row, { borderColor: colors.border }]}>
-        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{index + 1}. {TYPE_LABELS[question.type]}</Text>
+        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.numberedLabel", { number: index + 1, label: quizTypeLabel(question.type, locale) })}</Text>
         {question.type === "title_cover"
-          ? <Image source={{ uri: uriFor(String(question.options[question.answerIndex])) }} contentFit="contain" style={styles.answerThumb} alt="Answer cover" />
+          ? <Image source={{ uri: uriFor(String(question.options[question.answerIndex])) }} contentFit="contain" style={styles.answerThumb} alt={t("quizzes.answerCover")} />
           : <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{String(question.options[question.answerIndex])}</Text>}
       </View>)}
     </ScrollView>} /></View> : null}
-    <Dialog visible={confirmingPublish} title="Publish quiz" onClose={() => setConfirmingPublish(false)}>
+    <Dialog visible={confirmingPublish} title={t("quizzes.publishQuiz")} onClose={() => setConfirmingPublish(false)}>
       <View style={styles.dialog}>
-        <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Publishing creates the challenge link and locks the books, quotes and questions. This can't be undone.</Text>
-        <Button label="Publish" loading={publishing} onPress={() => void publish()} />
+        <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("quizzes.publishWarning")}</Text>
+        <Button label={t("quizzes.publish")} loading={publishing} onPress={() => void publish()} />
       </View>
     </Dialog>
   </Screen>;

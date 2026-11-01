@@ -8,23 +8,17 @@ import { useLibrary, useWorkBooks } from "../library";
 import { Button, Input, Screen, Segmented, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { resolveCover } from "../library/api/covers";
 import { createQuiz, type Quiz } from "./api";
+import { quizTypeLabel } from "./quizTypeLabel";
 import { useWorkCharacters } from "./useWorkCharacters";
+import { useLocale, useT } from "../../i18n";
 
-const SOURCES = [{ value: "shelf", label: "Shelf" }, { value: "collection", label: "Collection" }, { value: "pool", label: "Famous" }] as const;
+const SOURCES = [{ value: "shelf", label: "quizzes.sourceShelf" }, { value: "collection", label: "shell.collection" }, { value: "pool", label: "quizzes.sourceFamous" }] as const;
 type Source = (typeof SOURCES)[number]["value"];
 
-const TYPE_LABELS: Record<QuizQuestionType, string> = {
-  cover_title: "Blurred cover → title",
-  title_cover: "Title → cover",
-  quote_title: "Quote → title",
-  blurb_title: "Blurb → title",
-  characters_title: "Characters → title",
-};
-
-function toQuizBook(book: Record<string, unknown>, resolvedCover: string | null | undefined): QuizBookInput {
+function toQuizBook(book: Record<string, unknown>, resolvedCover: string | null | undefined, untitled: string): QuizBookInput {
   return {
     workId: workIdOf(book),
-    title: String(book.Title ?? "Untitled"),
+    title: String(book.Title ?? untitled),
     author: String(book.Attribution ?? ""),
     coverUrl: typeof book._coverUrl === "string" && book._coverUrl ? book._coverUrl : resolvedCover ?? null,
     quote: null,
@@ -35,6 +29,8 @@ function toQuizBook(book: Record<string, unknown>, resolvedCover: string | null 
 const LENGTHS = [4, 5, 10, 15, 20];
 
 export function QuizCreateScreen() {
+  const t = useT();
+  const locale = useLocale();
   const { colors } = useTheme();
   const queryClient = useQueryClient();
   const [step, setStep] = useState(0);
@@ -99,7 +95,7 @@ export function QuizCreateScreen() {
 
   const books: QuizBookInput[] = source === "pool"
     ? QUIZ_POOL.filter((book) => poolIds.includes(book.id)).map(({ id: _id, ...book }) => book)
-    : shelfRawBooks.map((raw) => toQuizBook(raw, resolvedCovers[bookKey(raw)]));
+    : shelfRawBooks.map((raw) => toQuizBook(raw, resolvedCovers[bookKey(raw)], t("library.untitled")));
 
   const { characters, failed: charactersFailed } = useWorkCharacters(books.flatMap((book) => (book.workId ? [book.workId] : [])));
   const offeredBooks = books.map((book) => {
@@ -116,43 +112,43 @@ export function QuizCreateScreen() {
     setError(null);
     try {
       const data: QuizDataInput = {
-        sourceLabel: source === "pool" ? "Famous books" : source === "collection" ? collection?.name ?? "Collection" : "My shelf",
+        sourceLabel: source === "pool" ? t("quizzes.famousBooks") : source === "collection" ? collection?.name ?? t("shell.collection") : t("quizzes.myShelf"),
         questionCount: effectiveCount,
         allowedTypes: effectiveTypes.length > 0 ? effectiveTypes : availableTypes,
         books,
         questions: null,
       };
-      const created = await createQuiz(name.trim() || "Untitled quiz", data);
+      const created = await createQuiz(name.trim() || t("quizzes.untitledQuiz"), data);
       queryClient.setQueryData<Quiz[]>(["quizzes"], (items = []) => [created, ...items]);
       router.replace(`/quiz/${created.id}` as never);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Couldn't create the quiz.");
+      setError(reason instanceof Error ? reason.message : t("quizzes.createFailed"));
     } finally {
       setBusy(false);
     }
   }
 
   return <Screen top={false} style={styles.screen}>
-    <Stack.Screen options={{ headerShown: true, title: "Create quiz" }} />
+    <Stack.Screen options={{ headerShown: true, title: t("arena.createQuiz") }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
-    <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Step {step + 1} of 2</Text>
-    <Text {...dynamicType} style={[typography.title, { color: colors.text }]}>{["Choose books", "Set up questions"][step]}</Text>
+    <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.createStep", { step: step + 1 })}</Text>
+    <Text {...dynamicType} style={[typography.title, { color: colors.text }]}>{step === 0 ? t("quizzes.chooseBooks") : t("quizzes.setUpQuestions")}</Text>
     {step === 0 ? <>
-      <Input label="Quiz name" value={name} onChangeText={setName} placeholder="Untitled quiz" maxLength={200} />
-      <Segmented accessibilityLabel="Question source" options={SOURCES} value={source} onChange={setSource} />
+      <Input label={t("quizzes.quizName")} value={name} onChangeText={setName} placeholder={t("quizzes.untitledQuiz")} maxLength={200} />
+      <Segmented accessibilityLabel={t("quizzes.questionSource")} options={SOURCES.map(({ value, label }) => ({ value, label: t(label) }))} value={source} onChange={setSource} />
       {source === "collection" ? <View style={styles.collections}>
         {collections.map((group) => (
           <Pressable key={group.id} accessibilityRole="radio" accessibilityState={{ selected: collectionId === group.id }} onPress={() => setCollectionId(group.id)} style={[styles.row, { borderColor: collectionId === group.id ? colors.accent : colors.border, backgroundColor: collectionId === group.id ? colors.accentSoft : colors.surface }]}>
             <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.text }]}>{group.name}</Text>
           </Pressable>
         ))}
-        {collections.length === 0 ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>No collections yet.</Text> : null}
+        {collections.length === 0 ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("quizzes.noCollections")}</Text> : null}
       </View> : null}
       {source === "pool" ? <FlatList
         data={QUIZ_POOL}
         keyExtractor={(book) => book.id}
         style={styles.list}
-        ListEmptyComponent={<Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>No books found.</Text>}
+        ListEmptyComponent={<Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("quizzes.noBooksFound")}</Text>}
         renderItem={({ item }) => {
           const checked = poolIds.includes(item.id);
           return <Pressable accessibilityRole="checkbox" accessibilityState={{ checked }} onPress={() => setPoolIds((value) => checked ? value.filter((entry) => entry !== item.id) : [...value, item.id])} style={[styles.row, { borderColor: checked ? colors.accent : colors.border, backgroundColor: checked ? colors.accentSoft : colors.surface }]}>
@@ -162,15 +158,15 @@ export function QuizCreateScreen() {
         }}
       /> : null}
       {source === "shelf" ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>
-        {library.isPending ? "Loading books…" : library.isError ? "Your library couldn't be loaded." : `${shelfRawBooks.length} books in your library.`}
+        {library.isPending ? t("quizzes.loadingBooks") : library.isError ? t("quizzes.libraryLoadFailed") : t("quizzes.booksInLibrary", { count: shelfRawBooks.length })}
       </Text> : null}
       {resolveFailed && source !== "pool" ? <View style={styles.resolveRetry}>
-        <Text {...dynamicType} style={[typography.caption, styles.grow, { color: colors.textDim }]}>Some covers couldn't be checked, so cover questions may be unavailable.</Text>
-        <Button label="Retry" variant="secondary" onPress={() => { setResolveFailed(false); setResolveAttempt((value) => value + 1); }} />
+        <Text {...dynamicType} style={[typography.caption, styles.grow, { color: colors.textDim }]}>{t("quizzes.coversUnchecked")}</Text>
+        <Button label={t("shell.retry")} variant="secondary" onPress={() => { setResolveFailed(false); setResolveAttempt((value) => value + 1); }} />
       </View> : null}
-      <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{books.length} {books.length === 1 ? "book" : "books"} selected</Text>
+      <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.booksSelected", { count: books.length })}</Text>
     </> : <ScrollView contentContainerStyle={styles.stepScroll} keyboardShouldPersistTaps="handled">
-      <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Questions</Text>
+      <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("quizzes.questions")}</Text>
       <View style={styles.lengths}>
         {lengthOptions.map((count) => (
           <Pressable key={count} accessibilityRole="radio" accessibilityState={{ selected: effectiveCount === count }} onPress={() => setQuestionCount(count)} style={[styles.length, { borderColor: effectiveCount === count ? colors.accent : colors.border, backgroundColor: effectiveCount === count ? colors.accentSoft : colors.surface }]}>
@@ -178,20 +174,20 @@ export function QuizCreateScreen() {
           </Pressable>
         ))}
       </View>
-      <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Question types</Text>
-      {charactersFailed ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Characters couldn't be checked</Text> : null}
+      <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("quizzes.questionTypes")}</Text>
+      {charactersFailed ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.charactersUnchecked")}</Text> : null}
       {QUIZ_QUESTION_TYPES.map((type) => {
         const offered = availableTypes.includes(type);
         const checked = offered && effectiveTypes.includes(type);
         return <Pressable key={type} accessibilityRole="checkbox" accessibilityState={{ checked, disabled: !offered }} disabled={!offered} onPress={() => setAllowedTypes((value) => value.includes(type) ? value.filter((entry) => entry !== type) : [...value, type])} style={[styles.row, offered ? null : styles.offered, { borderColor: colors.border }]}>
-          <Text {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{TYPE_LABELS[type]}</Text>
-          {!offered ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>no book has this data</Text> : <Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>{checked ? "✓" : ""}</Text>}
+          <Text {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{quizTypeLabel(type, locale)}</Text>
+          {!offered ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.noBookHasData")}</Text> : <Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>{checked ? "✓" : ""}</Text>}
         </Pressable>;
       })}
     </ScrollView>}
     <View style={styles.actions}>
-      {step > 0 ? <Button label="Back" variant="secondary" onPress={() => setStep((value) => value - 1)} /> : null}
-      {step < 1 ? <Button label="Next" disabled={books.length < 4 || (source === "collection" && !collection)} onPress={() => setStep(1)} /> : <Button label="Create quiz" loading={busy} disabled={effectiveTypes.length === 0 || effectiveCount === 0} onPress={() => void create()} />}
+      {step > 0 ? <Button label={t("shell.back")} variant="secondary" onPress={() => setStep((value) => value - 1)} /> : null}
+      {step < 1 ? <Button label={t("tierlists.next")} disabled={books.length < 4 || (source === "collection" && !collection)} onPress={() => setStep(1)} /> : <Button label={t("arena.createQuiz")} loading={busy} disabled={effectiveTypes.length === 0 || effectiveCount === 0} onPress={() => void create()} />}
     </View>
   </Screen>;
 }
