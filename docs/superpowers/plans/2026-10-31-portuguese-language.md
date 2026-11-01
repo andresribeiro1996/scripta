@@ -1098,6 +1098,8 @@ Domain errors extend `LocalizedError`. Route literals use `t(localeOf(request), 
 - Modify: `backend/src/modules/works/`
 - Modify: `backend/src/modules/quizzes/`
 - Modify: `backend/src/worksErrors.ts`
+- Modify: `backend/src/modules/arena/routes.ts`
+- Modify: `backend/src/modules/murals/routes.ts`
 - Modify: `backend/src/app.ts`
 - Test: `backend/src/modules/library/`
 - Test: `backend/src/modules/books/`
