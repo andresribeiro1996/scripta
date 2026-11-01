@@ -29,7 +29,7 @@ export default function ForgotPassword() {
     try {
       await apiClient.request("/auth/forgot-password", { method: "POST", body: { email: email.trim() } });
       setSent(true); setCooldown(60);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : t("shell.connectFailedShort")); }
+    } catch (reason) { setError(reason instanceof TypeError ? t("shell.connectFailedShort") : reason instanceof Error ? reason.message : t("shell.connectFailedShort")); }
     finally { setBusy(false); }
   }
   return <Screen top={false} bottom><Stack.Screen options={{ headerShown: true, title: t("shell.recoverAccount") }} />

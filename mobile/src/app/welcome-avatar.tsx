@@ -34,7 +34,7 @@ export default function WelcomeAvatarRoute() {
     try {
       await uploadAvatar({ uri: asset.uri, name: asset.fileName ?? `avatar-${Date.now()}.jpg`, mimeType: asset.mimeType ?? "image/jpeg" });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t("shell.uploadFailed"));
+      setError(reason instanceof TypeError ? t("shell.connectFailedShort") : reason instanceof Error ? reason.message : t("shell.uploadFailed"));
     } finally {
       setBusy(false);
     }

@@ -43,7 +43,7 @@ export default function AccountSecurityPage() {
       if (action === "password") { await signOut(); router.replace({ pathname: "/login", params: { notice: "password-changed" } }); }
       else { setMessage(action === "email" ? t("shell.checkNewAddress") : t("shell.checkInbox")); setMode(null); }
       setCurrent(""); setPassword(""); setConfirm("");
-    } catch (reason) { setError(reason instanceof Error ? reason.message : t("shell.pleaseTryAgain")); }
+    } catch (reason) { setError(reason instanceof TypeError ? t("shell.connectFailedShort") : reason instanceof Error ? reason.message : t("shell.pleaseTryAgain")); }
     finally { setBusy(false); }
   }
 
@@ -55,7 +55,7 @@ export default function AccountSecurityPage() {
       await signOut();
       router.replace("/login");
       show(t("shell.accountDeleted"), "success");
-    } catch (reason) { setDeleteError(reason instanceof Error ? reason.message : t("shell.pleaseTryAgain")); }
+    } catch (reason) { setDeleteError(reason instanceof TypeError ? t("shell.connectFailedShort") : reason instanceof Error ? reason.message : t("shell.pleaseTryAgain")); }
     finally { setBusy(false); }
   }
 

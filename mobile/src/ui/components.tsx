@@ -251,7 +251,7 @@ export function IconButton({
   const color = tone === "danger" ? colors.danger : tone === "accent" ? colors.onAccent : colors.textDim;
   return (
     <Pressable
-      accessibilityLabel={badge ? t("shell.badgeNew", { label: accessibilityLabel, badge }) : accessibilityLabel}
+      accessibilityLabel={badge ? t("shell.badgeNew", { label: accessibilityLabel, badge, count: Number.parseInt(badge, 10) }) : accessibilityLabel}
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}
@@ -644,7 +644,7 @@ export function SwipeableTabs<T extends string>({
           const selected = option.value === value;
           return (
             <Pressable
-              accessibilityLabel={option.accessibilityLabel ?? (option.badge ? t("shell.badgeRemaining", { label: option.label, badge: option.badge }) : option.label)}
+              accessibilityLabel={option.accessibilityLabel ?? (option.badge ? t("shell.badgeRemaining", { label: option.label, badge: option.badge, count: Number.parseInt(String(option.badge), 10) }) : option.label)}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
               key={option.value}

@@ -46,7 +46,7 @@ export default function ChooseUsernamePage() {
     try {
       await setUsername(trimmed);
     } catch (e) {
-      setError(e instanceof Error ? e.message : t("shell.usernameSaveFailed"));
+      setError(e instanceof TypeError ? t("shell.connectFailedShort") : e instanceof Error ? e.message : t("shell.usernameSaveFailed"));
     } finally {
       setBusy(false);
     }

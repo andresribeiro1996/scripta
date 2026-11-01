@@ -128,3 +128,17 @@ test("the arena books sheet title is one message per subject", () => {
   assert.equal(t("arena.booksSheetTitle", { name: "Fantasy" }), "Fantasy books");
   assert.equal(t("arena.charactersSheetTitle", { name: "Dune" }), "Dune characters");
 });
+
+test("badge labels pick the singular in Portuguese, including a capped badge", () => {
+  assert.equal(t("shell.badgeNew", { label: "Atividade", badge: "1", count: 1 }), "Atividade, 1 new");
+  assert.equal(t("shell.badgeRemaining", { label: "Votar", badge: 3, count: 3 }), "Votar, 3 remaining");
+  setLocalePreference("pt-PT");
+  try {
+    assert.equal(t("shell.badgeNew", { label: "Atividade", badge: "1", count: 1 }), "Atividade, 1 novo");
+    assert.equal(t("shell.badgeNew", { label: "Atividade", badge: "99+", count: Number.parseInt("99+", 10) }), "Atividade, 99+ novos");
+    assert.equal(t("shell.badgeRemaining", { label: "Votar", badge: 1, count: 1 }), "Votar, 1 restante");
+    assert.equal(t("shell.badgeRemaining", { label: "Votar", badge: 3, count: 3 }), "Votar, 3 restantes");
+  } finally {
+    setLocalePreference("auto");
+  }
+});
