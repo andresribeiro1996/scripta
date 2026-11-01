@@ -7,13 +7,13 @@ import { Toast, ToggleSwitch, minimumTouchTarget, spacing, typography, useTheme 
 import { Text } from "../../ui/Text";
 import { fetchOwnProfile, updateFeedSettings } from "../community/api";
 import { ReaderGlyph } from "../community/ReaderGlyph";
-import { getLocale, useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 const OWN_PROFILE_KEY = ["community", "own-profile"] as const;
-const LABEL = "Show my reader glyph next to my name";
 
 export function ReaderGlyphSetting({ username, books, groups }: { username: string; books: Array<Record<string, unknown>>; groups: Group[] }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const client = useQueryClient();
   const { data: profile } = useQuery({ queryKey: OWN_PROFILE_KEY, queryFn: fetchOwnProfile });
@@ -33,7 +33,7 @@ export function ReaderGlyphSetting({ username, books, groups }: { username: stri
       void client.invalidateQueries({ queryKey: ["community", "profile", username] });
     } catch (reason) {
       client.setQueryData<OwnProfile>(OWN_PROFILE_KEY, profile);
-      setError(saveFailureMessage(reason, "Couldn't save the glyph setting.", getLocale()));
+      setError(saveFailureMessage(reason, t("readerCard.glyphSaveFailed"), locale));
     } finally {
       setBusy(false);
     }
@@ -42,14 +42,14 @@ export function ReaderGlyphSetting({ username, books, groups }: { username: stri
   return (
     <View style={styles.gap}>
       <View style={styles.row}>
-        <Text style={[typography.body, styles.grow, { color: colors.text }]}>{LABEL}</Text>
-        <ToggleSwitch accessibilityLabel={LABEL} value={on} disabled={!profile || busy} onValueChange={() => void toggle()} />
+        <Text style={[typography.body, styles.grow, { color: colors.text }]}>{t("readerCard.glyphToggle")}</Text>
+        <ToggleSwitch accessibilityLabel={t("readerCard.glyphToggle")} value={on} disabled={!profile || busy} onValueChange={() => void toggle()} />
       </View>
       <View accessible accessibilityLabel={preview.line} style={styles.preview}>
         <ReaderGlyph identity={preview.glyph ?? undefined} />
         <Text style={[typography.caption, styles.grow, { color: colors.textDim }]}>{preview.line}</Text>
       </View>
-      {profile && !profile.published ? <Text style={[typography.caption, { color: colors.textDim }]}>It shows once your shelf is published.</Text> : null}
+      {profile && !profile.published ? <Text style={[typography.caption, { color: colors.textDim }]}>{t("readerCard.glyphAfterPublish")}</Text> : null}
       {error ? <Toast visible message={error} tone="error" /> : null}
     </View>
   );
