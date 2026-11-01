@@ -10,16 +10,16 @@ const OPTIONS: ThemePreference[] = ["system", ...THEME_IDS];
 export function ThemePicker() {
   const t = useT();
   const selected = useThemePreference();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(false);
 
   async function choose(preference: ThemePreference) {
     fadeToThemePreference(preference);
-    setError(null);
+    setError(false);
     try {
       await saveAccountAppearance({ theme: preference });
     } catch (err) {
       if (!isAppearanceSyncFailure(err)) throw err;
-      setError(t("settings.languageSaveFailed"));
+      setError(true);
     }
   }
 
@@ -28,7 +28,7 @@ export function ThemePicker() {
       <ThemeOptionGrid options={OPTIONS} value={selected} onChange={(option) => void choose(option)} />
       {error && (
         <p role="alert" className="mt-3 text-xs text-(--color-danger)">
-          {error}
+          {t("settings.languageSaveFailed")}
         </p>
       )}
     </>

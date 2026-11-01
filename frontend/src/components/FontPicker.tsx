@@ -9,17 +9,17 @@ export function FontPicker({ slot }: { slot: FontSlot }) {
   const t = useT();
   const selected = useFontPreference(slot);
   const themeDefault = resolveFonts(resolveTheme(useThemePreference(), osScheme()), "theme", "theme")[slot];
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(false);
   const options: FontPreference[] = ["theme", ...(slot === "display" ? DISPLAY_FONT_IDS : TEXT_FONT_IDS)];
 
   async function choose(preference: FontPreference) {
     applyFontPreference(slot, preference);
-    setError(null);
+    setError(false);
     try {
       await saveAccountAppearance(slot === "display" ? { displayFont: preference } : { textFont: preference });
     } catch (err) {
       if (!isAppearanceSyncFailure(err)) throw err;
-      setError(t("settings.languageSaveFailed"));
+      setError(true);
     }
   }
 
@@ -44,7 +44,7 @@ export function FontPicker({ slot }: { slot: FontSlot }) {
       </div>
       {error && (
         <p role="alert" className="mt-2 text-xs text-(--color-danger)">
-          {error}
+          {t("settings.languageSaveFailed")}
         </p>
       )}
     </fieldset>

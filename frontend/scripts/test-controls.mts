@@ -4,6 +4,8 @@ import { test } from "node:test";
 import { BUTTON_DANGER, BUTTON_DANGER_OUTLINE, FIELD_CLASS, chipClass } from "../src/components/page/buttonClasses";
 import { CARD, LIST_PANEL, LIST_ROW_LINK, PANEL_HEADING, SECTION_HEADING } from "../src/components/page/surfaceClasses";
 
+import { en } from "../src/i18n/messages/en/index";
+
 const src = (f: string) => readFileSync(new URL(`../src/${f}.tsx`, import.meta.url), "utf8");
 
 test("menus open on three dots, not a sun glyph", () => {
@@ -24,6 +26,9 @@ test("Settings rows name their object and meet the floor", () => {
   const s = src("pages/SettingsPage");
   assert.match(s, />\s*\{t\("settings\.changePicture"\)\}\s*</);
   assert.match(s, />\s*\{t\("settings\.changeUsername"\)\}\s*</);
+  assert.doesNotMatch(s, />\s*Change\s*</);
+  assert.equal(en["settings.changePicture"], "Change picture");
+  assert.equal(en["settings.changeUsername"], "Change username");
   assert.match(s, /LIST_PANEL/);
   assert.match(s, /setAvatarError\(err/);
   assert.equal(s.match(/setError\(err/g)?.length, 1);
