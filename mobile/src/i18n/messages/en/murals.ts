@@ -196,6 +196,7 @@ export const murals = {
   "murals.shadowColor": "Shadow color",
   "murals.shadowDistance": "Shadow distance",
   "murals.shadowSoftness": "Shadow softness",
+  "murals.shadowOn": "On",
   "murals.shadowStrength": "Shadow strength",
   "murals.shareDraftNote": "Image includes your unsaved changes. A public link shows the saved mural; creating one saves these changes first.",
   "murals.shareMural": "Share mural",

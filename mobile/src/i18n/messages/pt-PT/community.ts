@@ -92,7 +92,7 @@ export const community: CatalogOf<typeof en> = {
   "community.feedReadingCaption": "Livros que adiciona ou termina",
   "community.feedVotes": "Votos",
   "community.feedVotesCaption": "Jogos em que vota, mostrados pelo nome",
-  "community.feedFollows": "Seguimentos",
+  "community.feedFollows": "Pessoas que segue",
   "community.feedFollowsCaption": "Quem segue",
   "community.feedSettingsSaveFailed": "Não foi possível guardar as definições.",
   "community.somethingWentWrongRetry": "Algo correu mal. Tente novamente.",

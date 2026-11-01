@@ -49,7 +49,7 @@ export const library: CatalogOf<typeof en> = {
   "library.thoughtPlaceholder": "O que ficou consigo?",
   "library.againstFavourite": "Contra o seu favorito.",
   "library.thisOne": "Este",
-  "library.stillTitle": "Continuo com {title}",
+  "library.stillTitle": "Manter {title}",
   "library.stillThisOne": "este",
   "library.addedToFinished": "Adicionado a Lidos na sua estante",
   "library.addedToFinishedFavourites": "Adicionado a Lidos na sua estante e a Favoritos",

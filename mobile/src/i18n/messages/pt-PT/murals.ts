@@ -197,6 +197,7 @@ export const murals: CatalogOf<typeof en> = {
   "murals.shadowColor": "Cor da sombra",
   "murals.shadowDistance": "Distância da sombra",
   "murals.shadowSoftness": "Suavidade da sombra",
+  "murals.shadowOn": "Ativada",
   "murals.shadowStrength": "Intensidade da sombra",
   "murals.shareDraftNote": "A imagem inclui as suas alterações por guardar. Uma ligação pública mostra o mural guardado; ao criá-la, estas alterações são guardadas primeiro.",
   "murals.shareMural": "Partilhar mural",

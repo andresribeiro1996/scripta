@@ -190,7 +190,7 @@ export function StyleTab({ style, palette, onChange, onReset, onCopy, onPaste, c
         </> : null}
       </Group>
       <Group {...group("effects", t("murals.effects"))}>
-        <SelectRow label={t("library.shadow")} value={style.cardShadow ? "on" : "none"} options={[{ value: "none", label: t("library.none") }, { value: "on", label: t("tierlists.on") }]} onChange={(value) => set({ cardShadow: value === "on" })} />
+        <SelectRow label={t("library.shadow")} value={style.cardShadow ? "on" : "none"} options={[{ value: "none", label: t("library.none") }, { value: "on", label: t("murals.shadowOn") }]} onChange={(value) => set({ cardShadow: value === "on" })} />
         {style.cardShadow ? <>
           <PresetRow label={t("murals.shadowStrength")} presets={presetOptions(SHADOW_STRENGTH_PRESETS, locale)} value={style.shadowOpacity} onChange={(shadowOpacity) => set({ shadowOpacity })} />
           <PresetRow label={t("murals.shadowSoftness")} presets={presetOptions(SHADOW_BLUR_PRESETS, locale)} value={style.shadowBlur} onChange={(shadowBlur) => set({ shadowBlur })} />

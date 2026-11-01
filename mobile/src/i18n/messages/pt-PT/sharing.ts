@@ -23,7 +23,7 @@ export const sharing: CatalogOf<typeof en> = {
   "sharing.inviteToExplore": "Convide alguém a explorar e a participar.",
   "sharing.retryLink": "Tentar a ligação novamente",
   "sharing.openInAtmyshelf": "Abrir no Atmyshelf",
-  "sharing.sendLinkInstead": "Enviar a ligação",
+  "sharing.sendLinkInstead": "Enviar antes a ligação",
   "sharing.shareAsImage": "Partilhar como imagem",
   "sharing.shareAsImageDetail": "Feita para stories, publicações e grupos de conversa",
   "sharing.sendLink": "Enviar ligação",
