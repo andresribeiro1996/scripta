@@ -5,6 +5,7 @@ import Animated, { Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withT
 import { hasChosen, readerCardPages, readerCardShine, readerCardSummary, startTurn, turnBy, turnTo, turnToPage, type ReaderCardBase, type ReaderCardPage } from "@scripta/shared";
 import { MOTION } from "@scripta/shared/themes";
 import { minimumTouchTarget, radii, spacing, useReducedMotion, useTheme } from "../../ui";
+import { useT } from "../../i18n";
 import { CardShine } from "./CardShine";
 import { PLATE_RATIO, ReaderCardImage } from "./ReaderCardImage";
 
@@ -13,6 +14,7 @@ const TURN_MS = 450;
 const DOT_ON_SCRIM = "#ffffff";
 
 export function ReaderCardTurner({ input, width, onScrim = false, page, liveShine = false }: { input: ReaderCardBase; width: number; onScrim?: boolean; page?: { page: ReaderCardPage }; liveShine?: boolean }) {
+  const t = useT();
   const { colors } = useTheme();
   const reduced = useReducedMotion();
   const chosen = hasChosen(input.card.chosen);
@@ -49,7 +51,7 @@ export function ReaderCardTurner({ input, width, onScrim = false, page, liveShin
       announced.current = true;
       return;
     }
-    AccessibilityInfo.announceForAccessibility(`Page ${turn.index + 1} of ${pages.length}`);
+    AccessibilityInfo.announceForAccessibility(t("murals.pageOf", { page: turn.index + 1, total: pages.length }));
   }, [turn.index, pages.length]);
 
   const size = { width, height: width * PLATE_RATIO };
@@ -62,20 +64,20 @@ export function ReaderCardTurner({ input, width, onScrim = false, page, liveShin
       {isPager ? (
         <PagerView ref={pager} initialPage={initialPage} onPageSelected={(event) => { const index = event.nativeEvent.position; setTurn((state) => (state.index === index ? state : { ...state, index })); }} style={size}>
           {pages.map((page, i) => (
-            <View key={i} collapsable={false} accessible accessibilityRole="image" accessibilityLabel={i === 0 ? `${summary} Page 1 of ${pages.length}.` : `Page ${i + 1} of ${pages.length}`}>
+            <View key={i} collapsable={false} accessible accessibilityRole="image" accessibilityLabel={i === 0 ? t("murals.summaryPageOf", { summary, page: 1, total: pages.length }) : t("murals.pageOf", { page: i + 1, total: pages.length })}>
               <ReaderCardImage input={input} page={page} width={width} />
               {shineOn(page)}
             </View>
           ))}
         </PagerView>
       ) : (
-        <Pressable accessibilityRole="button" accessibilityLabel={`${summary} Page ${turn.index + 1} of ${pages.length}.`} accessibilityHint="Turns the card" onPress={() => setTurn((state) => turnBy(state, 1, pages.length))} style={size}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t("murals.summaryPageOf", { summary, page: turn.index + 1, total: pages.length })} accessibilityHint={t("murals.turnsCard")} onPress={() => setTurn((state) => turnBy(state, 1, pages.length))} style={size}>
           <CardFaces key={rest} rotation={rotation} faces={[<Fragment key="a"><ReaderCardImage input={input} page={pages[turn.faces[0]]!} width={width} />{shineOn(pages[turn.faces[0]]!)}</Fragment>, <Fragment key="b"><ReaderCardImage input={input} page={pages[turn.faces[1]]!} width={width} />{shineOn(pages[turn.faces[1]]!)}</Fragment>]} />
         </Pressable>
       )}
       <View style={styles.dots}>
         {pages.map((_, i) => (
-          <Pressable key={i} accessibilityLabel={`Page ${i + 1}`} accessibilityRole="button" accessibilityState={{ selected: i === turn.index }} onPress={() => setTurn((state) => turnTo(state, i, i > state.index ? 1 : -1))} style={styles.dot}>
+          <Pressable key={i} accessibilityLabel={t("murals.pageNumber", { page: i + 1 })} accessibilityRole="button" accessibilityState={{ selected: i === turn.index }} onPress={() => setTurn((state) => turnTo(state, i, i > state.index ? 1 : -1))} style={styles.dot}>
             <View style={[styles.dotMark, { backgroundColor: dotColor, opacity: i === turn.index ? 1 : 0.4 }]} />
           </Pressable>
         ))}

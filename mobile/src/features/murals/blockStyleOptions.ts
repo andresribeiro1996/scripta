@@ -1,13 +1,22 @@
-import { DEFAULT_BORDER_SIDES, blockGradient, contrastRatio, effectiveBlockColors, normalizeHexColor, resolveBlockColor, themeColorRef, type BlockStyle, type BlockThemeColorKey, type BorderSides, type CardBorderStyle } from "@scripta/shared";
+import { DEFAULT_BORDER_SIDES, blockGradient, cardBorderStyleOptions, contrastRatio, effectiveBlockColors, normalizeHexColor, resolveBlockColor, themeColorRef, type BlockStyle, type BlockThemeColorKey, type BorderSides, type CardBorderStyle } from "@scripta/shared";
+import type { Locale } from "@scripta/shared/i18n";
 import type { ThemeColors } from "@scripta/shared/themes";
+import { translatorFor, type MobileMessages } from "../../i18n";
 
+export type MessageKey = Extract<keyof MobileMessages, string>;
 export type Preset<T> = { key: string; label: string; value: T };
+export type PresetSpec<T> = { key: string; labelKey: MessageKey; value: T };
 
-export const CORNER_PRESETS: Preset<number>[] = [
-  { key: "square", label: "Square", value: 0 },
-  { key: "slight", label: "Slight", value: 4 },
-  { key: "rounded", label: "Rounded", value: 12 },
-  { key: "round", label: "Round", value: 24 },
+export function presetOptions<T>(presets: readonly PresetSpec<T>[], locale: Locale): Preset<T>[] {
+  const t = translatorFor(locale);
+  return presets.map(({ key, labelKey, value }) => ({ key, label: t(labelKey), value }));
+}
+
+export const CORNER_PRESETS: PresetSpec<number>[] = [
+  { key: "square", labelKey: "murals.cornerSquare", value: 0 },
+  { key: "slight", labelKey: "murals.cornerSlight", value: 4 },
+  { key: "rounded", labelKey: "murals.cornerRounded", value: 12 },
+  { key: "round", labelKey: "murals.cornerRound", value: 24 },
 ];
 
 export const SIZE_PRESETS: Preset<number>[] = [
@@ -17,68 +26,66 @@ export const SIZE_PRESETS: Preset<number>[] = [
   { key: "xl", label: "XL", value: 20 },
 ];
 
-export const BORDER_WIDTH_PRESETS: Preset<number>[] = [
-  { key: "none", label: "None", value: 0 },
-  { key: "thin", label: "Thin", value: 1 },
-  { key: "thick", label: "Thick", value: 3 },
+export const BORDER_WIDTH_PRESETS: PresetSpec<number>[] = [
+  { key: "none", labelKey: "library.none", value: 0 },
+  { key: "thin", labelKey: "murals.presetThin", value: 1 },
+  { key: "thick", labelKey: "murals.presetThick", value: 3 },
 ];
 
-export const BORDER_STRENGTH_PRESETS: Preset<number>[] = [
-  { key: "faint", label: "Faint", value: 40 },
-  { key: "medium", label: "Medium", value: 72 },
-  { key: "solid", label: "Solid", value: 100 },
+export const BORDER_STRENGTH_PRESETS: PresetSpec<number>[] = [
+  { key: "faint", labelKey: "murals.presetFaint", value: 40 },
+  { key: "medium", labelKey: "murals.presetMedium", value: 72 },
+  { key: "solid", labelKey: "murals.presetSolid", value: 100 },
 ];
 
-export const FADE_PRESETS: Preset<number>[] = [
-  { key: "none", label: "None", value: 100 },
-  { key: "light", label: "Light", value: 72 },
-  { key: "strong", label: "Strong", value: 40 },
+export const FADE_PRESETS: PresetSpec<number>[] = [
+  { key: "none", labelKey: "murals.presetNone", value: 100 },
+  { key: "light", labelKey: "murals.presetLight", value: 72 },
+  { key: "strong", labelKey: "murals.presetStrong", value: 40 },
 ];
 
-export const SHADOW_STRENGTH_PRESETS: Preset<number>[] = [
-  { key: "soft", label: "Soft", value: 12 },
-  { key: "medium", label: "Medium", value: 24 },
-  { key: "strong", label: "Strong", value: 40 },
+export const SHADOW_STRENGTH_PRESETS: PresetSpec<number>[] = [
+  { key: "soft", labelKey: "library.soft", value: 12 },
+  { key: "medium", labelKey: "murals.presetMedium", value: 24 },
+  { key: "strong", labelKey: "murals.presetStrong", value: 40 },
 ];
 
-export const SHADOW_BLUR_PRESETS: Preset<number>[] = [
-  { key: "sharp", label: "Sharp", value: 0 },
-  { key: "soft", label: "Soft", value: 4 },
-  { key: "diffuse", label: "Diffuse", value: 12 },
+export const SHADOW_BLUR_PRESETS: PresetSpec<number>[] = [
+  { key: "sharp", labelKey: "murals.presetSharp", value: 0 },
+  { key: "soft", labelKey: "library.soft", value: 4 },
+  { key: "diffuse", labelKey: "murals.presetDiffuse", value: 12 },
 ];
 
-export const SHADOW_DISTANCE_PRESETS: Preset<number>[] = [
-  { key: "none", label: "None", value: 0 },
-  { key: "near", label: "Near", value: 2 },
-  { key: "far", label: "Far", value: 8 },
+export const SHADOW_DISTANCE_PRESETS: PresetSpec<number>[] = [
+  { key: "none", labelKey: "library.none", value: 0 },
+  { key: "near", labelKey: "murals.presetNear", value: 2 },
+  { key: "far", labelKey: "murals.presetFar", value: 8 },
 ];
 
-export const GRADIENT_DIRECTION_PRESETS: Preset<number>[] = [
-  { key: "up", label: "Up", value: 0 },
-  { key: "right", label: "Right", value: 90 },
-  { key: "down", label: "Down", value: 180 },
-  { key: "diagonal", label: "Diagonal", value: 135 },
+export const GRADIENT_DIRECTION_PRESETS: PresetSpec<number>[] = [
+  { key: "up", labelKey: "murals.directionUp", value: 0 },
+  { key: "right", labelKey: "murals.directionRight", value: 90 },
+  { key: "down", labelKey: "murals.directionDown", value: 180 },
+  { key: "diagonal", labelKey: "murals.directionDiagonal", value: 135 },
 ];
 
-export const GRADIENT_STRENGTH_PRESETS: Preset<number>[] = [
-  { key: "subtle", label: "Subtle", value: 25 },
-  { key: "medium", label: "Medium", value: 50 },
-  { key: "full", label: "Full", value: 100 },
+export const GRADIENT_STRENGTH_PRESETS: PresetSpec<number>[] = [
+  { key: "subtle", labelKey: "library.subtle", value: 25 },
+  { key: "medium", labelKey: "murals.presetMedium", value: 50 },
+  { key: "full", labelKey: "murals.presetFull", value: 100 },
 ];
 
-export const BORDER_SIDE_PRESETS: Preset<BorderSides>[] = [
-  { key: "all", label: "All", value: DEFAULT_BORDER_SIDES },
-  { key: "topBottom", label: "Top & bottom", value: { top: true, right: false, bottom: true, left: false } },
-  { key: "leftRight", label: "Left & right", value: { top: false, right: true, bottom: false, left: true } },
-  { key: "bottom", label: "Bottom only", value: { top: false, right: false, bottom: true, left: false } },
-  { key: "left", label: "Left only", value: { top: false, right: false, bottom: false, left: true } },
+export const BORDER_SIDE_PRESETS: PresetSpec<BorderSides>[] = [
+  { key: "all", labelKey: "murals.sidesAll", value: DEFAULT_BORDER_SIDES },
+  { key: "topBottom", labelKey: "murals.sidesTopBottom", value: { top: true, right: false, bottom: true, left: false } },
+  { key: "leftRight", labelKey: "murals.sidesLeftRight", value: { top: false, right: true, bottom: false, left: true } },
+  { key: "bottom", labelKey: "murals.sidesBottomOnly", value: { top: false, right: false, bottom: true, left: false } },
+  { key: "left", labelKey: "murals.sidesLeftOnly", value: { top: false, right: false, bottom: false, left: true } },
 ];
 
-export const BORDER_STYLE_CHOICES: Array<{ value: CardBorderStyle; label: string }> = [
-  { value: "solid", label: "Solid" },
-  { value: "dashed", label: "Dashed" },
-  { value: "dotted", label: "Dotted" },
-];
+const SUPPORTED_BORDER_STYLES: readonly CardBorderStyle[] = ["solid", "dashed", "dotted"];
+
+export const borderStyleChoices = (locale: Locale) => cardBorderStyleOptions(locale).filter(({ value }) => SUPPORTED_BORDER_STYLES.includes(value));
 
 export const BACKGROUND_THEME_SWATCHES: BlockThemeColorKey[] = ["background", "accentSoft", "accentFill", "accent"];
 export const TEXT_THEME_SWATCHES: BlockThemeColorKey[] = ["accent", "onAccent"];
@@ -88,42 +95,42 @@ export const BACKGROUND_FIXED_SWATCHES = ["#ffffff", "#f1e2d8", "#e4efdf", "#dce
 export const COLOR_LOOK_FIELDS = ["backgroundColor", "textColor", "cardBorderColor"] as const;
 export const FRAME_LOOK_FIELDS = ["cardRadius", "cardBorderWidth", "cardBorderStyle", "cardBorderOpacity", "cardBorderSides", "cardShadow"] as const;
 
-export type ColorLook = { key: string; label: string; style: Pick<BlockStyle, (typeof COLOR_LOOK_FIELDS)[number]> & Partial<Pick<BlockStyle, "cardShadow">> };
-export type FrameLook = { key: string; label: string; style: Pick<BlockStyle, (typeof FRAME_LOOK_FIELDS)[number]> };
+export type ColorLook = { key: string; labelKey: MessageKey; style: Pick<BlockStyle, (typeof COLOR_LOOK_FIELDS)[number]> & Partial<Pick<BlockStyle, "cardShadow">> };
+export type FrameLook = { key: string; labelKey: MessageKey; style: Pick<BlockStyle, (typeof FRAME_LOOK_FIELDS)[number]> };
 export type Look = ColorLook | FrameLook;
 
 export const COLOR_LOOKS: ColorLook[] = [
-  { key: "theme", label: "Theme", style: { backgroundColor: null, textColor: null, cardBorderColor: null } },
-  { key: "clear", label: "Clear", style: { backgroundColor: "transparent", textColor: null, cardBorderColor: null, cardShadow: false } },
-  { key: "tinted", label: "Tinted", style: { backgroundColor: themeColorRef("accentSoft"), textColor: null, cardBorderColor: null } },
-  { key: "accent", label: "Accent", style: { backgroundColor: themeColorRef("accent"), textColor: themeColorRef("onAccent"), cardBorderColor: null } },
-  { key: "parchment", label: "Parchment", style: { backgroundColor: "#f6efe3", textColor: "#201e1c", cardBorderColor: null } },
-  { key: "note", label: "Note", style: { backgroundColor: "#fff3b0", textColor: "#201e1c", cardBorderColor: null } },
-  { key: "ink", label: "Ink", style: { backgroundColor: "#201e1c", textColor: "#f2f0ec", cardBorderColor: null } },
-  { key: "clay", label: "Clay", style: { backgroundColor: "#97532d", textColor: "#ffffff", cardBorderColor: null } },
-  { key: "sage", label: "Sage", style: { backgroundColor: "#e4efdf", textColor: "#263729", cardBorderColor: null } },
-  { key: "seaGlass", label: "Sea-glass", style: { backgroundColor: "#dcebf2", textColor: "#223943", cardBorderColor: null } },
-  { key: "lilac", label: "Lilac", style: { backgroundColor: "#ebe4f3", textColor: "#3b2b4b", cardBorderColor: null } },
-  { key: "rose", label: "Rose", style: { backgroundColor: "#f3e0e5", textColor: "#4b2932", cardBorderColor: null } },
-  { key: "ochre", label: "Ochre", style: { backgroundColor: "#f4e4b9", textColor: "#4a3515", cardBorderColor: null } },
+  { key: "theme", labelKey: "settings.theme", style: { backgroundColor: null, textColor: null, cardBorderColor: null } },
+  { key: "clear", labelKey: "murals.lookClear", style: { backgroundColor: "transparent", textColor: null, cardBorderColor: null, cardShadow: false } },
+  { key: "tinted", labelKey: "murals.lookTinted", style: { backgroundColor: themeColorRef("accentSoft"), textColor: null, cardBorderColor: null } },
+  { key: "accent", labelKey: "murals.lookAccent", style: { backgroundColor: themeColorRef("accent"), textColor: themeColorRef("onAccent"), cardBorderColor: null } },
+  { key: "parchment", labelKey: "murals.lookParchment", style: { backgroundColor: "#f6efe3", textColor: "#201e1c", cardBorderColor: null } },
+  { key: "note", labelKey: "murals.note", style: { backgroundColor: "#fff3b0", textColor: "#201e1c", cardBorderColor: null } },
+  { key: "ink", labelKey: "murals.lookInk", style: { backgroundColor: "#201e1c", textColor: "#f2f0ec", cardBorderColor: null } },
+  { key: "clay", labelKey: "murals.lookClay", style: { backgroundColor: "#97532d", textColor: "#ffffff", cardBorderColor: null } },
+  { key: "sage", labelKey: "murals.lookSage", style: { backgroundColor: "#e4efdf", textColor: "#263729", cardBorderColor: null } },
+  { key: "seaGlass", labelKey: "murals.lookSeaGlass", style: { backgroundColor: "#dcebf2", textColor: "#223943", cardBorderColor: null } },
+  { key: "lilac", labelKey: "murals.lookLilac", style: { backgroundColor: "#ebe4f3", textColor: "#3b2b4b", cardBorderColor: null } },
+  { key: "rose", labelKey: "murals.lookRose", style: { backgroundColor: "#f3e0e5", textColor: "#4b2932", cardBorderColor: null } },
+  { key: "ochre", labelKey: "murals.lookOchre", style: { backgroundColor: "#f4e4b9", textColor: "#4a3515", cardBorderColor: null } },
 ];
 
-const frameLook = (key: string, label: string, cardBorderWidth: number, cardShadow: boolean, cardRadius = 12, cardBorderSides = DEFAULT_BORDER_SIDES): FrameLook => ({
+const frameLook = (key: string, labelKey: MessageKey, cardBorderWidth: number, cardShadow: boolean, cardRadius = 12, cardBorderSides = DEFAULT_BORDER_SIDES): FrameLook => ({
   key,
-  label,
+  labelKey,
   style: { cardRadius, cardBorderWidth, cardBorderStyle: "solid", cardBorderOpacity: 100, cardBorderSides, cardShadow },
 });
 
 export const FRAME_LOOKS: FrameLook[] = [
-  frameLook("card", "Card", 0, true),
-  frameLook("framed", "Framed", 1, true),
-  frameLook("flat", "Flat", 0, false),
-  frameLook("outline", "Outline", 3, false),
-  frameLook("bookplate", "Bookplate", 1, false, 4),
-  frameLook("marginNote", "Margin note", 3, false, 0, { top: false, right: false, bottom: false, left: true }),
+  frameLook("card", "murals.lookCard", 0, true),
+  frameLook("framed", "murals.lookFramed", 1, true),
+  frameLook("flat", "murals.lookFlat", 0, false),
+  frameLook("outline", "murals.lookOutline", 3, false),
+  frameLook("bookplate", "murals.lookBookplate", 1, false, 4),
+  frameLook("marginNote", "murals.lookMarginNote", 3, false, 0, { top: false, right: false, bottom: false, left: true }),
 ];
 
-export function matchPreset(presets: readonly Preset<number>[], value: number): string | null {
+export function matchPreset(presets: readonly { key: string; value: number }[], value: number): string | null {
   return presets.find((preset) => preset.value === value)?.key ?? null;
 }
 

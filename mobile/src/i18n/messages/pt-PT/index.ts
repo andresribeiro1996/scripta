@@ -6,10 +6,11 @@ import { book } from "./book";
 import { community } from "./community";
 import { errors } from "./errors";
 import { library } from "./library";
+import { murals } from "./murals";
 import { quizzes } from "./quizzes";
 import { settings } from "./settings";
 import { sharing } from "./sharing";
 import { shell } from "./shell";
 import { tierlists } from "./tierlists";
 
-export const ptPT: CatalogOf<typeof en> = { ...addBook, ...arena, ...book, ...community, ...errors, ...library, ...quizzes, ...settings, ...sharing, ...shell, ...tierlists };
+export const ptPT: CatalogOf<typeof en> = { ...addBook, ...arena, ...book, ...community, ...errors, ...library, ...murals, ...quizzes, ...settings, ...sharing, ...shell, ...tierlists };

@@ -7,19 +7,17 @@ import type { GalleryImage } from "../gallery/api";
 import { GenreChoices } from "../library/components/GenreChoices";
 import { SelectRow, ToggleRow } from "../library/components/StyleControls";
 import type { Tierlist } from "../tierlists/api";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export type PickerKind = "book" | "image" | "tierlist";
 
-const SHELF_SOURCES = [{ value: "pick", label: "Pick books" }, { value: "follow", label: "Follow a collection" }] as const;
-const QUOTE_SOURCES = [{ value: "pinned", label: "Pinned passage" }, { value: "rediscover", label: "Rediscover" }] as const;
-
 function PickerRow({ label, value, onPress }: { label: string; value: string; onPress: () => void }) {
+  const t = useT();
   const { colors } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${label}: ${value}`}
+      accessibilityLabel={t("murals.pickerRow", { label, value })}
       onPress={onPress}
       style={({ pressed }) => [styles.pickerRow, { borderColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : colors.surface }]}
     >
@@ -42,20 +40,23 @@ export function ContentTab({ block, books, groups, images, tierlists, update, on
   onPick: (kind: PickerKind) => void;
 }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
+  const shelfSources = [{ value: "pick", label: t("murals.pickBooks") }, { value: "follow", label: t("murals.followCollection") }] as const;
+  const quoteSources = [{ value: "pinned", label: t("murals.pinnedPassage") }, { value: "rediscover", label: t("murals.rediscover") }] as const;
   const collections = groups.filter((group) => group.type === "collection");
-  const bookTitle = (key: string) => key ? String(books.find((book) => bookKey(book) === key)?.Title ?? "Book unavailable") : "None";
+  const bookTitle = (key: string) => key ? String(books.find((book) => bookKey(book) === key)?.Title ?? t("book.unavailable")) : t("murals.presetNone");
   const hint = (text: string) => <Text style={[typography.caption, { color: colors.textDim }]}>{text}</Text>;
 
   if (block.type === "shelf") {
     const following = collections.some((group) => group.id === block.collectionId);
     return (
       <View style={styles.tab}>
-        <Input label="Title" value={block.title} hint={following ? "Leave blank to use the collection's name." : undefined} onChangeText={(title) => update((item) => item.type === "shelf" ? { ...item, title } : item)} />
-        {collections.length ? <Segmented options={SHELF_SOURCES} value={following ? "follow" : "pick"} accessibilityLabel="Shelf source" onChange={(source) => update((item) => item.type !== "shelf" ? item : source === "follow" ? { ...item, collectionId: collections[0]!.id, bookKeys: [] } : { ...item, collectionId: undefined, bookKeys: (resolveHomeBlock(item, books, groups, "", locale) as typeof item).bookKeys })} /> : null}
+        <Input label={t("murals.title")} value={block.title} hint={following ? t("murals.titleBlankHint") : undefined} onChangeText={(title) => update((item) => item.type === "shelf" ? { ...item, title } : item)} />
+        {collections.length ? <Segmented options={shelfSources} value={following ? "follow" : "pick"} accessibilityLabel={t("murals.shelfSource")} onChange={(source) => update((item) => item.type !== "shelf" ? item : source === "follow" ? { ...item, collectionId: collections[0]!.id, bookKeys: [] } : { ...item, collectionId: undefined, bookKeys: (resolveHomeBlock(item, books, groups, "", locale) as typeof item).bookKeys })} /> : null}
         {following
-          ? <SelectRow label="Collection" value={block.collectionId!} options={collections.map((group) => ({ value: group.id, label: group.name }))} onChange={(collectionId) => update((item) => item.type === "shelf" ? { ...item, collectionId, bookKeys: [] } : item)} />
-          : <PickerRow label="Books" value={`${block.bookKeys.length} chosen`} onPress={() => onPick("book")} />}
+          ? <SelectRow label={t("shell.collection")} value={block.collectionId!} options={collections.map((group) => ({ value: group.id, label: group.name }))} onChange={(collectionId) => update((item) => item.type === "shelf" ? { ...item, collectionId, bookKeys: [] } : item)} />
+          : <PickerRow label={t("book.books")} value={t("murals.chosenCount", { count: block.bookKeys.length })} onPress={() => onPick("book")} />}
       </View>
     );
   }
@@ -63,8 +64,8 @@ export function ContentTab({ block, books, groups, images, tierlists, update, on
   if (block.type === "spotlight") {
     return (
       <View style={styles.tab}>
-        <PickerRow label="Book" value={bookTitle(block.bookKey)} onPress={() => onPick("book")} />
-        <Input label="Caption" value={block.caption ?? ""} onChangeText={(caption) => update((block) => ({ ...block, caption } as MuralBlock))} />
+        <PickerRow label={t("shell.book")} value={bookTitle(block.bookKey)} onPress={() => onPick("book")} />
+        <Input label={t("murals.caption")} value={block.caption ?? ""} onChangeText={(caption) => update((block) => ({ ...block, caption } as MuralBlock))} />
       </View>
     );
   }
@@ -73,10 +74,10 @@ export function ContentTab({ block, books, groups, images, tierlists, update, on
     const quote = resolveQuote(block, books);
     return (
       <View style={styles.tab}>
-        <Segmented options={QUOTE_SOURCES} value={block.mode === "rediscover" ? "rediscover" : "pinned"} accessibilityLabel="Passage source" onChange={(source) => update((item) => item.type !== "quote" ? item : source === "rediscover" ? { ...item, mode: "rediscover", bookKey: "", highlightId: "" } : { ...item, mode: undefined })} />
+        <Segmented options={quoteSources} value={block.mode === "rediscover" ? "rediscover" : "pinned"} accessibilityLabel={t("murals.passageSource")} onChange={(source) => update((item) => item.type !== "quote" ? item : source === "rediscover" ? { ...item, mode: "rediscover", bookKey: "", highlightId: "" } : { ...item, mode: undefined })} />
         {block.mode === "rediscover"
-          ? hint("A different passage from your books each day. Only passages from known books are used.")
-          : <PickerRow label="Passage" value={quote ? String(quote.highlight.Text || quote.highlight.Annotation || "Untitled passage") : "None"} onPress={() => onPick("book")} />}
+          ? hint(t("murals.rediscoverNote"))
+          : <PickerRow label={t("murals.passage")} value={quote ? String(quote.highlight.Text || quote.highlight.Annotation || t("murals.untitledPassage")) : t("library.none")} onPress={() => onPick("book")} />}
       </View>
     );
   }
@@ -84,8 +85,8 @@ export function ContentTab({ block, books, groups, images, tierlists, update, on
   if (block.type === "quoteCollection") {
     return (
       <View style={styles.tab}>
-        <Input label="Title" value={block.title} onChangeText={(title) => update((block) => ({ ...block, title } as MuralBlock))} />
-        <PickerRow label="Passages" value={String(block.quotes.length)} onPress={() => onPick("book")} />
+        <Input label={t("murals.title")} value={block.title} onChangeText={(title) => update((block) => ({ ...block, title } as MuralBlock))} />
+        <PickerRow label={t("murals.passages")} value={String(block.quotes.length)} onPress={() => onPick("book")} />
       </View>
     );
   }
@@ -93,8 +94,8 @@ export function ContentTab({ block, books, groups, images, tierlists, update, on
   if (block.type === "image") {
     return (
       <View style={styles.tab}>
-        <PickerRow label="Image" value={images.find((image) => image.id === block.imageId)?.filename ?? "None"} onPress={() => onPick("image")} />
-        <Input label="Caption" value={block.caption ?? ""} onChangeText={(caption) => update((block) => ({ ...block, caption } as MuralBlock))} />
+        <PickerRow label={t("murals.image")} value={images.find((image) => image.id === block.imageId)?.filename ?? t("library.none")} onPress={() => onPick("image")} />
+        <Input label={t("murals.caption")} value={block.caption ?? ""} onChangeText={(caption) => update((block) => ({ ...block, caption } as MuralBlock))} />
       </View>
     );
   }
@@ -102,8 +103,8 @@ export function ContentTab({ block, books, groups, images, tierlists, update, on
   if (block.type === "text") {
     return (
       <View style={styles.tab}>
-        <Input label="Heading" value={block.heading} onChangeText={(heading) => update((block) => ({ ...block, heading } as MuralBlock))} />
-        <Input label="Body" value={block.body} multiline onChangeText={(body) => update((block) => ({ ...block, body } as MuralBlock))} />
+        <Input label={t("murals.heading")} value={block.heading} onChangeText={(heading) => update((block) => ({ ...block, heading } as MuralBlock))} />
+        <Input label={t("murals.body")} value={block.body} multiline onChangeText={(body) => update((block) => ({ ...block, body } as MuralBlock))} />
       </View>
     );
   }
@@ -111,8 +112,8 @@ export function ContentTab({ block, books, groups, images, tierlists, update, on
   if (block.type === "profile") {
     return (
       <View style={styles.tab}>
-        <Input label="Biography" value={block.bio} multiline onChangeText={(bio) => update((block) => block.type === "profile" ? { ...block, bio } : block)} />
-        <Text style={{ color: colors.text }}>What I like</Text>
+        <Input label={t("murals.biography")} value={block.bio} multiline onChangeText={(bio) => update((block) => block.type === "profile" ? { ...block, bio } : block)} />
+        <Text style={{ color: colors.text }}>{t("murals.whatILike")}</Text>
         <GenreChoices value={block.favoriteGenres} onChange={(favoriteGenres) => update((block) => block.type === "profile" ? { ...block, favoriteGenres } : block)} />
       </View>
     );
@@ -129,7 +130,7 @@ export function ContentTab({ block, books, groups, images, tierlists, update, on
   if (block.type === "tierlist") {
     return (
       <View style={styles.tab}>
-        <PickerRow label="Tier list" value={tierlists.find((item) => item.id === block.tierlistId)?.name ?? "None"} onPress={() => onPick("tierlist")} />
+        <PickerRow label={t("book.gameTierlist")} value={tierlists.find((item) => item.id === block.tierlistId)?.name ?? t("library.none")} onPress={() => onPick("tierlist")} />
       </View>
     );
   }

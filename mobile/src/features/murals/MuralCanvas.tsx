@@ -9,6 +9,7 @@ import {
   blockTextColors,
   calculateShelfTheme,
   finishTileMarkup,
+  genreLabel,
   resolveHomeBlock,
   type Group,
   GRID_COLUMNS,
@@ -51,7 +52,7 @@ import type { GalleryImage } from "../gallery/api";
 import type { Tierlist } from "../tierlists/api";
 import { selectionBorderColor } from "./blockStyleOptions";
 import { MURAL_ROW_HEIGHT, muralCanvasHeight, muralDragCell, muralDragPosition, muralPreviewScale } from "./layout";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export const NO_GROUPS: Group[] = [];
 const LIFT_SPRING = { duration: 300, dampingRatio: 0.8 } as const;
@@ -145,9 +146,10 @@ function EmptyBlock({ message, style }: { message: string; style: StyleProp<Text
   return <View style={styles.emptyBlock}><Text style={style}>{message}</Text></View>;
 }
 
-const title = (book: Record<string, unknown> | undefined) => String(book?.Title ?? "Book unavailable");
+const bookTitle = (book: Record<string, unknown>, t: ReturnType<typeof useT>) => String(book.Title ?? t("book.unavailable"));
 
 function CoverRow({ blockId, books, mode, caption, dim, accent, editable, onAssetReady }: { blockId: string; books: Array<Record<string, unknown>>; mode: "reading" | "shelf"; caption: ReturnType<typeof blockTextStyles>["caption"]; dim: { color: string }; accent: string; editable?: boolean; onAssetReady?: (key: string) => void }) {
+  const t = useT();
   const { colors } = useTheme();
   const [rowHeight, setRowHeight] = useState(0);
   const line = Math.ceil(caption.lineHeight * PixelRatio.getFontScale());
@@ -159,9 +161,9 @@ function CoverRow({ blockId, books, mode, caption, dim, accent, editable, onAsse
   return <ScrollView horizontal scrollEnabled={!editable} showsHorizontalScrollIndicator={false} onLayout={(event) => setRowHeight(event.nativeEvent.layout.height)} style={styles.coverScroll} contentContainerStyle={styles.coverRow}>{rowHeight > 0 ? books.map((book) => {
     const percent = mode === "reading" ? readingPercent(book) : null;
     return <View key={bookKey(book)} style={[styles.coverTile, { width: tileWidth, height: rowHeight }]}>
-      <View accessible accessibilityRole="image" accessibilityLabel={title(book)} style={{ width: tileWidth, height: coverHeight }}><CoverImage book={book} contentFit="contain" onLoadEnd={onAssetReady ? () => onAssetReady(`cover:${blockId}:${bookKey(book)}:${String(book._coverUrl ?? "")}`) : undefined} /></View>
+      <View accessible accessibilityRole="image" accessibilityLabel={bookTitle(book, t)} style={{ width: tileWidth, height: coverHeight }}><CoverImage book={book} contentFit="contain" onLoadEnd={onAssetReady ? () => onAssetReady(`cover:${blockId}:${bookKey(book)}:${String(book._coverUrl ?? "")}`) : undefined} /></View>
       {bodyHeight ? <View style={[styles.coverFooter, { height: bodyHeight }]}>
-        {mode === "shelf" ? <Text numberOfLines={1} style={caption}>{title(book)}</Text> : percent === null ? null : <>
+        {mode === "shelf" ? <Text numberOfLines={1} style={caption}>{bookTitle(book, t)}</Text> : percent === null ? null : <>
           <View style={[styles.readingTrack, { backgroundColor: colors.border }]}>{percent ? <View style={[styles.readingFill, { width: `${percent}%`, backgroundColor: accent }]} /> : null}</View>
           <Text style={[caption, dim]}>{percent}%</Text>
         </>}
@@ -172,6 +174,7 @@ function CoverRow({ blockId, books, mode, caption, dim, accent, editable, onAsse
 
 export function BlockContent({ block, books, images, tierlists, profile, groups, shelfThemeOverride, readerCardOverride, statsOverride, editable, onAssetReady }: { block: MuralBlock; books: Array<Record<string, unknown>>; images: GalleryImage[]; tierlists: Tierlist[]; profile?: ReaderProfile; groups?: Group[]; shelfThemeOverride?: ShelfTheme; readerCardOverride?: PublicReaderCard; statsOverride?: Record<string, number>; editable?: boolean; onAssetReady?: (key: string) => void }) {
   const locale = useLocale();
+  const t = useT();
   const { colors: themeColors } = useTheme();
   const [failedSource, setFailedSource] = useState<string | null>(null);
   const style = resolveBlockStyle(block.style);
@@ -179,75 +182,75 @@ export function BlockContent({ block, books, images, tierlists, profile, groups,
   const colors = { ...themeColors, text: blockColors.text };
   const text = blockTextStyles(style, colors.text);
   const dim = { color: blockColors.dim };
-  const eyebrow = (label: string, count?: number) => <View style={styles.eyebrowRow}><Text numberOfLines={1} style={[text.label, dim, styles.eyebrowLabel]}>{label}</Text>{count === undefined ? null : <Text style={[text.caption, dim, styles.eyebrowCount]}>{count} {count === 1 ? "book" : "books"}</Text>}</View>;
-  if (block.type === "text") return <><Text numberOfLines={2} style={text.title}>{block.heading || "Note"}</Text><Text style={text.body}>{block.body}</Text></>;
+  const eyebrow = (label: string, count?: number) => <View style={styles.eyebrowRow}><Text numberOfLines={1} style={[text.label, dim, styles.eyebrowLabel]}>{label}</Text>{count === undefined ? null : <Text style={[text.caption, dim, styles.eyebrowCount]}>{t("murals.bookCount", { count })}</Text>}</View>;
+  if (block.type === "text") return <><Text numberOfLines={2} style={text.title}>{block.heading || t("murals.note")}</Text><Text style={text.body}>{block.body}</Text></>;
   if (block.type === "profile") {
     const theme = shelfThemeOverride ?? calculateShelfTheme(books);
-    const initial = (profile?.username || "Reader")[0]?.toUpperCase();
+    const initial = (profile?.username || t("community.readerFallback"))[0]?.toUpperCase();
     return <View style={styles.profileBlock}>
       <View style={styles.profileHeader}>
         {profile?.avatarUrl && failedSource !== profile.avatarUrl ? <Image source={{ uri: profile.avatarUrl }} style={styles.profileAvatar} contentFit="cover" onDisplay={() => onAssetReady?.(`avatar:${block.id}:${profile.avatarUrl}`)} onError={() => { setFailedSource(profile.avatarUrl!); onAssetReady?.(`avatar:${block.id}:${profile.avatarUrl}`); }} /> : <View style={[styles.profileAvatar, styles.profileInitial, { backgroundColor: colors.accentSoft }]}><Text style={[styles.profileInitialText, { color: colors.accent }]}>{initial}</Text></View>}
-        <View style={styles.profileCopy}><Text numberOfLines={1} style={text.name}>@{profile?.username || "reader"}</Text>{block.bio ? <Text numberOfLines={3} style={[text.bio, dim]}>{block.bio}</Text> : null}</View>
+        <View style={styles.profileCopy}><Text numberOfLines={1} style={text.name}>@{profile?.username || t("community.readerFallback")}</Text>{block.bio ? <Text numberOfLines={3} style={[text.bio, dim]}>{block.bio}</Text> : null}</View>
       </View>
-      {block.favoriteGenres.length ? <View style={styles.genreSection}><Text style={[text.label, dim]}>What I like</Text><View style={styles.genreRow}>{block.favoriteGenres.map((genre) => <View key={genre} style={[styles.genreChip, { backgroundColor: colors.accentSoft }]}><Text style={[text.caption, { color: colors.accent }]}>{genre}</Text></View>)}</View></View> : null}
-      {theme.genres.length ? <View style={styles.genreSection}><Text style={[text.label, dim]}>My shelf theme</Text><Text style={text.body}>{theme.genres.join(" · ")}</Text><Text style={[text.caption, dim]}>Based on {theme.matchedBooks} of {theme.totalBooks} books</Text></View> : null}
+      {block.favoriteGenres.length ? <View style={styles.genreSection}><Text style={[text.label, dim]}>{t("murals.whatILike")}</Text><View style={styles.genreRow}>{block.favoriteGenres.map((genre) => <View key={genre} style={[styles.genreChip, { backgroundColor: colors.accentSoft }]}><Text style={[text.caption, { color: colors.accent }]}>{genreLabel(genre, locale)}</Text></View>)}</View></View> : null}
+      {theme.genres.length ? <View style={styles.genreSection}><Text style={[text.label, dim]}>{t("murals.shelfTheme")}</Text><Text style={text.body}>{theme.genres.map((genre) => genreLabel(genre, locale)).join(" · ")}</Text><Text style={[text.caption, dim]}>{t("murals.basedOn", { matched: theme.matchedBooks, total: theme.totalBooks })}</Text></View> : null}
     </View>;
   }
   if (block.type === "currentlyReading") {
     const reading = blockBooks(block, books);
-    return <>{eyebrow("Currently reading", reading.length)}
-      {reading.length ? <CoverRow blockId={block.id} books={reading} mode="reading" caption={text.caption} dim={dim} accent={blockColors.accent} editable={editable} onAssetReady={onAssetReady} /> : <EmptyBlock message="Choose books or connect a collection in Edit." style={[text.caption, dim]} />}
+    return <>{eyebrow(t("murals.currentlyReading"), reading.length)}
+      {reading.length ? <CoverRow blockId={block.id} books={reading} mode="reading" caption={text.caption} dim={dim} accent={blockColors.accent} editable={editable} onAssetReady={onAssetReady} /> : <EmptyBlock message={t("murals.chooseBooksOrCollection")} style={[text.caption, dim]} />}
     </>;
   }
   if (block.type === "shelf") {
     const selected = blockBooks(block, books);
-    return <>{eyebrow(block.title || "Shelf", selected.length)}
-      {selected.length ? <CoverRow blockId={block.id} books={selected} mode="shelf" caption={text.caption} dim={dim} accent={blockColors.accent} editable={editable} onAssetReady={onAssetReady} /> : <EmptyBlock message="Choose books or connect a collection in Edit." style={[text.caption, dim]} />}
+    return <>{eyebrow(block.title || t("community.tabShelf"), selected.length)}
+      {selected.length ? <CoverRow blockId={block.id} books={selected} mode="shelf" caption={text.caption} dim={dim} accent={blockColors.accent} editable={editable} onAssetReady={onAssetReady} /> : <EmptyBlock message={t("murals.chooseBooksOrCollection")} style={[text.caption, dim]} />}
     </>;
   }
   if (block.type === "spotlight") {
     const [book] = blockBooks(block, books);
-    if (!book) return <EmptyBlock message="Pick a book for this spotlight." style={[text.caption, dim]} />;
+    if (!book) return <EmptyBlock message={t("murals.pickSpotlight")} style={[text.caption, dim]} />;
     return <View style={styles.bookColumn}>
       <View style={styles.bookCover}><CoverImage book={book} contentFit="contain" onLoadEnd={onAssetReady ? () => onAssetReady(`cover:${block.id}:${bookKey(book)}:${String(book._coverUrl ?? "")}`) : undefined} /></View>
-      <Text numberOfLines={1} style={text.title}>{title(book)}</Text>
-      <Text numberOfLines={1} style={[text.caption, dim]}>{String(book.Attribution ?? "Unknown author")}</Text>
+      <Text numberOfLines={1} style={text.title}>{bookTitle(book, t)}</Text>
+      <Text numberOfLines={1} style={[text.caption, dim]}>{String(book.Attribution ?? t("tierlists.unknownAuthor"))}</Text>
       {block.caption ? <Text style={text.caption}>{block.caption}</Text> : null}
     </View>;
   }
-  if (block.type === "quote") { const value = resolveQuote(block, books); return <><Text numberOfLines={6} style={text.body}>“{String(value?.highlight.Text ?? "No eligible passage available")}”</Text>{value ? <Text style={[text.caption, dim]}>{String(value.book.Title)} · {String(value.book.Attribution ?? "")}</Text> : null}</>; }
-  if (block.type === "quoteCollection") return <>{eyebrow(block.title || "Quotes")}{resolveQuoteCollection(block, books).map(({ highlight }, index) => <Text key={index} style={text.body}>“{String(highlight.Text ?? highlight.Annotation ?? "")}”</Text>)}</>;
-  if (block.type === "image") { const image = images.find((item) => item.id === block.imageId); return image && failedSource !== image.url ? <><Image source={{ uri: image.url }} style={styles.fill} contentFit="cover" onDisplay={() => onAssetReady?.(`image:${block.id}:${image.url}`)} onError={() => { setFailedSource(image.url); onAssetReady?.(`image:${block.id}:${image.url}`); }} />{block.caption ? <Text style={[text.caption, dim]}>{block.caption}</Text> : null}</> : <EmptyBlock message="Image unavailable" style={[text.caption, dim]} />; }
+  if (block.type === "quote") { const value = resolveQuote(block, books); return <><Text numberOfLines={6} style={text.body}>“{String(value?.highlight.Text ?? t("murals.noEligiblePassage"))}”</Text>{value ? <Text style={[text.caption, dim]}>{String(value.book.Title)} · {String(value.book.Attribution ?? "")}</Text> : null}</>; }
+  if (block.type === "quoteCollection") return <>{eyebrow(block.title || t("murals.quotes"))}{resolveQuoteCollection(block, books).map(({ highlight }, index) => <Text key={index} style={text.body}>“{String(highlight.Text ?? highlight.Annotation ?? "")}”</Text>)}</>;
+  if (block.type === "image") { const image = images.find((item) => item.id === block.imageId); return image && failedSource !== image.url ? <><Image source={{ uri: image.url }} style={styles.fill} contentFit="cover" onDisplay={() => onAssetReady?.(`image:${block.id}:${image.url}`)} onError={() => { setFailedSource(image.url); onAssetReady?.(`image:${block.id}:${image.url}`); }} />{block.caption ? <Text style={[text.caption, dim]}>{block.caption}</Text> : null}</> : <EmptyBlock message={t("murals.imageUnavailable")} style={[text.caption, dim]} />; }
 
   if (block.type === "stats") {
     const value = (metric: StatMetric) => statsOverride?.[metric] ?? computeStat(metric, books);
     const breakdown = libraryBreakdown(block.metrics, value);
     if (!breakdown) return <View style={styles.stats}>{block.metrics.map((metric) => <View key={metric}><Text numberOfLines={1} style={text.stat}>{value(metric)}</Text><Text numberOfLines={1} style={[text.caption, dim]}>{statMetricLabels(locale)[metric]}</Text></View>)}</View>;
     const segments = [
-      { label: "finished", count: breakdown.finished, color: blockColors.accent },
-      { label: "reading", count: breakdown.reading, color: colors.accentFill },
-      { label: "to read", count: breakdown.toRead, color: colors.border },
+      { key: "finished", label: t("murals.countFinished", { count: breakdown.finished }), count: breakdown.finished, color: blockColors.accent },
+      { key: "reading", label: t("murals.countReading", { count: breakdown.reading }), count: breakdown.reading, color: colors.accentFill },
+      { key: "toRead", label: t("murals.countToRead", { count: breakdown.toRead }), count: breakdown.toRead, color: colors.border },
     ];
     return <View style={styles.statsBreakdown}>
-      {eyebrow("Your library")}
-      <View style={styles.statsHero}><Text style={[text.hero, { color: blockColors.accent }]}>{breakdown.finished}</Text><Text style={[text.caption, dim, styles.statsOf]}>of {breakdown.total} finished</Text></View>
-      <View style={styles.statsBar}>{breakdown.total ? segments.filter((segment) => segment.count).map((segment) => <View key={segment.label} style={{ flex: segment.count, backgroundColor: segment.color }} />) : <View style={{ flex: 1, backgroundColor: colors.border }} />}</View>
-      <View style={styles.statsLegend}>{segments.map((segment) => <View key={segment.label} style={styles.statsLegendRow}><View style={[styles.statsDot, { backgroundColor: segment.color }]} /><Text numberOfLines={1} style={[text.caption, dim]}>{segment.count} {segment.label}</Text></View>)}</View>
+      {eyebrow(t("murals.yourLibrary"))}
+      <View style={styles.statsHero}><Text style={[text.hero, { color: blockColors.accent }]}>{breakdown.finished}</Text><Text style={[text.caption, dim, styles.statsOf]}>{t("murals.ofFinished", { total: breakdown.total })}</Text></View>
+      <View style={styles.statsBar}>{breakdown.total ? segments.filter((segment) => segment.count).map((segment) => <View key={segment.key} style={{ flex: segment.count, backgroundColor: segment.color }} />) : <View style={{ flex: 1, backgroundColor: colors.border }} />}</View>
+      <View style={styles.statsLegend}>{segments.map((segment) => <View key={segment.key} style={styles.statsLegendRow}><View style={[styles.statsDot, { backgroundColor: segment.color }]} /><Text numberOfLines={1} style={[text.caption, dim]}>{segment.label}</Text></View>)}</View>
       {breakdown.others.map((metric) => <View key={metric} style={styles.statsRow}><Text numberOfLines={1} style={[text.stat, { color: blockColors.accent }]}>{value(metric)}</Text><Text numberOfLines={1} style={[text.caption, dim, styles.statsOf]}>{statMetricLabels(locale)[metric]}</Text></View>)}
     </View>;
   }
-  if (block.type === "tierlist") { const tierlist = tierlists.find((item) => item.id === block.tierlistId); return <>{eyebrow(tierlist?.name ?? "Tier list unavailable")}{tierlist?.data.tiers.map((tier) => <Text key={tier.id} style={text.body}>{tier.label}: {tier.workIds.length}</Text>)}</>; }
-  if (block.type === "readerCard") return <ReaderCardBlock books={books} groups={groups ?? NO_GROUPS} readerName={profile?.username || "reader"} publicCard={readerCardOverride} editable={editable} />;
+  if (block.type === "tierlist") { const tierlist = tierlists.find((item) => item.id === block.tierlistId); return <>{eyebrow(tierlist?.name ?? t("shell.tierlistUnavailable"))}{tierlist?.data.tiers.map((tier) => <Text key={tier.id} style={text.body}>{t("murals.tierCount", { label: tier.label, count: tier.workIds.length })}</Text>)}</>; }
+  if (block.type === "readerCard") return <ReaderCardBlock books={books} groups={groups ?? NO_GROUPS} readerName={profile?.username || t("community.readerFallback")} publicCard={readerCardOverride} editable={editable} />;
   return <Text style={text.body}>{blockLabel(block.type, locale)}</Text>;
 }
 
 const MOVES: Record<string, [number, number]> = { moveLeft: [-1, 0], moveRight: [1, 0], moveUp: [0, -1], moveDown: [0, 1] };
 const MOVE_ACTIONS = [
-  { name: "moveLeft", label: "Move left" },
-  { name: "moveRight", label: "Move right" },
-  { name: "moveUp", label: "Move up" },
-  { name: "moveDown", label: "Move down" },
-];
+  { name: "moveLeft", labelKey: "murals.moveLeft" },
+  { name: "moveRight", labelKey: "murals.moveRight" },
+  { name: "moveUp", labelKey: "murals.moveUp" },
+  { name: "moveDown", labelKey: "murals.moveDown" },
+] as const;
 
 const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, selected, books, images, tierlists, profile, groups, shelfThemeOverride, readerCardOverride, statsOverride, onSelect, onMove, onAssetReady, drag, preview, drop, scroll }: {
   block: MuralBlock;
@@ -271,6 +274,7 @@ const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, se
   scroll?: MuralDragScroll;
 }) {
   const locale = useLocale();
+  const t = useT();
   const { colors } = useTheme();
   const lifted = useSharedValue(0);
   const pointerOrigin = useSharedValue({ x: 0, y: 0, scroll: 0 });
@@ -348,7 +352,7 @@ const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, se
         animated,
       ]}>
         <FinishOverlay id={block.id} style={style} colors={colors} />
-        {editable ? <Pressable accessibilityRole="button" accessibilityLabel={`${blockLabel(block.type, locale)} block. Long press and drag to move`} accessibilityActions={MOVE_ACTIONS} onAccessibilityAction={(event) => { const move = MOVES[event.nativeEvent.actionName]; if (move) onMove(move[0], move[1]); }} onPress={onSelect} style={[styles.blockPress, blockPadding(style)]}>{body}</Pressable> : <View style={[styles.blockPress, blockPadding(style)]}>{body}</View>}
+        {editable ? <Pressable accessibilityRole="button" accessibilityLabel={t("murals.blockDragLabel", { block: blockLabel(block.type, locale) })} accessibilityActions={MOVE_ACTIONS.map(({ name, labelKey }) => ({ name, label: t(labelKey) }))} onAccessibilityAction={(event) => { const move = MOVES[event.nativeEvent.actionName]; if (move) onMove(move[0], move[1]); }} onPress={onSelect} style={[styles.blockPress, blockPadding(style)]}>{body}</Pressable> : <View style={[styles.blockPress, blockPadding(style)]}>{body}</View>}
         <FadeOverlay style={style} colors={colors} />
         {selected ? <View pointerEvents="none" style={{ position: "absolute", inset: 0, borderWidth: 2, borderRadius: style.cardRadius, borderColor: selectionBorderColor(style, colors) }} /> : null}
       </Animated.View>;
@@ -367,6 +371,7 @@ export function BlockPreview({ theme, block, canvasWidth, maxHeight, books, imag
   groups?: Group[];
 }) {
   const locale = useLocale();
+  const t = useT();
   const colors = themes[theme].colors;
   const [boxWidth, setBoxWidth] = useState(0);
   const [day] = useState(localDay);
@@ -379,7 +384,7 @@ export function BlockPreview({ theme, block, canvasWidth, maxHeight, books, imag
   return (
     <MuralThemeScope theme={theme}>
     <View
-      accessibilityLabel={`Preview of this ${blockLabel(block.type, locale)} block`}
+      accessibilityLabel={t("murals.blockPreviewLabel", { block: blockLabel(block.type, locale) })}
       onLayout={(event) => setBoxWidth(event.nativeEvent.layout.width)}
       style={[styles.previewBox, { height: (scale ? height * scale : maxHeight) + spacing.md * 2, backgroundColor: colors.background }]}
     >

@@ -4,7 +4,7 @@ import { Keyboard, Platform, StyleSheet, useWindowDimensions, View } from "react
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FormScroll, Segmented, Sheet } from "../../ui";
 import { minimumTouchTarget, spacing, typography } from "../../ui/theme";
-import { useLocale } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export type SheetTab = "content" | "style" | "layout";
 
@@ -20,6 +20,7 @@ export function BlockSheet({ block, visible, tab, onTabChange, onClose, preview,
   layout: ReactNode;
 }) {
   const locale = useLocale();
+  const t = useT();
   const { height, fontScale } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const sheetHeight = Math.min(640, height * 0.9, height - insets.top - spacing.sm);
@@ -39,9 +40,9 @@ export function BlockSheet({ block, visible, tab, onTabChange, onClose, preview,
     if (tab) lastTab.current = tab;
   }, [tab]);
   const tabs: Array<{ value: SheetTab; label: string }> = [
-    ...(content ? [{ value: "content" as const, label: "Content" }] : []),
-    ...(style ? [{ value: "style" as const, label: "Style" }] : []),
-    { value: "layout", label: "Size" },
+    ...(content ? [{ value: "content" as const, label: t("murals.tabContent") }] : []),
+    ...(style ? [{ value: "style" as const, label: t("library.style") }] : []),
+    { value: "layout", label: t("library.size") },
   ];
   const wanted = tab ?? lastTab.current;
   const current = tabs.find((item) => item.value === wanted)?.value ?? "layout";
@@ -49,7 +50,7 @@ export function BlockSheet({ block, visible, tab, onTabChange, onClose, preview,
     <Sheet visible={visible} title={block ? blockLabel(block.type, locale) : ""} onClose={onClose}>
       <View style={[styles.frame, { height: frameHeight }]}>
         {keyboardShown || frameHeight < 320 * fontScale ? null : preview(Math.min(144, Math.round(frameHeight / 5)))}
-        <Segmented options={tabs} value={current} onChange={onTabChange} accessibilityLabel="Block settings" />
+        <Segmented options={tabs} value={current} onChange={onTabChange} accessibilityLabel={t("murals.blockSettings")} />
         <FormScroll contentContainerStyle={styles.body}>{current === "content" ? content : current === "style" ? style : layout}</FormScroll>
       </View>
     </Sheet>

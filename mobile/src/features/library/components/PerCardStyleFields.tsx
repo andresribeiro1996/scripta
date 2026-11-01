@@ -10,8 +10,8 @@ import { Text } from "../../../ui/Text";
 import { cardFontFamily, resolveBorderStyle } from "../../../ui/libraryStyle";
 import { radii, spacing, typography, useTheme } from "../../../ui/theme";
 import {
-  BORDER_SIDE_PRESETS, BORDER_STRENGTH_PRESETS, BORDER_STYLE_CHOICES, BORDER_WIDTH_PRESETS, CORNER_PRESETS, FADE_PRESETS,
-  FRAME_LOOK_FIELDS, FRAME_LOOKS, matchPreset, matchSides,
+  BORDER_SIDE_PRESETS, BORDER_STRENGTH_PRESETS, BORDER_WIDTH_PRESETS, CORNER_PRESETS, FADE_PRESETS,
+  FRAME_LOOK_FIELDS, FRAME_LOOKS, borderStyleChoices, matchPreset, matchSides, presetOptions,
 } from "../../murals/blockStyleOptions";
 import { Caption, Chip, ColorSwatchRow, PresetRow, SelectRow, StepperRow, Tile } from "./StyleControls";
 import { cardTextMayBeHardToRead } from "./scrim";
@@ -61,7 +61,7 @@ export function PerCardStyleFields({ draft, canvasColor, onApply, onSaveNow }: {
       <Section title={t("library.sectionLooks")}>
         <View style={styles.looks}>
           {FRAME_LOOKS.map((look) => (
-            <Tile key={look.key} label={look.label} width="30%" selected={FRAME_LOOK_FIELDS.every((key) => key === "cardBorderSides" ? matchSides(draft[key]) === matchSides(look.style[key]) : draft[key] === look.style[key])} onPress={() => onSaveNow(look.style)}>
+            <Tile key={look.key} label={t(look.labelKey)} width="30%" selected={FRAME_LOOK_FIELDS.every((key) => key === "cardBorderSides" ? matchSides(draft[key]) === matchSides(look.style[key]) : draft[key] === look.style[key])} onPress={() => onSaveNow(look.style)}>
               <View style={[styles.look, { backgroundColor: colors.border, borderRadius: Math.min(look.style.cardRadius, radii.lg), borderColor: draft.cardBorderColor ?? colors.text, borderTopWidth: look.style.cardBorderSides.top ? look.style.cardBorderWidth : 0, borderRightWidth: look.style.cardBorderSides.right ? look.style.cardBorderWidth : 0, borderBottomWidth: look.style.cardBorderSides.bottom ? look.style.cardBorderWidth : 0, borderLeftWidth: look.style.cardBorderSides.left ? look.style.cardBorderWidth : 0, boxShadow: look.style.cardShadow ? "0 2px 4px rgba(0,0,0,0.2)" : undefined }]}>
                 <Text style={{ color: colors.text, fontFamily: cardFontFamily(draft.cardFontFamily), fontSize: 12 }}>Aa</Text>
               </View>
@@ -96,17 +96,17 @@ export function PerCardStyleFields({ draft, canvasColor, onApply, onSaveNow }: {
       </Section>
       <Section title={t("library.sectionFrame")}>
         <View style={styles.wrap}>
-          {CORNER_PRESETS.map(({ key, label, value }) => <Tile key={key} label={label} selected={draft.cardRadius === value} onPress={() => onSaveNow({ cardRadius: value })}><View style={[styles.corner, { borderColor: colors.text, borderTopLeftRadius: value }]} /></Tile>)}
+          {presetOptions(CORNER_PRESETS, locale).map(({ key, label, value }) => <Tile key={key} label={label} selected={draft.cardRadius === value} onPress={() => onSaveNow({ cardRadius: value })}><View style={[styles.corner, { borderColor: colors.text, borderTopLeftRadius: value }]} /></Tile>)}
         </View>
         {matchPreset(CORNER_PRESETS, draft.cardRadius) === null ? <Caption>{t("library.customCorners", { radius: draft.cardRadius })}</Caption> : null}
-        <PresetRow label={t("library.width")} presets={BORDER_WIDTH_PRESETS} value={draft.cardBorderWidth} onChange={(cardBorderWidth) => onSaveNow({ cardBorderWidth })} />
+        <PresetRow label={t("library.width")} presets={presetOptions(BORDER_WIDTH_PRESETS, locale)} value={draft.cardBorderWidth} onChange={(cardBorderWidth) => onSaveNow({ cardBorderWidth })} />
         {draft.cardBorderWidth > 0 ? <>
-          <SelectRow label={t("library.style")} value={resolveBorderStyle(draft.cardBorderStyle)} options={BORDER_STYLE_CHOICES} onChange={(cardBorderStyle) => onSaveNow({ cardBorderStyle })} />
+          <SelectRow label={t("library.style")} value={resolveBorderStyle(draft.cardBorderStyle)} options={borderStyleChoices(locale)} onChange={(cardBorderStyle) => onSaveNow({ cardBorderStyle })} />
           {resolveBorderStyle(draft.cardBorderStyle) !== draft.cardBorderStyle ? <Caption>{t("library.borderSavedForWeb", { style: cardBorderStyleOptions(locale).find((option) => option.value === draft.cardBorderStyle)?.label ?? draft.cardBorderStyle, shown: cardBorderStyleOptions(locale).find((option) => option.value === resolveBorderStyle(draft.cardBorderStyle))?.label.toLowerCase() ?? resolveBorderStyle(draft.cardBorderStyle) })}</Caption> : null}
-          <PresetRow label={t("library.strength")} presets={BORDER_STRENGTH_PRESETS} value={draft.cardBorderOpacity} onChange={(cardBorderOpacity) => onSaveNow({ cardBorderOpacity })} />
+          <PresetRow label={t("library.strength")} presets={presetOptions(BORDER_STRENGTH_PRESETS, locale)} value={draft.cardBorderOpacity} onChange={(cardBorderOpacity) => onSaveNow({ cardBorderOpacity })} />
           <Text style={[typography.body, styles.label, { color: colors.text }]}>{t("library.sides")}</Text>
           <View style={styles.wrap}>
-            {BORDER_SIDE_PRESETS.map(({ key, label, value }) => {
+            {presetOptions(BORDER_SIDE_PRESETS, locale).map(({ key, label, value }) => {
               const edge = (on: boolean) => on ? colors.text : colors.border;
               return <Tile key={key} label={label} width={88} selected={matchSides(draft.cardBorderSides) === key} onPress={() => onSaveNow({ cardBorderSides: value })}><View style={[styles.sides, { borderTopColor: edge(value.top), borderRightColor: edge(value.right), borderBottomColor: edge(value.bottom), borderLeftColor: edge(value.left) }]} /></Tile>;
             })}
@@ -116,7 +116,7 @@ export function PerCardStyleFields({ draft, canvasColor, onApply, onSaveNow }: {
         <SelectRow label={t("library.shadow")} value={draft.cardShadow ? "soft" : "none"} options={[{ value: "none", label: t("library.none") }, { value: "soft", label: t("library.soft") }]} onChange={(value) => onSaveNow({ cardShadow: value === "soft" })} />
       </Section>
       <Section title={t("library.sectionFadeFeedback")}>
-        <PresetRow label={t("library.fade")} presets={FADE_PRESETS} value={draft.cardOpacity} onChange={(cardOpacity) => onSaveNow({ cardOpacity })} />
+        <PresetRow label={t("library.fade")} presets={presetOptions(FADE_PRESETS, locale)} value={draft.cardOpacity} onChange={(cardOpacity) => onSaveNow({ cardOpacity })} />
         <SelectRow label={t("library.pressFeedback")} value={draft.cardHoverEffect ? "on" : "off"} options={[{ value: "off", label: t("library.none") }, { value: "on", label: t("library.subtle") }]} onChange={(value) => onSaveNow({ cardHoverEffect: value === "on" })} />
       </Section>
       <Button label={fineTune ? t("library.hideFineTuning") : t("library.fineTune")} variant="secondary" onPress={() => setFineTune(!fineTune)} />

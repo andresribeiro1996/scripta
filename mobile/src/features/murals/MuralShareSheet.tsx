@@ -9,6 +9,7 @@ import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import type { GalleryImage } from "../gallery/api";
 import type { Tierlist } from "../tierlists/api";
 import { MuralCanvas } from "./MuralCanvas";
+import { useT } from "../../i18n";
 
 export function MuralShareSheet({ mural, books, groups, images, tierlists, profile, onClose, onEnableLink, onDisableLink, draft = false, contentReady = true, contentError, onRetryContent }: {
   mural: Mural | null;
@@ -25,20 +26,21 @@ export function MuralShareSheet({ mural, books, groups, images, tierlists, profi
   contentError?: string;
   onRetryContent: () => void;
 }) {
+  const t = useT();
   const { colors } = useTheme();
   const [imageReady, setImageReady] = useState(false);
   useEffect(() => { setImageReady(false); }, [mural?.id]);
   return <ContentShareSheet
     visible={mural !== null}
     onClose={onClose}
-    title={mural?.name ?? "Mural"}
-    description={draft ? "Image includes your unsaved changes. A public link shows the saved mural; creating one saves these changes first." : undefined}
+    title={mural?.name ?? t("murals.mural")}
+    description={draft ? t("murals.shareDraftNote") : undefined}
     url={mural?.shareUrl}
     onEnableLink={onEnableLink}
-    enableLinkLabel="Create public link"
+    enableLinkLabel={t("murals.createPublicLink")}
     onDisableLink={onDisableLink}
     imageReady={contentReady && !contentError && imageReady}
-    previewControls={contentError ? <View style={{ gap: spacing.sm }}><Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{contentError}</Text><Button label="Retry preview" variant="secondary" onPress={onRetryContent} /></View> : undefined}
+    previewControls={contentError ? <View style={{ gap: spacing.sm }}><Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{contentError}</Text><Button label={t("tierlists.retryPreview")} variant="secondary" onPress={onRetryContent} /></View> : undefined}
   >
     {mural ? <View style={{ backgroundColor: themes[muralThemeId(mural.theme)].colors.background, padding: spacing.sm }}><MuralCanvas mural={mural} books={books} groups={groups} images={images} tierlists={tierlists} profile={profile} onImageReadyChange={setImageReady} /></View> : null}
   </ContentShareSheet>;
