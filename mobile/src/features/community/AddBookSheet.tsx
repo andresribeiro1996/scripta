@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { router, useGlobalSearchParams, usePathname, useSegments } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { localDay, saveFailureMessage, searchResultByline, toRecommendation } from "@scripta/shared";
+import { localDay, saveFailureMessage, searchResultByline, statusLabel, toRecommendation } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { Button, Sheet, Toast, dynamicType, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
@@ -98,14 +98,14 @@ export function AddBookSheet({
       </View>
       <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.textDim }]}>{existing ? t("community.moveItTo") : t("community.addAs")}</Text>
       <View style={styles.actions}>
-        {STATUS_OPTIONS.map((option) => (
+        {STATUS_VALUES.map((value) => (
           <Button
-            key={option.value}
-            label={t(option.labelKey)}
-            variant={option.value === currentStatus ? "primary" : "secondary"}
-            loading={busyStatus === option.value}
+            key={value}
+            label={statusLabel(value, locale)}
+            variant={value === currentStatus ? "primary" : "secondary"}
+            loading={busyStatus === value}
             disabled={busyStatus !== null}
-            onPress={() => void handleAdd(option.value)}
+            onPress={() => void handleAdd(value)}
           />
         ))}
       </View>

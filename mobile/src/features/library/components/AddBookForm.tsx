@@ -13,6 +13,7 @@ import {
   searchInsideOutside,
   searchResultByline,
   seriesLabel,
+  statusLabel,
   type BookFormat,
   type BookGenre,
 } from "@scripta/shared";
@@ -47,11 +48,7 @@ const FORMAT_CHIPS: Record<BookFormat, { labelKey: MessageKey; icon: IconName }>
   other: { labelKey: "addBook.formatOther", icon: "otherFormat" },
 };
 
-const STATUS_OPTIONS: Array<{ value: number; labelKey: MessageKey }> = [
-  { value: 1, labelKey: "library.layoutReading" },
-  { value: 0, labelKey: "addBook.statusToRead" },
-  { value: 2, labelKey: "shell.finished" },
-];
+const STATUS_VALUES = [1, 0, 2] as const;
 
 const UPLOAD_CLEANUP_FAILED = "addBook.uploadCleanupFailed";
 const REPLACED_CLEANUP_FAILED = "addBook.replacedCleanupFailed";
@@ -443,8 +440,8 @@ export function AddBookForm({
         <View style={styles.group}>
           <FieldLabel>{t("addBook.addAs")}</FieldLabel>
           <View style={styles.statusRow}>
-            {STATUS_OPTIONS.map((option) => (
-              <Chip key={option.value} grow label={t(option.labelKey)} selected={readStatus === option.value} onPress={() => setReadStatus(option.value)} />
+            {STATUS_VALUES.map((value) => (
+              <Chip key={value} grow label={statusLabel(value, locale)} selected={readStatus === value} onPress={() => setReadStatus(value)} />
             ))}
           </View>
         </View>

@@ -66,7 +66,6 @@ export const community: CatalogOf<typeof en> = {
   "community.labelWithName": "{label}: {name}",
   "community.longPressDelete": "Prima sem soltar para eliminar",
   "community.moreActionsFor": "Mais ações para {name}",
-  "community.statusReading": "A ler",
   "community.addToLibrarySignIn": "Inicie sessão para adicionar livros à sua biblioteca.",
   "community.addedFinishStepFailed": "Adicionado à sua biblioteca, mas não foi possível abrir o passo de conclusão.",
   "community.updatedInLibrary": "Atualizado na sua biblioteca.",

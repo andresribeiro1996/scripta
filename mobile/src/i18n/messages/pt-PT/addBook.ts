@@ -6,7 +6,6 @@ export const addBook: CatalogOf<typeof en> = {
   "addBook.formatEbook": "Ebook",
   "addBook.formatAudiobook": "Audiolivro",
   "addBook.formatOther": "Outro",
-  "addBook.statusToRead": "Por ler",
   "addBook.uploadCleanupFailed": "Não foi possível remover da sua galeria a fotografia enviada.",
   "addBook.replacedCleanupFailed": "Não foi possível remover da sua galeria a fotografia substituída.",
   "addBook.searchFailed": "A pesquisa falhou — tente novamente.",

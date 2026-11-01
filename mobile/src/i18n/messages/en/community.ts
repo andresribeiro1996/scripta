@@ -65,7 +65,6 @@ export const community = {
   "community.labelWithName": "{label}: {name}",
   "community.longPressDelete": "Long-press to delete",
   "community.moreActionsFor": "More actions for {name}",
-  "community.statusReading": "Reading",
   "community.addToLibrarySignIn": "Sign in to add books to your library.",
   "community.addedFinishStepFailed": "Added to your library, but couldn't open the finish step.",
   "community.updatedInLibrary": "Updated in your library.",

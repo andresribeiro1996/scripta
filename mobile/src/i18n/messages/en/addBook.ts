@@ -5,7 +5,6 @@ export const addBook = {
   "addBook.formatEbook": "Ebook",
   "addBook.formatAudiobook": "Audiobook",
   "addBook.formatOther": "Other",
-  "addBook.statusToRead": "To read",
   "addBook.uploadCleanupFailed": "Couldn't remove the uploaded photo from your gallery.",
   "addBook.replacedCleanupFailed": "Couldn't remove the replaced photo from your gallery.",
   "addBook.searchFailed": "Search failed — try again.",
