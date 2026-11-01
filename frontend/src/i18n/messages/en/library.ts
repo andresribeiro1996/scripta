@@ -11,6 +11,7 @@ export const library = {
   "library.unknownAuthor": "Unknown author",
   "library.bookCover": "Book cover",
   "library.bookFallback": "book",
+  "library.highlightCount": { one: "{count} highlight", other: "{count} highlights" },
   "library.thisBook": "this book",
   "library.selectBook": "Select {title}",
   "library.styleButton": "Style",

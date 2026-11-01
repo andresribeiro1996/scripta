@@ -62,8 +62,11 @@ test("the library toolbar translates its labels, filters and sort options", () =
 
 test("a book card falls back to Portuguese placeholders and button labels", () => {
   const book = { ReadStatus: 2 };
-  const html = inPortuguese(() => withClient(createElement(BookCard, { book, onClick: () => undefined, onOpenStyle: () => undefined, onOpenCoverPicker: () => undefined })));
+  const card = (extra: object) => createElement(BookCard, { book: { ...book, ...extra }, onClick: () => undefined });
+  assert.match(withClient(card({ highlights: [{}] })), />1 highlight</);
+  const html = inPortuguese(() => withClient(createElement(BookCard, { book: { ...book, highlights: [{}, {}] }, onClick: () => undefined, onOpenStyle: () => undefined, onOpenCoverPicker: () => undefined })));
   assert.match(html, />Sem título</);
+  assert.match(html, />2 destaques</);
   assert.match(html, />Autor desconhecido</);
   assert.match(html, />Estilo</);
   assert.match(html, />Capa</);

@@ -395,7 +395,7 @@ export function BookCard({
 
       {highlights > 0 && (
         <div className="absolute top-2.5 right-2.5 rounded-full bg-[rgba(10,8,6,0.72)] px-2.5 py-1 text-[10.5px] font-semibold text-white backdrop-blur-xs">
-          {highlights} highlight{highlights === 1 ? "" : "s"}
+          {t("library.highlightCount", { count: highlights })}
         </div>
       )}
 
