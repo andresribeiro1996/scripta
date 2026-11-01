@@ -264,24 +264,24 @@ const oneTier = [{ id: "s", label: "S", color: "#c9482f", workIds: [] as string[
 
 test("a create with access but no board is invalid", () => {
   const service = makeService();
-  assert.deepEqual(service.createTierlist("u1", { name: "X", access: "anonymous" }), { ok: false, reason: "invalid", error: "Choose books and tiers before publishing." });
+  assert.deepEqual(service.createTierlist("u1", { name: "X", access: "anonymous" }), { ok: false, reason: "invalid", error: "tierlists.chooseBooksAndTiers" });
   assert.equal(service.listTierlists("u1", false).length, 0);
 });
 
 test("a create with two tiers sharing an id is invalid", () => {
   const service = makeService();
   const tiers = [oneTier[0]!, { ...oneTier[0]!, label: "Again" }];
-  assert.deepEqual(service.createTierlist("u1", { name: "X", data: { tiers, pool: [] } }), { ok: false, reason: "invalid", error: "Duplicate tier or book." });
+  assert.deepEqual(service.createTierlist("u1", { name: "X", data: { tiers, pool: [] } }), { ok: false, reason: "invalid", error: "tierlists.duplicateTierOrBook" });
 });
 
 test("a create with a book listed twice is invalid", () => {
   const service = makeService();
-  assert.deepEqual(service.createTierlist("u1", { name: "X", data: { tiers: oneTier, pool: ["b1", "b1"] } }), { ok: false, reason: "invalid", error: "Duplicate tier or book." });
+  assert.deepEqual(service.createTierlist("u1", { name: "X", data: { tiers: oneTier, pool: ["b1", "b1"] } }), { ok: false, reason: "invalid", error: "tierlists.duplicateTierOrBook" });
 });
 
 test("a public create needs every book in the pool and no tier filled", () => {
   const service = makeService();
-  const error = "Public tier lists need an unranked book pool.";
+  const error = "tierlists.needsUnrankedPool";
   assert.deepEqual(service.createTierlist("u1", { name: "X", data: { tiers: oneTier, pool: [] }, access: "anonymous" }), { ok: false, reason: "invalid", error });
   assert.deepEqual(service.createTierlist("u1", { name: "X", data: { tiers: [{ ...oneTier[0]!, workIds: ["b1"] }], pool: ["b2"] }, access: "anonymous" }), { ok: false, reason: "invalid", error });
   assert.equal(service.listTierlists("u1", false).length, 0);
@@ -289,7 +289,7 @@ test("a public create needs every book in the pool and no tier filled", () => {
 
 test("a public create whose book the library no longer holds is invalid", () => {
   const service = createTierlistsService(createInMemoryRepo(), fakeWorks({ books: [book("b1")] }));
-  assert.deepEqual(service.createTierlist("u1", { name: "X", data: { tiers: oneTier, pool: ["b1", "b2"] }, access: "members" }), { ok: false, reason: "invalid", error: "A selected book is no longer in your library." });
+  assert.deepEqual(service.createTierlist("u1", { name: "X", data: { tiers: oneTier, pool: ["b1", "b2"] }, access: "members" }), { ok: false, reason: "invalid", error: "tierlists.bookNoLongerInLibrary" });
   assert.equal(service.listTierlists("u1", false).length, 0);
 });
 
@@ -314,10 +314,10 @@ test("an update of a public or someone else's list is not-found, and a bad board
   const service = makeService();
   const mine = created(service.createTierlist("u1", { name: "Mine" }));
   const published = created(service.createTierlist("u1", { name: "Public", data: { tiers: oneTier, pool: ["b1"] }, access: "anonymous" }));
-  const notFound = { ok: false, reason: "not-found", error: "No tier list with that id." };
+  const notFound = { ok: false, reason: "not-found", error: "tierlists.notFound" };
   assert.deepEqual(service.updateTierlist("u2", mine.id, { data: { tiers: oneTier, pool: [] } }), notFound);
   assert.deepEqual(service.updateTierlist("u1", published.id, { data: { tiers: oneTier, pool: [] } }), notFound);
-  assert.deepEqual(service.updateTierlist("u1", mine.id, { data: { tiers: oneTier, pool: ["b1", "b1"] } }), { ok: false, reason: "invalid", error: "Duplicate tier or book." });
+  assert.deepEqual(service.updateTierlist("u1", mine.id, { data: { tiers: oneTier, pool: ["b1", "b1"] } }), { ok: false, reason: "invalid", error: "tierlists.duplicateTierOrBook" });
   assert.deepEqual(service.getTierlist("u1", mine.id)?.data, mine.data);
 });
 
@@ -395,7 +395,7 @@ test("updateTierlist replaces data without touching name", () => {
 test("updateTierlist is not-found for an unowned tier list", () => {
   const service = makeService();
   const theirs = created(service.createTierlist("u2", { name: "Theirs" }));
-  assert.deepEqual(service.updateTierlist("u1", theirs.id, { name: "Mine" }), { ok: false, reason: "not-found", error: "No tier list with that id." });
+  assert.deepEqual(service.updateTierlist("u1", theirs.id, { name: "Mine" }), { ok: false, reason: "not-found", error: "tierlists.notFound" });
 });
 
 test("deleteTierlist returns false for an unowned tier list", () => {

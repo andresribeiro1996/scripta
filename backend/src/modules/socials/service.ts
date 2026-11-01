@@ -124,8 +124,8 @@ export function createSocialsService(repo: SocialsRepository, encryptionKey: str
       });
 
       if (!res.ok) {
-        if (res.status === 401) throw new BlueskyAuthError("That handle/app password combination was rejected by Bluesky.");
-        throw new BlueskyAuthError(`Bluesky sign-in failed (${res.status}).`);
+        if (res.status === 401) throw new BlueskyAuthError("socials.blueskyRejected");
+        throw new BlueskyAuthError("socials.blueskyFailed", { status: res.status });
       }
 
       const body = (await res.json()) as { accessJwt: string; refreshJwt: string; did: string; handle: string };
@@ -145,7 +145,7 @@ export function createSocialsService(repo: SocialsRepository, encryptionKey: str
 
     async postToSocial(userId, provider, input) {
       if (provider !== "x" && provider !== "threads") {
-        throw new SocialsNotConfiguredError(`Posting isn't supported for "${provider}" yet.`);
+        throw new SocialsNotConfiguredError("socials.postUnsupported", { provider });
       }
 
       const conn = getDecryptedConnection(userId, provider);

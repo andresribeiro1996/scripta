@@ -1,6 +1,6 @@
 # Emails
 
-The backend sends eight emails, all through Resend. Each has an HTML part (branded, light and dark) and a plain-text part.
+The backend sends eight emails, all through Resend. Each has an HTML part (branded, light and dark) and a plain-text part. Emails 1–7 follow the language of the request that triggered them (`Accept-Language`, English or European Portuguese); email 8 is an operator alert and stays English. The subjects below are the English ones.
 
 | # | Subject | Trigger | Recipient | Link expiry | Code |
 |---|---|---|---|---|---|
@@ -15,7 +15,7 @@ The backend sends eight emails, all through Resend. Each has an HTML part (brand
 
 ## How they are built
 
-`sendAccountEmail(to, subject, text, html?)` in `backend/src/modules/auth/email.ts` posts to Resend's HTTP API. `renderEmail(content, siteUrl)` in `backend/src/modules/auth/emailLayout.ts` turns `{ heading, paragraphs, button?, footnote? }` into `{ text, html }`; every input is a plain string and is HTML-escaped, so there is no raw-HTML input. `text` is sent as the fallback part and carries the link on its own line.
+`sendAccountEmail(to, subject, text, html?)` in `backend/src/modules/auth/email.ts` posts to Resend's HTTP API. `renderEmail(content, siteUrl, locale)` in `backend/src/modules/auth/emailLayout.ts` turns `{ heading, paragraphs, button?, footnote? }` into `{ text, html }`; every input is a plain string and is HTML-escaped, so there is no raw-HTML input. `locale` sets `<html lang>` and the "Or paste this link…" line; the copy itself comes from the `email.*` and `waitlist.*` keys in `backend/src/i18n/messages/`. `text` is sent as the fallback part and carries the link on its own line.
 
 The HTML is a table layout with inline styles, so mail clients that ignore `<style>` still show the light design. Dark mode is a `prefers-color-scheme: dark` block in `<head>` using class names, with `!important` over the inline defaults. The look is black and white on the app's paper background: black (light) or paper-white (dark) for the card border, top bar, button and links, with no accent colour. The background, surface and text tones come from the light and dark themes in `frontend/src/themes.css`. The header mark has a light and a dark `<img>`, one shown at a time. Both load from `<FRONTEND_URL>/email/mark.png` and `mark-dark.png`, so the images only show once the frontend that ships `frontend/public/email/` is deployed.
 
@@ -36,9 +36,9 @@ Without the first three, `emailEnabled` is false: recovery and verification retu
 
 ## Adding an email
 
-1. Call `renderEmail({ heading, paragraphs, button?, footnote? }, frontendUrl)` and pass `mail.text` and `mail.html` to the sender. Inside `createAccountSecurity`, use `notify(to, subject, content)`.
+1. Add the subject and copy to both catalogs, take a `locale` from `localeOf(request)` captured before any background `deliver(...)`, call `renderEmail({ heading, paragraphs, button?, footnote? }, frontendUrl, locale)` and pass `mail.text` and `mail.html` to the sender. Inside `createAccountSecurity`, use `notify(to, subject, content, locale)`.
 2. Keep the link in `button.url`; do not put URLs in paragraphs. Put "ignore this" and expiry sentences in `footnote`.
-3. Add the row above and a test that asserts the subject and the link.
+3. Add the row above and tests that assert the subject and the link in English and in Portuguese.
 
 ## Logo assets
 

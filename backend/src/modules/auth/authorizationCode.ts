@@ -16,6 +16,8 @@
 // immediately, not after the window closes.
 
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import type { Locale } from "@scripta/shared/i18n";
+import { t } from "../../i18n/index.js";
 import type { AuthenticatedUser, TokenPair } from "./domain/types.js";
 
 /** Plan requires TTL <= 60s; kept well under that so a slow network still
@@ -106,6 +108,6 @@ export function consumeAuthorizationCode(code: string, codeVerifier: string | nu
   return { ok: true, user: entry.user, tokens: entry.tokens };
 }
 
-export function authorizationCodeErrorMessage(_reason: "not_found" | "expired" | "verifier_mismatch" | "verifier_not_expected"): string {
-  return "This sign-in code has expired or was already used — please try again.";
+export function authorizationCodeErrorMessage(_reason: "not_found" | "expired" | "verifier_mismatch" | "verifier_not_expected", locale: Locale): string {
+  return t(locale, "auth.codeExpired");
 }

@@ -296,7 +296,7 @@ test("Home opts into current public murals and shared reading starts, rechecking
   assert.equal(reading.kind === "reading" && reading.started, true);
   assert.equal(reading.kind === "reading" && reading.book.isbn, "9780441172719");
   deps.findUserIdByUsername = () => "alice";
-  const activity = service.getActivity("alice", "viewer", undefined, 20).items.find(item => item.id === start.id);
+  const activity = service.getActivity("alice", "viewer", undefined, 20, "en").items.find(item => item.id === start.id);
   assert.equal(activity?.type, "book_added");
   assert.equal(activity?.payload.started, true);
   repo.updateFeedSettings("alice", DEFAULT_FEED_SETTINGS);
@@ -760,7 +760,7 @@ test("getProfileByUsername assembles identity, mural, and published content", ()
   tournamentRefs.set("g1", tournRef("g1", "alice"));
   service.follow("bob", "alice");
 
-  const view = service.getProfileByUsername("alice", "bob");
+  const view = service.getProfileByUsername("alice", "en", "bob");
   assert.equal(view.profile.user.username, "user-alice");
   assert.equal(view.profile.viewerFollows, true);
   assert.equal(view.profile.followerCount, 1);
@@ -768,7 +768,7 @@ test("getProfileByUsername assembles identity, mural, and published content", ()
   assert.deepEqual(view.published.tierlists.map((t) => t.id), ["t1"]);
   assert.deepEqual(view.published.tournaments.map((t) => t.id), ["g1"]);
 
-  const anonymous = service.getProfileByUsername("alice");
+  const anonymous = service.getProfileByUsername("alice", "en");
   assert.equal(anonymous.profile.viewerFollows, undefined);
 });
 
@@ -782,7 +782,7 @@ test("getProfileByUsername's user carries a reader glyph only when published, sw
   repo.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, readerGlyph: true });
   readerGlyphs.set("alice", "star");
 
-  const view = service.getProfileByUsername("alice");
+  const view = service.getProfileByUsername("alice", "en");
   assert.equal(view.profile.user.readerGlyph, "star");
   assert.deepEqual(readerGlyphCalls, ["alice"]);
 });
@@ -791,7 +791,7 @@ test("getProfileByUsername 404s for an unknown username", () => {
   const { repo } = createRepoFake();
   const { deps } = createDeps(repo);
   const service = createCommunityService(deps);
-  assert.throws(() => service.getProfileByUsername("ghost"), ProfileNotFoundError);
+  assert.throws(() => service.getProfileByUsername("ghost", "en"), ProfileNotFoundError);
 });
 
 test("the owner sees their own unpublished profile in full", () => {
@@ -804,7 +804,7 @@ test("the owner sees their own unpublished profile in full", () => {
   muralPayloads.set("alice:m1", fakePayload);
   tierlistRefs.set("t1", tierRef("t1", "alice"));
   profiles.set("alice", profileRow("alice", { published: 0, mural_id: "m1" }));
-  const view = service.getProfileByUsername("alice", "alice");
+  const view = service.getProfileByUsername("alice", "en", "alice");
   assert.equal(view.private, false);
   assert.equal(view.profile.publishedAt, null);
   assert.deepEqual(view.mural, fakePayload);
@@ -818,7 +818,7 @@ test("owner without a profiles row sees their own profile", () => {
   const service = createCommunityService(deps);
   usernames.set("alice", "alice");
   readerProfiles.set("alice", reader("alice"));
-  const view = service.getProfileByUsername("alice", "alice");
+  const view = service.getProfileByUsername("alice", "en", "alice");
   assert.equal(view.private, false);
   assert.equal(view.mural, null);
 });
@@ -832,10 +832,10 @@ test("a follower of an unpublished user still gets the private shell and 404s", 
   libraries.set("alice", { books: [] });
   profiles.set("alice", profileRow("alice", { published: 0 }));
   repo.insertFollow({ follower_id: "bob", followee_id: "alice", created_at: at(1) });
-  const view = service.getProfileByUsername("alice", "bob");
+  const view = service.getProfileByUsername("alice", "en", "bob");
   assert.equal(view.private, true);
   assert.equal(view.mural, null);
-  assert.throws(() => service.getActivity("alice", "bob", undefined, 10), ProfileNotFoundError);
+  assert.throws(() => service.getActivity("alice", "bob", undefined, 10, "en"), ProfileNotFoundError);
   assert.throws(() => service.getLibrary("alice", "bob"), ProfileNotFoundError);
   assert.throws(() => service.getLibrary("alice"), ProfileNotFoundError);
 });
@@ -858,7 +858,7 @@ test("getProfileByUsername shows an unpublished user as private, with nothing pu
   repo.insertFollow({ follower_id: "bob", followee_id: "alice", created_at: at(1) });
   repo.insertFollow({ follower_id: "alice", followee_id: "bob", created_at: at(1) });
 
-  const view = service.getProfileByUsername("alice", "me");
+  const view = service.getProfileByUsername("alice", "en", "me");
   assert.equal(view.private, true);
   assert.equal(view.profile.user.username, "user-alice");
   assert.equal(view.profile.user.readerGlyph, undefined);
@@ -869,7 +869,7 @@ test("getProfileByUsername shows an unpublished user as private, with nothing pu
   assert.equal(view.mural, null);
   assert.deepEqual(view.published, { tierlists: [], tournaments: [], quizzes: [] });
 
-  assert.equal(service.getProfileByUsername("bob").private, true);
+  assert.equal(service.getProfileByUsername("bob", "en").private, true);
 });
 
 test("getProfileByUsername marks a published profile as not private", () => {
@@ -879,7 +879,7 @@ test("getProfileByUsername marks a published profile as not private", () => {
   usernames.set("alice", "alice");
   readerProfiles.set("alice", reader("alice"));
   profiles.set("alice", profileRow("alice"));
-  const view = service.getProfileByUsername("alice");
+  const view = service.getProfileByUsername("alice", "en");
   assert.equal(view.private, false);
   assert.equal(view.profile.publishedAt, "2026-09-01T00:00:00.000Z");
 });
@@ -891,7 +891,7 @@ test("a profile mural deleted later resolves to null without breaking the view",
   usernames.set("alice", "alice");
   readerProfiles.set("alice", reader("alice"));
   profiles.set("alice", profileRow("alice", { mural_id: "deleted" }));
-  const view = service.getProfileByUsername("alice");
+  const view = service.getProfileByUsername("alice", "en");
   assert.equal(view.mural, null);
   assert.equal(view.profile.user.username, "user-alice");
 });
@@ -1962,21 +1962,33 @@ test("getActivity filters categories by feed settings but not for the owner", ()
   service.emitEvent("alice", "book_added", "book", "b1", { title: "Dune", status: 0 });
   service.emitEvent("alice", "voted_on", "tournament", "t9", { game: "tournament", name: "X" });
   service.emitEvent("alice", "following", "user", "bob", { username: "mia" });
-  const stranger = service.getActivity("alice", undefined, undefined, 20);
+  const stranger = service.getActivity("alice", undefined, undefined, 20, "en");
   assert.deepEqual(stranger.items.map((i) => i.type), ["following"]);
-  const owner = service.getActivity("alice", "alice", undefined, 20);
+  const owner = service.getActivity("alice", "alice", undefined, 20, "en");
   assert.equal(owner.items.length, 3);
+});
+
+test("getActivity details a published game in the requested language", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice"));
+  tierlistRefs.set("t1", tierRef("t1", "alice"));
+  service.emitEvent("alice", "tierlist_published", "tierlist", "t1");
+  assert.equal(service.getActivity("alice", undefined, undefined, 20, "en").items[0]?.payload.detail, "5 books · 2 ballots");
+  assert.equal(service.getActivity("alice", undefined, undefined, 20, "pt-PT").items[0]?.payload.detail, "5 livros · 2 votos");
 });
 
 test("getActivity 404s on unknown username and unpublished profile", () => {
   const { repo, profiles } = createRepoFake();
   const { deps, usernames } = createDeps(repo);
   const service = createCommunityService(deps);
-  assert.throws(() => service.getActivity("ghost", undefined, undefined, 20), ProfileNotFoundError);
+  assert.throws(() => service.getActivity("ghost", undefined, undefined, 20, "en"), ProfileNotFoundError);
   usernames.set("alice", "alice");
   profiles.set("alice", profileRow("alice", { published: 0 }));
-  assert.throws(() => service.getActivity("alice", undefined, undefined, 20), ProfileNotFoundError);
-  assert.throws(() => service.getActivity("alice", "me", undefined, 20), ProfileNotFoundError);
+  assert.throws(() => service.getActivity("alice", undefined, undefined, 20, "en"), ProfileNotFoundError);
+  assert.throws(() => service.getActivity("alice", "me", undefined, 20, "en"), ProfileNotFoundError);
 });
 
 test("an unparseable activity cursor is a 400-worthy error", () => {
@@ -1985,7 +1997,7 @@ test("an unparseable activity cursor is a 400-worthy error", () => {
   const service = createCommunityService(deps);
   usernames.set("alice", "alice");
   repo.upsertProfile(profileRow("alice"));
-  assert.throws(() => service.getActivity("alice", undefined, "###", 20), InvalidCursorError);
+  assert.throws(() => service.getActivity("alice", undefined, "###", 20, "en"), InvalidCursorError);
 });
 
 test("getActivity enriches publications, paginates by cursor, and skips vanished refs", () => {
@@ -1999,10 +2011,10 @@ test("getActivity enriches publications, paginates by cursor, and skips vanished
   repo.insertEvent({ id: "e1", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "t1", payload: null, created_at: "2026-09-03T00:00:00.000Z" });
   repo.insertEvent({ id: "e2", user_id: "alice", type: "tournament_published", ref_type: "tournament", ref_id: "g1", payload: null, created_at: "2026-09-02T00:00:00.000Z" });
   repo.insertEvent({ id: "e3", user_id: "alice", type: "tierlist_published", ref_type: "tierlist", ref_id: "gone", payload: null, created_at: "2026-09-01T00:00:00.000Z" });
-  const first = service.getActivity("alice", undefined, undefined, 1);
+  const first = service.getActivity("alice", undefined, undefined, 1, "en");
   assert.deepEqual(first.items[0]?.payload, { name: "List t1", href: "/vote/code-t1", detail: "5 books · 2 ballots", covers: [] });
   assert.ok(first.nextCursor);
-  const second = service.getActivity("alice", undefined, first.nextCursor!, 1);
+  const second = service.getActivity("alice", undefined, first.nextCursor!, 1, "en");
   assert.deepEqual(second.items.map((i) => i.id), ["e2"]);
   assert.deepEqual(second.items[0]?.payload, { name: "Cup g1", href: "/arena/g1", detail: "8-book bracket · active", covers: [] });
   assert.equal(second.nextCursor, null);
@@ -2022,10 +2034,10 @@ test("getActivity keeps fetching past rows hidden from the viewer", () => {
   repo.insertEvent(book("e3", "b3", "2026-09-03T00:00:00.000Z"));
   repo.insertEvent(book("e4", "b4", "2026-09-02T00:00:00.000Z"));
   repo.insertEvent({ id: "e5", user_id: "alice", type: "following", ref_type: "user", ref_id: "bob", payload: JSON.stringify({ username: "mia" }), created_at: "2026-09-01T00:00:00.000Z" });
-  const page = service.getActivity("alice", undefined, undefined, 2);
+  const page = service.getActivity("alice", undefined, undefined, 2, "en");
   assert.deepEqual(page.items.map((i) => i.id), ["e5"]);
   assert.equal(page.nextCursor, null);
-  const ownerPage = service.getActivity("alice", "alice", undefined, 2);
+  const ownerPage = service.getActivity("alice", "alice", undefined, 2, "en");
   assert.deepEqual(ownerPage.items.map((i) => i.id), ["e1", "e2"]);
   assert.ok(ownerPage.nextCursor);
 });
@@ -2060,10 +2072,10 @@ test("a visitor's activity page asks the repository to leave out the types the o
   const reads = recordActivityReads(repo);
   const books = ["book_added", "book_finished", "book_started"];
 
-  const first = service.getActivity("alice", undefined, undefined, 2);
+  const first = service.getActivity("alice", undefined, undefined, 2, "en");
   assert.deepEqual(first.items.map((item) => item.id), ["follow-3", "follow-2"]);
   assert.ok(first.nextCursor);
-  const second = service.getActivity("alice", undefined, first.nextCursor, 2);
+  const second = service.getActivity("alice", undefined, first.nextCursor, 2, "en");
   assert.deepEqual(second.items.map((item) => item.id), ["follow-1"]);
   assert.equal(second.nextCursor, null);
   assert.deepEqual(reads, [
@@ -2073,7 +2085,7 @@ test("a visitor's activity page asks the repository to leave out the types the o
   ]);
 
   reads.length = 0;
-  const owner = service.getActivity("alice", "alice", undefined, 100);
+  const owner = service.getActivity("alice", "alice", undefined, 100, "en");
   assert.equal(owner.items.length, 63);
   assert.equal(owner.items.filter((item) => item.type === "book_added" || item.type === "book_finished").length, 60);
   assert.deepEqual(reads, [
@@ -2092,7 +2104,7 @@ test("a visitor's read leaves out exactly the types of the categories the owner 
   const hiddenWith = (settings: FeedSettings) => {
     repo.updateFeedSettings("alice", settings);
     reads.length = 0;
-    service.getActivity("alice", undefined, undefined, 5);
+    service.getActivity("alice", undefined, undefined, 5, "en");
     return reads[0]?.hiddenTypes;
   };
 
@@ -2119,7 +2131,7 @@ test("a row the repository returns although its category is switched off is stil
     return listEvents(userId, keyset, limit, []);
   };
 
-  const page = service.getActivity("alice", undefined, undefined, 2);
+  const page = service.getActivity("alice", undefined, undefined, 2, "en");
 
   assert.deepEqual(page.items.map((item) => item.id), ["e5"]);
   assert.equal(page.nextCursor, null);
@@ -2146,16 +2158,16 @@ test("getActivity continues into history once the recent events run out, with no
     const ids: string[] = [];
     let cursor: string | null | undefined;
     for (let pages = 0; cursor !== null && pages < 20; pages++) {
-      const page = service.getActivity("alice", "alice", cursor ?? undefined, limit);
+      const page = service.getActivity("alice", "alice", cursor ?? undefined, limit, "en");
       ids.push(...page.items.map((item) => item.id));
       cursor = page.nextCursor;
     }
     return ids;
   };
 
-  assert.deepEqual(service.getActivity("alice", "alice", undefined, 1).items.map((item) => item.id), ["e5"]);
+  assert.deepEqual(service.getActivity("alice", "alice", undefined, 1, "en").items.map((item) => item.id), ["e5"]);
   assert.deepEqual(historyReads, []);
-  assert.deepEqual(service.getActivity("alice", "alice", undefined, 2).items.map((item) => item.id), ["e5", "e4"]);
+  assert.deepEqual(service.getActivity("alice", "alice", undefined, 2, "en").items.map((item) => item.id), ["e5", "e4"]);
   assert.deepEqual(historyReads, [1]);
   for (const limit of [1, 2, 3, 4, 5, 6]) assert.deepEqual(activityIds(limit), ["e5", "e4", "e3", "e2", "e1"], `limit ${limit}`);
 });
@@ -2222,8 +2234,8 @@ test("feed settings round-trip and reach only the owner's profile view", () => {
   const settings = { publications: false, reading: true, votes: false, follows: true };
   service.updateFeedSettings("alice", settings);
   assert.deepEqual(service.getFeedSettings("alice"), settings);
-  assert.deepEqual(service.getProfileByUsername("alice", "alice").feedSettings, settings);
-  assert.equal(service.getProfileByUsername("alice", "bob").feedSettings, undefined);
+  assert.deepEqual(service.getProfileByUsername("alice", "en", "alice").feedSettings, settings);
+  assert.equal(service.getProfileByUsername("alice", "en", "bob").feedSettings, undefined);
 });
 
 function withBackgroundTasks(deps: CommunityDeps): Promise<void>[] {
@@ -2422,9 +2434,9 @@ test("owners read their own activity before publishing; visitors still get 404",
   usernames.set("alice", "alice");
   ownedMurals.add("alice:m1");
   service.setShelfMural("alice", "m1");
-  assert.doesNotThrow(() => service.getActivity("alice", "alice", undefined, 20));
-  assert.throws(() => service.getActivity("alice", "bob", undefined, 20), ProfileNotFoundError);
-  assert.throws(() => service.getActivity("alice", undefined, undefined, 20), ProfileNotFoundError);
+  assert.doesNotThrow(() => service.getActivity("alice", "alice", undefined, 20, "en"));
+  assert.throws(() => service.getActivity("alice", "bob", undefined, 20, "en"), ProfileNotFoundError);
+  assert.throws(() => service.getActivity("alice", undefined, undefined, 20, "en"), ProfileNotFoundError);
 });
 
 test("getActivity links votes to what was voted on, and leaves vanished ones plain", () => {
@@ -2438,7 +2450,7 @@ test("getActivity links votes to what was voted on, and leaves vanished ones pla
   service.emitEvent("alice", "voted_on", "tierlist", "t1", { game: "tierlist", id: "t1", name: "List t1" });
   service.emitEvent("alice", "voted_on", "tournament", "g1", { game: "tournament", id: "g1", name: "Cup g1" });
   service.emitEvent("alice", "voted_on", "tournament", "gone", { game: "tournament", id: "gone", name: "Old cup" });
-  const payloads = Object.fromEntries(service.getActivity("alice", "alice", undefined, 20).items.map((item) => [String(item.payload.id), item.payload]));
+  const payloads = Object.fromEntries(service.getActivity("alice", "alice", undefined, 20, "en").items.map((item) => [String(item.payload.id), item.payload]));
   assert.deepEqual(payloads.t1, { game: "tierlist", id: "t1", name: "List t1", covers: ["a", "b", "c"], href: "/vote/code-t1" });
   assert.deepEqual(payloads.g1, { game: "tournament", id: "g1", name: "Cup g1", covers: ["x"], href: "/arena/g1" });
   assert.deepEqual(payloads.gone, { game: "tournament", id: "gone", name: "Old cup" });
@@ -2453,7 +2465,7 @@ test("getActivity enriches a vote by its ref_type even when the payload names no
   tournamentRefs.set("g1", tournRef("g1", "bob", { covers: ["a", "b", "c", "d"] }));
   repo.insertEvent({ id: "e-known", user_id: "alice", type: "voted_on", ref_type: "tournament", ref_id: "g1", payload: JSON.stringify({ id: "g1", name: "Cup g1" }), created_at: at(3) });
   repo.insertEvent({ id: "e-unknown", user_id: "alice", type: "voted_on", ref_type: "book", ref_id: "g1", payload: JSON.stringify({ game: "tournament", id: "g1", name: "Cup g1" }), created_at: at(2) });
-  const payloads = Object.fromEntries(service.getActivity("alice", "alice", undefined, 20).items.map((item) => [item.id, item.payload]));
+  const payloads = Object.fromEntries(service.getActivity("alice", "alice", undefined, 20, "en").items.map((item) => [item.id, item.payload]));
   assert.deepEqual(payloads["e-known"], { id: "g1", name: "Cup g1", covers: ["a", "b", "c"], href: "/arena/g1" });
   assert.deepEqual(payloads["e-unknown"], { game: "tournament", id: "g1", name: "Cup g1" });
 });
@@ -2487,7 +2499,7 @@ function suggestionFixture() {
       sharedShelves.set(id, Array.from({ length: shared }, (_, n) => ({ title: `Book ${n + 1}`, author: "A. Writer", coverUrl: null })));
     }
   };
-  const suggested = (limit = 20) => service.suggestPeople("viewer", limit);
+  const suggested = (limit = 20) => service.suggestPeople("viewer", limit, "en");
   return { repo, service, readerProfiles, readerGlyphs, libraryCalls, sharedCounts, sharedShelves, sharedBookCountsCalls, sharedBooksCalls, addReader, suggested };
 }
 
@@ -2638,20 +2650,20 @@ test("portrait previews resolve only the returned readers' selected public mural
   muralPayloads.set("first:m-first", payload);
   const calls: string[] = [];
   const resolve = deps.murals.getMuralPublicPayload;
-  deps.murals.getMuralPublicPayload = (owner, muralId) => {
+  deps.murals.getMuralPublicPayload = (owner, muralId, locale) => {
     calls.push(`${owner}:${muralId}`);
-    return resolve(owner, muralId);
+    return resolve(owner, muralId, locale);
   };
   const service = createCommunityService(deps);
-  assert.equal("mural" in service.suggestPeople("viewer", 1)[0]!, false);
+  assert.equal("mural" in service.suggestPeople("viewer", 1, "en")[0]!, false);
   assert.deepEqual(calls, []);
-  assert.deepEqual(service.suggestPeople("viewer", 1, true)[0]?.mural, payload);
+  assert.deepEqual(service.suggestPeople("viewer", 1, "en", true)[0]?.mural, payload);
   assert.deepEqual(calls, ["first:m-first"]);
-  assert.deepEqual(service.suggestPeople("viewer", 3, true).map(person => person.mural), [payload, null, null]);
+  assert.deepEqual(service.suggestPeople("viewer", 3, "en", true).map(person => person.mural), [payload, null, null]);
   assert.deepEqual(libraryCalls, []);
   repo.upsertProfile(profileRow("first", { published: 0, mural_id: "m-first" }));
   calls.length = 0;
-  assert.equal(service.suggestPeople("viewer", 3, true).some(person => person.user.userId === "first"), false);
+  assert.equal(service.suggestPeople("viewer", 3, "en", true).some(person => person.user.userId === "first"), false);
   assert.deepEqual(calls, ["second:m-second"]);
 });
 
@@ -2665,10 +2677,10 @@ test("portrait previews recheck visibility and propagate resolver failures", () 
   let calls = 0;
   deps.murals.getMuralPublicPayload = () => { calls++; throw new Error("Preview unavailable"); };
   const service = createCommunityService(deps);
-  assert.equal(service.suggestPeople("viewer", 1, true)[0]?.mural, null);
+  assert.equal(service.suggestPeople("viewer", 1, "en", true)[0]?.mural, null);
   assert.equal(calls, 0);
   repo.upsertProfile(row);
-  assert.throws(() => service.suggestPeople("viewer", 1, true), /Preview unavailable/);
+  assert.throws(() => service.suggestPeople("viewer", 1, "en", true), /Preview unavailable/);
 });
 
 test("a follower's dashboard shows a quiz publication and a quiz play, each under its own switch", () => {
@@ -2713,7 +2725,7 @@ test("a quiz whose play closed after publishing still shows, closed", () => {
 
   const [item] = service.getDashboard("viewer", undefined, 20, ALL_KINDS).items;
   assert.equal(item && "content" in item && item.content.kind === "quiz" ? item.content.playOpen : null, false);
-  const activity = service.getActivity("alice", undefined, undefined, 20).items;
+  const activity = service.getActivity("alice", undefined, undefined, 20, "en").items;
   assert.equal(activity[0]?.payload.href, "/play/play-q1");
 });
 
@@ -2788,14 +2800,14 @@ test("getActivity enriches quiz publications and plays with a play link, and dro
   repo.insertEvent({ id: "e-pub", user_id: "alice", type: "quiz_published", ref_type: "quiz", ref_id: "q1", payload: null, created_at: at(3) });
   repo.insertEvent({ id: "e-play", user_id: "alice", type: "voted_on", ref_type: "quiz", ref_id: "q2", payload: JSON.stringify({ game: "quiz", id: "q2", name: "Quiz q2" }), created_at: at(2) });
 
-  const items = service.getActivity("alice", "alice", undefined, 20).items;
+  const items = service.getActivity("alice", "alice", undefined, 20, "en").items;
   assert.deepEqual(items.map((item) => [item.id, item.type, item.payload]), [
     ["e-pub", "quiz_published", { name: "Quiz q1", href: "/play/play-q1", detail: "6 questions · 3 plays", covers: ["a", "b", "c"] }],
     ["e-play", "voted_on", { game: "quiz", id: "q2", name: "Quiz q2", covers: ["x"], href: "/play/play-q2" }]
   ]);
 
   quizRefs.clear();
-  assert.deepEqual(service.getActivity("alice", "alice", undefined, 20).items.map((item) => item.id), ["e-play"]);
+  assert.deepEqual(service.getActivity("alice", "alice", undefined, 20, "en").items.map((item) => item.id), ["e-play"]);
 });
 
 test("an activity vote on a deleted quiz is kept, without cover or link", () => {
@@ -2806,7 +2818,7 @@ test("an activity vote on a deleted quiz is kept, without cover or link", () => 
   repo.upsertProfile(profileRow("alice"));
   repo.insertEvent({ id: "e-play", user_id: "alice", type: "voted_on", ref_type: "quiz", ref_id: "gone", payload: JSON.stringify({ game: "quiz", id: "gone", name: "Old quiz" }), created_at: at(2) });
 
-  assert.deepEqual(service.getActivity("alice", "alice", undefined, 20).items.map((item) => [item.id, item.type, item.payload]), [["e-play", "voted_on", { game: "quiz", id: "gone", name: "Old quiz" }]]);
+  assert.deepEqual(service.getActivity("alice", "alice", undefined, 20, "en").items.map((item) => [item.id, item.type, item.payload]), [["e-play", "voted_on", { game: "quiz", id: "gone", name: "Old quiz" }]]);
 });
 
 test("profile published lists and completions send at most three covers per game", () => {
@@ -2822,7 +2834,7 @@ test("profile published lists and completions send at most three covers per game
   deps.completedTournaments = () => [{ card: tournRef("cup", "alice", { status: "completed", covers }), completedAt: at(10), winner: { workId: "w1", title: "Dune", author: "Frank Herbert", cover: null } }];
   const service = createCommunityService(deps);
 
-  const { published } = service.getProfileByUsername("alice");
+  const { published } = service.getProfileByUsername("alice", "en");
   assert.deepEqual([published.tierlists[0]?.covers, published.tournaments[0]?.covers, published.quizzes[0]?.covers], [["a", "b", "c"], ["a", "b", "c"], ["a", "b", "c"]]);
   const completion = service.getDashboard("viewer", undefined, 20, new Set(["completion"])).items[0];
   assert.equal(completion?.kind === "completion" ? completion.tournament.covers.length : null, 3);
@@ -2837,7 +2849,7 @@ test("getActivity drops a quiz publication whose quiz is owned by someone else",
   quizRefs.set("q1", quizRef("q1", "bob"));
   repo.insertEvent({ id: "e-pub", user_id: "alice", type: "quiz_published", ref_type: "quiz", ref_id: "q1", payload: null, created_at: at(3) });
 
-  assert.deepEqual(service.getActivity("alice", "alice", undefined, 20).items, []);
+  assert.deepEqual(service.getActivity("alice", "alice", undefined, 20, "en").items, []);
 });
 
 test("a profile's Published list includes its quizzes, and nothing while unpublished", () => {
@@ -2850,9 +2862,9 @@ test("a profile's Published list includes its quizzes, and nothing while unpubli
   quizRefs.set("q1", quizRef("q1", "alice"));
   quizRefs.set("q2", quizRef("q2", "bob"));
 
-  assert.deepEqual(service.getProfileByUsername("alice").published.quizzes.map((q) => [q.kind, q.id]), [["quiz", "q1"]]);
+  assert.deepEqual(service.getProfileByUsername("alice", "en").published.quizzes.map((q) => [q.kind, q.id]), [["quiz", "q1"]]);
   repo.upsertProfile(profileRow("alice", { published: 0 }));
-  assert.deepEqual(service.getProfileByUsername("alice").published.quizzes, []);
+  assert.deepEqual(service.getProfileByUsername("alice", "en").published.quizzes, []);
 });
 
 test("discover's quiz filter returns only quizzes, all includes them, and the viewer's played flag is set", () => {

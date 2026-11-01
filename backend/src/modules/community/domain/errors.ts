@@ -1,45 +1,52 @@
+import type { Locale } from "@scripta/shared/i18n";
+import { LocalizedError, t } from "../../../i18n/index.js";
 import { FOLLOW_LIMIT } from "./feed.js";
 
-export class CommunityError extends Error {}
+export class CommunityError extends LocalizedError {}
 
 export class ProfileNotFoundError extends CommunityError {
   constructor() {
-    super("No published profile at that address.");
+    super("community.profileNotFound");
   }
 }
 
 export class SelfFollowError extends CommunityError {
   constructor() {
-    super("You can't follow yourself.");
+    super("community.selfFollow");
   }
 }
 
 export class FollowLimitError extends CommunityError {
   constructor() {
-    super(`You can follow up to ${FOLLOW_LIMIT.toLocaleString("en-US")} readers.`);
+    super("community.followLimit", { limit: FOLLOW_LIMIT.toLocaleString("en-US") });
   }
 }
 
 export class NotFollowingError extends CommunityError {
   constructor() {
-    super("You aren't following that profile.");
+    super("community.notFollowing");
   }
 }
 
 export class UsernameRequiredError extends CommunityError {
   constructor() {
-    super("Choose a username before publishing your profile.");
+    super("community.usernameRequired");
   }
 }
 
 export class MuralNotOwnedError extends CommunityError {
   constructor() {
-    super("No mural of yours with that id.");
+    super("community.muralNotOwned");
   }
 }
 
 export class InvalidCursorError extends CommunityError {
   constructor() {
-    super("Invalid feed cursor.");
+    super("community.invalidCursor");
   }
+}
+
+export function communityErrorMessage(locale: Locale, error: CommunityError): string {
+  const vars = error instanceof FollowLimitError ? { limit: FOLLOW_LIMIT.toLocaleString(locale === "en" ? "en-US" : locale) } : error.vars;
+  return t(locale, error.key, vars);
 }

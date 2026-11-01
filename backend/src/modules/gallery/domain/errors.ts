@@ -2,28 +2,30 @@
 // maps each to an HTTP status — same convention as
 // modules/auth/domain/errors.ts.
 
-export class GalleryError extends Error {}
+import { LocalizedError } from "../../../i18n/index.js";
+
+export class GalleryError extends LocalizedError {}
 
 export class InvalidImageError extends GalleryError {
   constructor() {
-    super("That file isn't a valid image (or is corrupted) — only JPEG, PNG, and WebP are supported.");
+    super("gallery.invalidImage");
   }
 }
 
 export class FileTooLargeError extends GalleryError {
   constructor(maxBytes: number) {
-    super(`Files can't be larger than ${Math.round(maxBytes / (1024 * 1024))} MB.`);
+    super("gallery.fileTooLarge", { mb: Math.round(maxBytes / (1024 * 1024)) });
   }
 }
 
 export class ImageDimensionsTooLargeError extends GalleryError {
   constructor(maxDimension: number) {
-    super(`Image dimensions can't exceed ${maxDimension}×${maxDimension}px.`);
+    super("gallery.dimensionsTooLarge", { max: maxDimension });
   }
 }
 
 export class QuotaExceededError extends GalleryError {
   constructor(maxBytes: number) {
-    super(`This would put you over your ${Math.round(maxBytes / (1024 * 1024))} MB image storage limit — delete something first.`);
+    super("gallery.quotaExceeded", { mb: Math.round(maxBytes / (1024 * 1024)) });
   }
 }

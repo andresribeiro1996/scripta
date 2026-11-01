@@ -680,3 +680,34 @@ test("PATCH reader card style stores a finish, keeps the rest, and rejects an un
   assert.equal(bad.statusCode, 400);
   await app.close();
 });
+
+test("library errors come back in Portuguese for a Portuguese request and stay English otherwise", async () => {
+  const { app } = await setup();
+  const portuguese = { authorization: "Bearer u1", "accept-language": "pt-PT" };
+  const none = await app.inject({ method: "GET", url: "/library", headers: portuguese });
+  assert.equal(none.statusCode, 404);
+  assert.deepEqual(none.json(), { error: "Ainda não há nenhuma biblioteca guardada." });
+  assert.deepEqual((await app.inject({ method: "GET", url: "/library", headers: { authorization: "Bearer u1" } })).json(), { error: "No library saved yet." });
+  const share = await app.inject({ method: "POST", url: "/library/share", headers: portuguese });
+  assert.deepEqual(share.json(), { error: "Ainda não há nenhuma biblioteca guardada — não há nada para partilhar." });
+  const malformed = await app.inject({ method: "PUT", url: "/library", headers: portuguese, payload: { nope: true } });
+  assert.equal(malformed.statusCode, 400);
+  assert.equal(malformed.json().error, "Esperado {\"data\": {\"books\": [...], ...}} — consulte o formato do library.json do exportador.");
+  const badChange = await app.inject({ method: "PATCH", url: "/library/books", headers: portuguese, payload: {} });
+  assert.equal(badChange.json().error, "Esperado { bookKey, readStatus?, rating?, day? } com readStatus ou rating, e day para readStatus 2.");
+  const missingBook = await app.inject({ method: "PATCH", url: "/library/books", headers: portuguese, payload: { bookKey: "nope", rating: 4 } });
+  assert.equal(missingBook.statusCode, 404);
+  const saved = await app.inject({ method: "PUT", url: "/library", headers: portuguese, payload: { data: { books: [kobo] } } });
+  assert.equal(saved.statusCode, 200);
+  const first = saved.json().updatedAt as string;
+  assert.equal((await app.inject({ method: "PUT", url: "/library", headers: portuguese, payload: { data: { books: [kobo] }, updatedAt: first } })).statusCode, 200);
+  const stale = await app.inject({ method: "PUT", url: "/library", headers: portuguese, payload: { data: { books: [] }, updatedAt: first } });
+  assert.equal(stale.statusCode, 409);
+  assert.equal(stale.json().error, "A biblioteca foi alterada noutro local desde que foi carregada.");
+  const unknownGroup = await app.inject({ method: "POST", url: "/library/groups/gone/books", headers: portuguese, payload: { bookKey: bookKey(kobo), member: true } });
+  assert.equal(unknownGroup.json().error, "Esse grupo não está na sua biblioteca.");
+  const oversized = await app.inject({ method: "PUT", url: "/library", headers: { ...portuguese, "content-type": "application/json" }, payload: saveOfBytes(env.LIBRARY_BODY_LIMIT_BYTES + 1024) });
+  assert.equal(oversized.statusCode, 413);
+  assert.equal(oversized.json().error, "A sua biblioteca tem mais de 10 MB, o máximo que o Atmyshelf consegue guardar. Remova alguns livros ou destaques e tente novamente.");
+  await app.close();
+});

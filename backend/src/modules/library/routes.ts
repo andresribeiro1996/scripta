@@ -7,8 +7,10 @@ import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
+import type { Locale } from "@scripta/shared/i18n";
 import { z } from "zod";
 import { env } from "../../config/env.js";
+import { localeOf, t } from "../../i18n/index.js";
 import { authGuard, rateLimitKey, readerNumberOf } from "../auth/index.js";
 import { LIBRARY_SMALL_SAVE_MAX_BYTES } from "./domain/constants.js";
 import { InvalidReaderCardChoiceError, LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
@@ -33,9 +35,9 @@ export async function sweepStaleImportDirs(now = Date.now()) {
   }
 }
 
-function libraryTooLargeBody() {
+function libraryTooLargeBody(locale: Locale) {
   return {
-    error: libraryTooLargeMessage(env.LIBRARY_BODY_LIMIT_BYTES),
+    error: libraryTooLargeMessage(locale, env.LIBRARY_BODY_LIMIT_BYTES),
     code: "LIBRARY_BODY_TOO_LARGE",
     maxBytes: env.LIBRARY_BODY_LIMIT_BYTES
   };
@@ -47,11 +49,16 @@ export function libraryWriteLimit(request: Pick<FastifyRequest, "method" | "head
   return request.method === "PUT" && small ? 120 : 30;
 }
 
+function importTooLargeBody(locale: Locale) {
+  return { error: t(locale, "library.importFileTooLarge"), code: "IMPORT_TOO_LARGE", maxBytes: env.IMPORT_MAX_UPLOAD_BYTES };
+}
+
 export function rejectOversizedImport(
   request: { raw: { destroy(): void } },
-  reply: { code(statusCode: number): { send(payload: unknown): unknown } }
+  reply: { code(statusCode: number): { send(payload: unknown): unknown } },
+  locale: Locale
 ) {
-  reply.code(413).send({ error: "Import file is too large.", code: "IMPORT_TOO_LARGE", maxBytes: env.IMPORT_MAX_UPLOAD_BYTES });
+  reply.code(413).send(importTooLargeBody(locale));
   request.raw.destroy();
 }
 
@@ -123,13 +130,13 @@ const bookChangeSchema = z
 
 const addChangeSchema = z.object({ book: z.object({ Title: z.string().min(1) }).passthrough() });
 
-function applyChange(service: LibraryService, userId: string, change: LibraryChange, reply: FastifyReply) {
+function applyChange(service: LibraryService, request: FastifyRequest, change: LibraryChange, reply: FastifyReply) {
   try {
-    return reply.send(service.applyChange(userId, change));
+    return reply.send(service.applyChange(request.user.id, change));
   } catch (error) {
-    if (error instanceof NoLibraryDocumentError || error instanceof LibraryChangeNotFoundError) return reply.code(404).send({ error: error.message });
-    if (error instanceof LibraryConflictError) return reply.code(409).send({ error: error.message });
-    if (error instanceof LibraryTooLargeError) return reply.code(413).send(libraryTooLargeBody());
+    if (error instanceof NoLibraryDocumentError || error instanceof LibraryChangeNotFoundError) return reply.code(404).send({ error: t(localeOf(request), error.key, error.vars) });
+    if (error instanceof LibraryConflictError) return reply.code(409).send({ error: t(localeOf(request), error.key, error.vars) });
+    if (error instanceof LibraryTooLargeError) return reply.code(413).send(libraryTooLargeBody(localeOf(request)));
     throw error;
   }
 }
@@ -149,7 +156,7 @@ export function buildLibraryRoutes(service: LibraryService) {
       reads.get("/library", { preHandler: authGuard }, async (request, reply) => {
         const library = service.getLibraryText(request.user.id);
         if (!library) {
-          return reply.code(404).send({ error: "No library saved yet." });
+          return reply.code(404).send({ error: t(localeOf(request), "library.noneSaved") });
         }
         return sendDocumentText(reply, library);
       });
@@ -161,23 +168,21 @@ export function buildLibraryRoutes(service: LibraryService) {
       writes.put("/library", {
         onRequest: authGuard,
         bodyLimit: env.LIBRARY_BODY_LIMIT_BYTES,
-        errorHandler(error, _request, reply) {
-          if (error.statusCode === 413) return reply.code(413).send(libraryTooLargeBody());
+        errorHandler(error, request, reply) {
+          if (error.statusCode === 413) return reply.code(413).send(libraryTooLargeBody(localeOf(request)));
           throw error;
         }
       }, async (request, reply) => {
         const parsed = saveLibrarySchema.safeParse(request.body);
         if (!parsed.success) {
-          return reply.code(400).send({
-            error: 'Expected {"data": {"books": [...], ...}} — see the exporter\'s library.json shape.'
-          });
+          return reply.code(400).send({ error: t(localeOf(request), "library.expectedLibrary") });
         }
         try {
           const library = service.saveLibrary(request.user.id, parsed.data.data, parsed.data.updatedAt, parsed.data.source);
           return sendDocumentText(reply, library);
         } catch (error) {
           if (error instanceof LibraryConflictError) {
-            return reply.code(409).send({ error: error.message, current: service.getLibrary(request.user.id) });
+            return reply.code(409).send({ error: t(localeOf(request), error.key, error.vars), current: service.getLibrary(request.user.id) });
           }
           throw error;
         }
@@ -186,38 +191,38 @@ export function buildLibraryRoutes(service: LibraryService) {
       writes.post("/library/books", { preHandler: authGuard }, async (request, reply) => {
         const parsed = addBookSchema.safeParse(request.body);
         if (!parsed.success) {
-          return reply.code(400).send({ error: "Expected { title, author, readStatus } — isbn/coverUrl optional." });
+          return reply.code(400).send({ error: t(localeOf(request), "library.expectedBook") });
         }
         try {
           return reply.send(service.addBook(request.user.id, parsed.data));
         } catch (error) {
           if (error instanceof LibraryConflictError) {
-            return reply.code(409).send({ error: error.message });
+            return reply.code(409).send({ error: t(localeOf(request), error.key, error.vars) });
           }
-          if (error instanceof LibraryTooLargeError) return reply.code(413).send(libraryTooLargeBody());
+          if (error instanceof LibraryTooLargeError) return reply.code(413).send(libraryTooLargeBody(localeOf(request)));
           throw error;
         }
       });
 
       writes.post("/library/books/add", { preHandler: authGuard, bodyLimit: CHANGE_BODY_LIMIT_BYTES }, async (request, reply) => {
         const parsed = addChangeSchema.safeParse(request.body);
-        if (!parsed.success) return reply.code(400).send({ error: "Expected { book } with a non-empty Title." });
-        return applyChange(service, request.user.id, { kind: "add", book: parsed.data.book }, reply);
+        if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "library.expectedBookWithTitle") });
+        return applyChange(service, request, { kind: "add", book: parsed.data.book }, reply);
       });
 
       writes.post("/library/books/merge", { preHandler: authGuard }, async (request, reply) => {
         const parsed = mergeBooksSchema.safeParse(request.body);
         if (!parsed.success) {
-          return reply.code(400).send({ error: "Expected { keep, merge: [...], updatedAt }." });
+          return reply.code(400).send({ error: t(localeOf(request), "library.expectedMerge") });
         }
         try {
           return sendDocumentText(reply, service.mergeBooks(request.user.id, parsed.data.keep, parsed.data.merge, parsed.data.updatedAt));
         } catch (error) {
-          if (error instanceof NoLibraryDocumentError) return reply.code(404).send({ error: "No library saved yet." });
+          if (error instanceof NoLibraryDocumentError) return reply.code(404).send({ error: t(localeOf(request), "library.noneSaved") });
           if (error instanceof LibraryConflictError) {
-            return reply.code(409).send({ error: error.message, current: service.getLibrary(request.user.id) });
+            return reply.code(409).send({ error: t(localeOf(request), error.key, error.vars), current: service.getLibrary(request.user.id) });
           }
-          if (error instanceof LibraryTooLargeError) return reply.code(413).send(libraryTooLargeBody());
+          if (error instanceof LibraryTooLargeError) return reply.code(413).send(libraryTooLargeBody(localeOf(request)));
           throw error;
         }
       });
@@ -228,7 +233,7 @@ export function buildLibraryRoutes(service: LibraryService) {
           return reply.send(library);
         } catch (err) {
           if (err instanceof NoLibraryDocumentError) {
-            return reply.code(404).send({ error: err.message });
+            return reply.code(404).send({ error: t(localeOf(request), err.key, err.vars) });
           }
           throw err;
         }
@@ -238,7 +243,7 @@ export function buildLibraryRoutes(service: LibraryService) {
         service.unshare(request.user.id);
         const library = service.getLibrary(request.user.id);
         if (!library) {
-          return reply.code(404).send({ error: "No library saved yet." });
+          return reply.code(404).send({ error: t(localeOf(request), "library.noneSaved") });
         }
         return reply.send(library);
       });
@@ -249,16 +254,16 @@ export function buildLibraryRoutes(service: LibraryService) {
 
       changes.post<{ Params: { groupId: string } }>("/library/groups/:groupId/books", { preHandler: authGuard, bodyLimit: CHANGE_BODY_LIMIT_BYTES }, async (request, reply) => {
         const parsed = membershipChangeSchema.safeParse(request.body);
-        if (!parsed.success) return reply.code(400).send({ error: "Expected { bookKey, member }." });
-        return applyChange(service, request.user.id, { kind: "membership", groupId: request.params.groupId, ...parsed.data }, reply);
+        if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "library.expectedMembership") });
+        return applyChange(service, request, { kind: "membership", groupId: request.params.groupId, ...parsed.data }, reply);
       });
 
       changes.patch("/library/books", { preHandler: authGuard, bodyLimit: CHANGE_BODY_LIMIT_BYTES }, async (request, reply) => {
         const parsed = bookChangeSchema.safeParse(request.body);
-        if (!parsed.success) return reply.code(400).send({ error: "Expected { bookKey, readStatus?, rating?, day? } with readStatus or rating, and day for readStatus 2." });
+        if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "library.expectedBookChange") });
         const { readStatus, day, bookKey, rating } = parsed.data;
         const change: LibraryChange = readStatus === 2 ? { kind: "book", bookKey, rating, readStatus, day: day! } : { kind: "book", bookKey, rating, readStatus, day };
-        return applyChange(service, request.user.id, change, reply);
+        return applyChange(service, request, change, reply);
       });
     });
 
@@ -270,11 +275,11 @@ export function buildLibraryRoutes(service: LibraryService) {
 
       cards.patch("/library/reader-card/style", { preHandler: authGuard }, async (request, reply) => {
         const parsed = readerCardStylePatchSchema.safeParse(request.body);
-        if (!parsed.success) return reply.code(400).send({ error: "Expected a reader card style change with known options." });
+        if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "library.expectedCardStyle") });
         try {
           return reply.send(service.patchReaderCardStyle(request.user.id, parsed.data));
         } catch (error) {
-          if (error instanceof InvalidReaderCardChoiceError) return reply.code(400).send({ error: error.message });
+          if (error instanceof InvalidReaderCardChoiceError) return reply.code(400).send({ error: t(localeOf(request), error.key, error.vars) });
           throw error;
         }
       });
@@ -288,25 +293,22 @@ export function buildLibraryRoutes(service: LibraryService) {
       imports.post("/library/import/preview", {
         preHandler: authGuard
       }, async (request, reply) => {
+        const locale = localeOf(request);
         const scratch = await mkdtemp(join(tmpdir(), "scripta-import-"));
         const outcome = await (async () => {
           try {
             const upload = await request.file();
-            if (!upload) return { status: 400, body: { error: "Upload one import file in multipart field \"file\"." } };
+            if (!upload) return { status: 400, body: { error: t(locale, "library.importNoFile") } };
             const path = join(scratch, "upload");
-            upload.file.once("limit", () => rejectOversizedImport(request, reply));
+            upload.file.once("limit", () => rejectOversizedImport(request, reply, locale));
             await pipeline(upload.file, createWriteStream(path, { flags: "wx" }));
-            if (upload.file.truncated) {
-              return { status: 413, body: { error: "Import file is too large.", code: "IMPORT_TOO_LARGE", maxBytes: env.IMPORT_MAX_UPLOAD_BYTES } };
-            }
-            return { status: 200, body: await parseImport(path, env.IMPORT_PARSE_TIMEOUT_MS, env.LIBRARY_BODY_LIMIT_BYTES, request.log) };
+            if (upload.file.truncated) return { status: 413, body: importTooLargeBody(locale) };
+            return { status: 200, body: await parseImport(path, env.IMPORT_PARSE_TIMEOUT_MS, env.LIBRARY_BODY_LIMIT_BYTES, locale, request.log) };
           } catch (error) {
             if (reply.sent) return { status: 413, body: null };
             if (error instanceof InvalidImportError) return { status: 422, body: { error: error.message, code: "INVALID_IMPORT" } };
             if (error instanceof ImportBusyError) return { status: 503, body: { error: error.message, code: "IMPORT_BUSY" } };
-            if ((error as { statusCode?: number }).statusCode === 413) {
-              return { status: 413, body: { error: "Import file is too large.", code: "IMPORT_TOO_LARGE", maxBytes: env.IMPORT_MAX_UPLOAD_BYTES } };
-            }
+            if ((error as { statusCode?: number }).statusCode === 413) return { status: 413, body: importTooLargeBody(locale) };
             throw error;
           } finally {
             await rm(scratch, { recursive: true, force: true });
@@ -330,7 +332,7 @@ export function buildPublicLibraryRoutes(service: LibraryService) {
     app.get<{ Params: { token: string } }>("/library/shared/:token", async (request, reply) => {
       const shared = service.getPublicByToken(request.params.token);
       if (!shared) {
-        return reply.code(404).send({ error: "No shared library at that link." });
+        return reply.code(404).send({ error: t(localeOf(request), "library.noSharedLibrary") });
       }
       reply.header("Cache-Control", "no-store");
       return reply.send(shared);

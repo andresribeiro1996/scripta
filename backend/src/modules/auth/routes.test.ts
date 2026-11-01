@@ -34,6 +34,7 @@ process.env.GALLERY_DB_PATH ??= join(scratchDir, "gallery.sqlite");
 const { buildAuthRoutes } = await import("./routes.js");
 const { createAuthorizationCode } = await import("./authorizationCode.js");
 
+import { UsernameInUseError } from "./domain/errors.js";
 import type { AuthenticatedUser, TokenPair } from "./domain/types.js";
 import type { AuthService } from "./service.js";
 import type { AccountAppearance, Appearance } from "@scripta/shared/themes";
@@ -246,4 +247,14 @@ test("an avatar file url whose id is not a uuid answers 400", async () => {
   await app.close();
   assert.equal(res.statusCode, 400);
   assert.equal(res.headers.location, undefined);
+});
+
+test("POST /auth/username answers a taken username in the request's language with the username field", async () => {
+  const service = { setUsername: async () => { throw new UsernameInUseError("andre"); } } as unknown as AuthService;
+  const english = await callAppearanceRoute(service, { method: "POST", url: "/auth/username", payload: { username: "andre" } }, "valid-token");
+  assert.equal(english.status, 409);
+  assert.deepEqual(english.body, { error: "Username \"andre\" is already taken.", field: "username" });
+  const portuguese = await callAppearanceRoute(service, { method: "POST", url: "/auth/username", headers: { "accept-language": "pt-PT" }, payload: { username: "andre" } }, "valid-token");
+  assert.equal(portuguese.status, 409);
+  assert.deepEqual(portuguese.body, { error: "O nome de utilizador \"andre\" já está a ser utilizado.", field: "username" });
 });

@@ -12,6 +12,7 @@ import fastifyOauth2 from "@fastify/oauth2";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { env, socialsEncryptionConfigured } from "../../config/env.js";
+import { t } from "../../i18n/index.js";
 import { openSocialsDb } from "./adapters/sqlite/connection.js";
 import { createSqliteSocialsRepository } from "./adapters/sqlite/sqliteSocialsRepository.js";
 import { OAUTH_PROVIDERS, type OAuthProviderConfig } from "./providerConfig.js";
@@ -101,10 +102,11 @@ async function registerOAuthProvider(app: FastifyInstance, config: OAuthProvider
 
   app.get(`/socials/${config.provider}/callback`, async (request, reply) => {
     const state = queryParam(request, "state");
-    const userId = consumeLinkSession(state, config.provider);
-    if (!userId) {
-      return redirectWithResult(reply, config.provider, "error", "This connection link expired — please try again.");
+    const link = consumeLinkSession(state, config.provider);
+    if (!link) {
+      return redirectWithResult(reply, config.provider, "error", t("en", "socials.linkExpired"));
     }
+    const { userId, locale } = link;
 
     try {
       const { token } = await oauthNamespace.getAccessTokenFromAuthorizationCodeFlow(request, reply);
@@ -121,7 +123,7 @@ async function registerOAuthProvider(app: FastifyInstance, config: OAuthProvider
       });
     } catch (err) {
       request.log.error(err, `[socials] ${config.provider} connect failed`);
-      return redirectWithResult(reply, config.provider, "error", `Couldn't finish connecting ${config.displayName}.`);
+      return redirectWithResult(reply, config.provider, "error", t(locale, "socials.connectFailed", { provider: config.displayName }));
     }
 
     return redirectWithResult(reply, config.provider, "connected");

@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z, ZodError } from "zod";
+import { localeOf, t, validationMessage } from "../../i18n/index.js";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
 import { DailyChapterError } from "./domain/dailyChapter.js";
 import { dailyGuestKey, type DailyChapterService } from "./dailyChapterService.js";
@@ -9,22 +10,23 @@ const playerIdSchema = z.string().min(1).max(100);
 
 function signedIn(request: FastifyRequest) {
   const user = getOptionalAuthenticatedUser(request);
-  if (request.headers.authorization && !user) throw new DailyChapterError(401, "Sign in again to load your daily history.");
+  if (request.headers.authorization && !user) throw new DailyChapterError(401, t(localeOf(request), "quizzes.dailySignInAgain"));
   return user;
 }
 
 function player(request: FastifyRequest, guestId?: string): string {
   const user = signedIn(request);
   if (user) return user.id;
-  if (!guestId) throw new DailyChapterError(400, "A device identity is required to save your result.");
+  if (!guestId) throw new DailyChapterError(400, t(localeOf(request), "quizzes.dailyDeviceIdentity"));
   return dailyGuestKey(guestId);
 }
 
 export function buildDailyChapterRoutes(service: DailyChapterService, isAdmin: (userId: string) => boolean) {
   return async function dailyChapterRoutes(app: FastifyInstance) {
-    app.setErrorHandler((error, _request, reply) => {
-      if (error instanceof DailyChapterError) return reply.code(error.status).send({ error: error.message });
-      if (error instanceof ZodError) return reply.code(400).send({ error: error.issues[0]?.message ?? "Invalid daily chapter data." });
+    app.setErrorHandler((error, request, reply) => {
+      const locale = request.url.startsWith("/daily-chapter/admin") ? "en" : localeOf(request);
+      if (error instanceof DailyChapterError) return reply.code(error.status).send({ error: error.key ? t(locale, error.key) : error.message });
+      if (error instanceof ZodError) return reply.code(400).send({ error: locale === "en" ? error.issues[0]?.message ?? "Invalid daily chapter data." : validationMessage(locale, error) });
       throw error;
     });
     const admin = [authGuard, async (request: FastifyRequest) => { if (!isAdmin(request.user.id)) throw new DailyChapterError(403, "Only the editor can manage daily editions."); }];

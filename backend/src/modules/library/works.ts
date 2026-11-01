@@ -1,4 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
+import type { Locale } from "@scripta/shared/i18n";
+import { LocalizedError, t } from "../../i18n/index.js";
 import { canonicalWorks, resolveWorks, type WorkLookup } from "../books/index.js";
 import { openLibraryDb } from "./adapters/sqlite/connection.js";
 
@@ -14,15 +16,16 @@ export interface WorkRef {
   title: string | null;
 }
 
-export class WorkResolutionError extends Error {
+export class WorkResolutionError extends LocalizedError {
   constructor(cause: unknown) {
-    super("The book catalog is unavailable. Try again in a moment.", { cause });
+    super("works.catalogUnavailable");
+    this.cause = cause;
   }
 }
 
-export class UnknownWorkError extends Error {
+export class UnknownWorkError extends LocalizedError {
   constructor() {
-    super("That book isn't in the catalog.");
+    super("works.unknownBook");
   }
 }
 
@@ -157,6 +160,6 @@ export function workIdsByKey(keys: string[], works: Map<string, WorkRef>): Map<s
   return new Map(keys.filter((key) => key !== "").map((key) => [key, works.get(key)?.workId ?? null]));
 }
 
-export function duplicateWorkMessage(ref: WorkRef): string {
-  return `${ref.title ?? "That book"} is already here as another edition.`;
+export function duplicateWorkMessage(locale: Locale, ref: WorkRef): string {
+  return t(locale, "works.duplicateEdition", { title: ref.title ?? t(locale, "works.thatBook") });
 }

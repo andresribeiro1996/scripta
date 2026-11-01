@@ -4,6 +4,7 @@
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { localeOf, t } from "../../i18n/index.js";
 import { authGuard, getOptionalAuthenticatedUser, rateLimitKey } from "../auth/index.js";
 import {
   AlreadyVotedError,
@@ -69,12 +70,12 @@ export function buildArenaRoutes(service: ArenaService) {
   return async function arenaRoutes(app: FastifyInstance) {
     app.post("/arenas", { preHandler: authGuard }, async (request, reply) => {
       const parsed = createTournamentSchema.safeParse(request.body);
-      if (!parsed.success) return reply.code(400).send({ error: "Expected {name, bracketSize, roundDurationMinutes}." });
+      if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "arena.expectedCreate") });
       try {
         const tournament = service.createTournament(request.user.id, parsed.data);
         return reply.code(201).send({ tournament: tournament satisfies Tournament });
       } catch (err) {
-        if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: err.message });
+        if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: t(localeOf(request), err.key, err.vars) });
         throw err;
       }
     });
@@ -93,7 +94,7 @@ export function buildArenaRoutes(service: ArenaService) {
       await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute", keyGenerator: rateLimitKey });
       scoped.get("/arenas/public", async (request, reply) => {
         const parsed = listPublicQuerySchema.safeParse(request.query);
-        if (!parsed.success) return reply.code(400).send({ error: "Invalid limit/offset." });
+        if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "arena.invalidLimitOffset") });
         return reply.send({ tournaments: summariesForWire(service.listPublic(parsed.data.limit, parsed.data.offset)) });
       });
     });
@@ -106,112 +107,112 @@ export function buildArenaRoutes(service: ArenaService) {
     // needed here.
     app.get("/arenas/:id", async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
-      if (!params.success) return reply.code(400).send({ error: "Invalid tournament id." });
+      if (!params.success) return reply.code(400).send({ error: t(localeOf(request), "arena.invalidTournamentId") });
       const query = getTournamentQuerySchema.safeParse(request.query);
-      if (!query.success) return reply.code(400).send({ error: "Invalid voterToken." });
+      if (!query.success) return reply.code(400).send({ error: t(localeOf(request), "arena.invalidVoterToken") });
       // Optional session, same as the vote route below: a signed-in
       // viewer's "you voted" badges must reflect the account's votes, not
       // just this browser's token, now that the account-level dedup locks
       // those duels.
       const viewer = getOptionalAuthenticatedUser(request);
       const tournament = service.getTournamentView(params.data.id, query.data.voterToken, viewer?.id ?? null);
-      if (!tournament) return reply.code(404).send({ error: "No such tournament." });
+      if (!tournament) return reply.code(404).send({ error: t(localeOf(request), "arena.noSuchTournament") });
       return reply.send({ tournament: tournamentForWire(tournament) });
     });
 
     app.put("/arenas/:id/slots", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
-      if (!params.success) return reply.code(400).send({ error: "Invalid tournament id." });
+      if (!params.success) return reply.code(400).send({ error: t(localeOf(request), "arena.invalidTournamentId") });
       const body = setWorkSlotsSchema.safeParse(request.body);
-      if (!body.success) return reply.code(400).send({ error: "Expected {slots: [{slotIndex, book}, ...]}." });
+      if (!body.success) return reply.code(400).send({ error: t(localeOf(request), "arena.expectedSlots") });
       try {
         service.setSlotsManual(params.data.id, request.user.id, body.data.slots);
         return reply.code(204).send();
       } catch (err) {
-        if (err instanceof UnknownWorkError) return reply.code(400).send({ error: err.message });
-        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });
-        if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: err.message });
+        if (err instanceof UnknownWorkError) return reply.code(400).send({ error: t(localeOf(request), err.key, err.vars) });
+        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: t(localeOf(request), err.key, err.vars) });
+        if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: t(localeOf(request), err.key, err.vars) });
         throw err;
       }
     });
 
     app.post("/arenas/:id/random-fill", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
-      if (!params.success) return reply.code(400).send({ error: "Invalid tournament id." });
+      if (!params.success) return reply.code(400).send({ error: t(localeOf(request), "arena.invalidTournamentId") });
       const body = randomFillWorksSchema.safeParse(request.body);
-      if (!body.success) return reply.code(400).send({ error: "Expected {pool: [book, ...]}." });
+      if (!body.success) return reply.code(400).send({ error: t(localeOf(request), "arena.expectedPool") });
       try {
         service.randomFill(params.data.id, request.user.id, body.data.pool);
         return reply.code(204).send();
       } catch (err) {
-        if (err instanceof UnknownWorkError) return reply.code(400).send({ error: err.message });
-        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });
-        if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: err.message });
+        if (err instanceof UnknownWorkError) return reply.code(400).send({ error: t(localeOf(request), err.key, err.vars) });
+        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: t(localeOf(request), err.key, err.vars) });
+        if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: t(localeOf(request), err.key, err.vars) });
         throw err;
       }
     });
 
     app.post("/arenas/:id/start", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
-      if (!params.success) return reply.code(400).send({ error: "Invalid tournament id." });
+      if (!params.success) return reply.code(400).send({ error: t(localeOf(request), "arena.invalidTournamentId") });
       try {
         service.start(params.data.id, request.user.id);
         return reply.code(204).send();
       } catch (err) {
-        if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: err.message });
+        if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: t(localeOf(request), err.key, err.vars) });
         throw err;
       }
     });
 
     app.patch("/arenas/:id", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
-      if (!params.success) return reply.code(400).send({ error: "Invalid tournament id." });
+      if (!params.success) return reply.code(400).send({ error: t(localeOf(request), "arena.invalidTournamentId") });
       const parsed = renameTournamentSchema.safeParse(request.body);
-      if (!parsed.success) return reply.code(400).send({ error: "Expected {name}." });
+      if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "arena.expectedName") });
       try {
         service.renameTournament(params.data.id, request.user.id, parsed.data.name);
         return reply.code(204).send();
       } catch (err) {
-        if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: err.message });
+        if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: t(localeOf(request), err.key, err.vars) });
         throw err;
       }
     });
 
     app.delete("/arenas/:id", { preHandler: authGuard }, async (request, reply) => {
       const params = idParamSchema.safeParse(request.params);
-      if (!params.success) return reply.code(400).send({ error: "Invalid tournament id." });
+      if (!params.success) return reply.code(400).send({ error: t(localeOf(request), "arena.invalidTournamentId") });
       try {
         service.deleteTournament(params.data.id, request.user.id);
         return reply.code(204).send();
       } catch (err) {
-        if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: err.message });
+        if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: t(localeOf(request), err.key, err.vars) });
         throw err;
       }
     });
 
     app.post("/arenas/:id/duels/:duelId/settle", { preHandler: authGuard }, async (request, reply) => {
       const params = duelParamSchema.safeParse(request.params);
-      if (!params.success) return reply.code(400).send({ error: "Invalid id." });
+      if (!params.success) return reply.code(400).send({ error: t(localeOf(request), "arena.invalidId") });
       try {
         service.settleEarly(params.data.id, request.user.id, params.data.duelId);
         return reply.code(204).send();
       } catch (err) {
-        if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: err.message });
+        if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: t(localeOf(request), err.key, err.vars) });
         throw err;
       }
     });
 
     app.post("/arenas/:id/duels/:duelId/tiebreak", { preHandler: authGuard }, async (request, reply) => {
       const params = duelParamSchema.safeParse(request.params);
-      if (!params.success) return reply.code(400).send({ error: "Invalid id." });
+      if (!params.success) return reply.code(400).send({ error: t(localeOf(request), "arena.invalidId") });
       const body = tiebreakWorkSchema.safeParse(request.body);
-      if (!body.success) return reply.code(400).send({ error: "Expected {winnerWorkId}." });
+      if (!body.success) return reply.code(400).send({ error: t(localeOf(request), "arena.expectedWinner") });
       try {
         service.tiebreak(params.data.id, request.user.id, params.data.duelId, body.data.winnerWorkId);
         return reply.code(204).send();
       } catch (err) {
-        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });
-        if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: err.message });
+        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: t(localeOf(request), err.key, err.vars) });
+        if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: t(localeOf(request), err.key, err.vars) });
         throw err;
       }
     });
@@ -227,9 +228,9 @@ export function buildVoteRoute(service: ArenaService) {
   return async function voteRoute(app: FastifyInstance) {
     app.post("/arenas/:id/duels/:duelId/vote", async (request, reply) => {
       const params = duelParamSchema.safeParse(request.params);
-      if (!params.success) return reply.code(400).send({ error: "Invalid id." });
+      if (!params.success) return reply.code(400).send({ error: t(localeOf(request), "arena.invalidId") });
       const body = voteWorkSchema.safeParse(request.body);
-      if (!body.success) return reply.code(400).send({ error: "Expected {voterToken, workId}." });
+      if (!body.success) return reply.code(400).send({ error: t(localeOf(request), "arena.expectedVote") });
       // Same optional-session treatment the tier-list ballot routes give
       // (see routes.ts there): the route is public, but a valid session
       // claims the vote — and the token's whole history — for the account.
@@ -238,8 +239,8 @@ export function buildVoteRoute(service: ArenaService) {
         service.vote(params.data.id, params.data.duelId, body.data.voterToken, body.data.workId, user?.id ?? null);
         return reply.code(204).send();
       } catch (err) {
-        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });
-        if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: err.message });
+        if (err instanceof WorkResolutionError) return reply.code(503).send({ error: t(localeOf(request), err.key, err.vars) });
+        if (err instanceof ArenaError) return reply.code(statusForArenaError(err)).send({ error: t(localeOf(request), err.key, err.vars) });
         throw err;
       }
     });

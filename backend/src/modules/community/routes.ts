@@ -1,8 +1,9 @@
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { localeOf, t } from "../../i18n/index.js";
 import { authGuard, getOptionalAuthenticatedUser, rateLimitKey } from "../auth/index.js";
-import { CommunityError, FollowLimitError, InvalidCursorError, ProfileNotFoundError } from "./domain/errors.js";
+import { CommunityError, FollowLimitError, InvalidCursorError, ProfileNotFoundError, communityErrorMessage } from "./domain/errors.js";
 import type { CommunityService } from "./service.js";
 
 const followSchema = z.object({ userId: z.string().min(1) });
@@ -46,12 +47,12 @@ export function buildCommunityRoutes(service: CommunityService) {
       await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute", keyGenerator: rateLimitKey });
       scoped.post("/community/follows", { preHandler: authGuard }, async (request, reply) => {
         const parsed = followSchema.safeParse(request.body);
-        if (!parsed.success) return reply.code(400).send({ error: "Expected {userId}." });
+        if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "community.expectedUserId") });
         try {
           service.follow(request.user.id, parsed.data.userId);
           return reply.code(204).send();
         } catch (err) {
-          if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
+          if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: communityErrorMessage(localeOf(request), err) });
           throw err;
         }
       });
@@ -62,7 +63,7 @@ export function buildCommunityRoutes(service: CommunityService) {
           service.unfollow(request.user.id, userId);
           return reply.code(204).send();
         } catch (err) {
-          if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
+          if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: communityErrorMessage(localeOf(request), err) });
           throw err;
         }
       });
@@ -72,19 +73,19 @@ export function buildCommunityRoutes(service: CommunityService) {
       await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute", keyGenerator: rateLimitKey });
       scoped.put("/community/profile/publish", { preHandler: authGuard }, async (request, reply) => {
         const parsed = publishSchema.safeParse(request.body);
-        if (!parsed.success) return reply.code(400).send({ error: "Expected {muralId?, shareReading?}." });
+        if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "community.expectedPublish") });
         try {
           service.publishProfile(request.user.id, parsed.data);
           return reply.send({ ok: true });
         } catch (err) {
-          if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
+          if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: communityErrorMessage(localeOf(request), err) });
           throw err;
         }
       });
 
       scoped.put("/community/profile/feed-settings", { preHandler: authGuard }, async (request, reply) => {
         const parsed = feedSettingsSchema.safeParse(request.body);
-        if (!parsed.success) return reply.code(400).send({ error: "Expected { publications, reading, votes, follows } booleans." });
+        if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "community.expectedFeedSettings") });
         service.updateFeedSettings(request.user.id, parsed.data);
         return reply.code(204).send();
       });
@@ -102,12 +103,12 @@ export function buildCommunityRoutes(service: CommunityService) {
 
     app.put("/community/profile/mural", { preHandler: authGuard }, async (request, reply) => {
       const parsed = shelfMuralSchema.safeParse(request.body);
-      if (!parsed.success) return reply.code(400).send({ error: "Expected {muralId}." });
+      if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "community.expectedMuralId") });
       try {
         service.setShelfMural(request.user.id, parsed.data.muralId);
         return reply.code(204).send();
       } catch (err) {
-        if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
+        if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: communityErrorMessage(localeOf(request), err) });
         throw err;
       }
     });
@@ -116,11 +117,11 @@ export function buildCommunityRoutes(service: CommunityService) {
       await scoped.register(fastifyRateLimit, { max: 60, timeWindow: "1 minute", keyGenerator: rateLimitKey });
       scoped.get("/community/dashboard", { preHandler: authGuard }, async (request, reply) => {
         const parsed = dashboardQuerySchema.safeParse(request.query);
-        if (!parsed.success) return reply.code(400).send({ error: "Invalid cursor/limit/kinds." });
+        if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "community.invalidDashboardQuery") });
         try {
           return reply.send(service.getDashboard(request.user.id, parsed.data.cursor, parsed.data.limit, parsed.data.kinds ? new Set(parsed.data.kinds.split(",")) : undefined));
         } catch (err) {
-          if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
+          if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: communityErrorMessage(localeOf(request), err) });
           throw err;
         }
       });
@@ -135,7 +136,7 @@ export function buildCommunityRoutes(service: CommunityService) {
       await scoped.register(fastifyRateLimit, { max: 60, timeWindow: "1 minute", keyGenerator: rateLimitKey });
       scoped.get("/community/people", { preHandler: authGuard }, async (request, reply) => {
         const parsed = peopleQuerySchema.safeParse(request.query);
-        if (!parsed.success) return reply.code(400).send({ error: "Expected ?q= and optional ?limit=." });
+        if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "community.expectedPeopleQuery") });
         return reply.send({ people: service.searchPeople(request.user.id, parsed.data.q, parsed.data.limit) });
       });
     });
@@ -144,8 +145,8 @@ export function buildCommunityRoutes(service: CommunityService) {
       await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute" });
       scoped.get("/community/people/suggested", { preHandler: authGuard }, async (request, reply) => {
         const parsed = suggestedQuerySchema.safeParse(request.query);
-        if (!parsed.success) return reply.code(400).send({ error: "Expected optional ?limit= between 1 and 50 and ?previews=1." });
-        return reply.send({ people: service.suggestPeople(request.user.id, parsed.data.limit, parsed.data.previews === "1") });
+        if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "community.expectedSuggestedQuery") });
+        return reply.send({ people: service.suggestPeople(request.user.id, parsed.data.limit, localeOf(request), parsed.data.previews === "1") });
       });
     });
   };
@@ -157,11 +158,11 @@ export function buildPublicCommunityRoutes(service: CommunityService) {
       const { username } = request.params as { username: string };
       try {
         const viewer = getOptionalAuthenticatedUser(request);
-        const view = service.getProfileByUsername(username, viewer?.id);
+        const view = service.getProfileByUsername(username, localeOf(request), viewer?.id);
         reply.header("Cache-Control", "no-store");
         return reply.send(view);
       } catch (err) {
-        if (err instanceof ProfileNotFoundError) return reply.code(404).send({ error: "No published profile at that address." });
+        if (err instanceof ProfileNotFoundError) return reply.code(404).send({ error: t(localeOf(request), "community.profileNotFound") });
         throw err;
       }
     });
@@ -169,14 +170,14 @@ export function buildPublicCommunityRoutes(service: CommunityService) {
     app.get("/community/profiles/:username/activity", async (request, reply) => {
       const { username } = request.params as { username: string };
       const parsed = activityQuerySchema.safeParse(request.query);
-      if (!parsed.success) return reply.code(400).send({ error: "Invalid activity query." });
+      if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "community.invalidActivityQuery") });
       try {
         const viewer = getOptionalAuthenticatedUser(request);
-        const page = service.getActivity(username, viewer?.id, parsed.data.cursor, parsed.data.limit);
+        const page = service.getActivity(username, viewer?.id, parsed.data.cursor, parsed.data.limit, localeOf(request));
         reply.header("Cache-Control", "no-store");
         return reply.send(page);
       } catch (err) {
-        if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: err.message });
+        if (err instanceof CommunityError) return reply.code(statusForCommunityError(err)).send({ error: communityErrorMessage(localeOf(request), err) });
         throw err;
       }
     });
@@ -189,7 +190,7 @@ export function buildPublicCommunityRoutes(service: CommunityService) {
         reply.header("Cache-Control", "no-store");
         return reply.send(library);
       } catch (err) {
-        if (err instanceof ProfileNotFoundError) return reply.code(404).send({ error: "No published profile at that address." });
+        if (err instanceof ProfileNotFoundError) return reply.code(404).send({ error: t(localeOf(request), "community.profileNotFound") });
         throw err;
       }
     });
@@ -201,7 +202,7 @@ export function buildDiscoverRoutes(service: CommunityService) {
     await app.register(fastifyRateLimit, { max: (_request, key) => (key.startsWith("ip:") ? 30 : 60), timeWindow: "1 minute", keyGenerator: rateLimitKey });
     app.get("/community/discover", async (request, reply) => {
       const parsed = discoverQuerySchema.safeParse(request.query);
-      if (!parsed.success) return reply.code(400).send({ error: "Invalid type/q/limit/offset." });
+      if (!parsed.success) return reply.code(400).send({ error: t(localeOf(request), "community.invalidDiscoverQuery") });
       reply.header("Cache-Control", "no-store");
       const viewer = getOptionalAuthenticatedUser(request);
       return reply.send(service.getDiscover(parsed.data.type, parsed.data.q, parsed.data.limit, parsed.data.offset, viewer?.id));

@@ -1,5 +1,7 @@
 import { blockReferences, muralThemeId, type MuralBlock, type MuralPublicPayload, type ResolvedTierlist } from "@scripta/shared";
+import type { Locale } from "@scripta/shared/i18n";
 import { env } from "../../../config/env.js";
+import { t } from "../../../i18n/index.js";
 import { resolvePublicReaderProfile } from "../../auth/index.js";
 import { resolvePublicBooksByWork, resolvePublicLibraryData } from "../../library/index.js";
 import type { MuralRow } from "./types.js";
@@ -13,6 +15,7 @@ export function muralCoverImageUrl(row: MuralRow): string | null {
 export function resolveMuralPublicPayload(
   row: MuralRow,
   blocks: unknown,
+  locale: Locale,
   getTierlistData?: (ownerUserId: string, tierlistId: string) => ResolvedTierlist | undefined
 ): MuralPublicPayload {
   const refs = blockReferences(blocks);
@@ -62,7 +65,7 @@ export function resolveMuralPublicPayload(
       theme: muralThemeId(row.theme),
       blocks: (Array.isArray(blocks) ? blocks : []).map((block) => {
         if (!block || typeof block !== "object") return block;
-        if (block.type === "quote" && block.mode === "rediscover") return { id: block.id, type: "text", layout: block.layout, style: block.style, heading: "Private passage", body: "Rediscovered passages are only visible to the owner." };
+        if (block.type === "quote" && block.mode === "rediscover") return { id: block.id, type: "text", layout: block.layout, style: block.style, heading: t(locale, "murals.privatePassage"), body: t(locale, "murals.privatePassageBody") };
         if (block.type === "shelf" && typeof block.collectionId === "string") {
           const { collectionId, ...rest } = block;
           return { ...rest, bookKeys: libraryData.collectionBooks?.[collectionId] ?? [] };
