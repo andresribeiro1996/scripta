@@ -1084,6 +1084,7 @@ Domain errors extend `LocalizedError`. Route literals use `t(localeOf(request), 
 - Test: `backend/src/modules/tierlists/`
 - Test: `backend/src/modules/murals/`
 - Test: `backend/src/modules/gallery/`
+- Modify: `backend/src/modules/community/`
 - Modify: `backend/package.json`
 
 - [ ] Steps 1–5 as Task 33
@@ -1100,6 +1101,7 @@ Domain errors extend `LocalizedError`. Route literals use `t(localeOf(request), 
 - Modify: `backend/src/worksErrors.ts`
 - Modify: `backend/src/modules/arena/routes.ts`
 - Modify: `backend/src/modules/murals/routes.ts`
+- Modify: `backend/src/modules/tierlists/routes.ts`
 - Modify: `backend/src/app.ts`
 - Test: `backend/src/modules/library/`
 - Test: `backend/src/modules/books/`
