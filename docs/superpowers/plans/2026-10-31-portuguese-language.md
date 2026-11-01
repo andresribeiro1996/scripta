@@ -973,6 +973,7 @@ Saved defaults are written in the creator's locale. `TierlistShareImage.tsx:36` 
 - Modify: `mobile/src/i18n/messages/en/index.ts`
 - Modify: `mobile/src/i18n/messages/pt-PT/index.ts`
 - Modify: `mobile/src/features/murals/`
+- Modify: `mobile/src/features/library/components/PerCardStyleFields.tsx`
 - Test: `mobile/src/features/murals/`
 
 Genres in `MuralCanvas.tsx` use `genreLabel`.
