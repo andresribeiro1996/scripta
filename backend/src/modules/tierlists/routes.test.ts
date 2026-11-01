@@ -100,12 +100,12 @@ test("share video renders an MP4 only for the published tier list's owner", asyn
   await app.register(fastifyMultipart, { limits: { fileSize: 4 * 1024 * 1024, files: 1 } });
   await app.register(buildTierlistShareVideoRoutes(service));
 
-  function upload(image: Buffer, user: string) {
+  function upload(image: Buffer, user: string, language?: string) {
     const boundary = "tierlist-card";
     return app.inject({
       method: "POST",
       url: `/tierlists/${copy.id}/share-video`,
-      headers: { authorization: `Bearer ${user}`, "content-type": `multipart/form-data; boundary=${boundary}` },
+      headers: { authorization: `Bearer ${user}`, "content-type": `multipart/form-data; boundary=${boundary}`, ...(language ? { "accept-language": language } : {}) },
       payload: Buffer.concat([
         Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="card.png"\r\nContent-Type: image/png\r\n\r\n`),
         image,
@@ -118,6 +118,7 @@ test("share video renders an MP4 only for the published tier list's owner", asyn
     const png = await sharp({ create: { width: 600, height: 1500, channels: 3, background: "#f2f0ec" } }).png().toBuffer();
     assert.equal((await upload(png, "u2")).statusCode, 404);
     assert.equal((await upload(Buffer.from("not a PNG"), "u1")).statusCode, 400);
+    assert.deepEqual((await upload(Buffer.from("not a PNG"), "u1", "pt-PT")).json(), { error: "Envie uma imagem PNG válida." });
     const jpeg = await sharp({ create: { width: 600, height: 1500, channels: 3, background: "#f2f0ec" } }).jpeg().toBuffer();
     assert.equal((await upload(jpeg, "u1")).statusCode, 400);
     const response = await upload(png, "u1");
@@ -670,4 +671,26 @@ test("the voted-on list carries the subject label", async () => {
   const voted = await app.inject({ method: "GET", url: "/tierlists/voted", headers: headers("c2") });
   assert.deepEqual(voted.json().tierlists[0].subject, { kind: "characters", label: "Harry Potter" });
   await app.close();
+});
+
+test("tier list errors come back in Portuguese for a Portuguese request and stay English otherwise", async () => {
+  const { app } = await ownerApp();
+  const portuguese = { ...headers("t-pt"), "accept-language": "pt-PT" };
+  const missing = await app.inject({ method: "GET", url: "/tierlists/6b0c2c3a-6f0a-4c3e-9d1c-3a7a4e2b9f11", headers: portuguese });
+  assert.equal(missing.statusCode, 404);
+  assert.deepEqual(missing.json(), { error: "Não existe nenhuma tabela de níveis com esse identificador." });
+  const unnamed = await app.inject({ method: "POST", url: "/tierlists", headers: portuguese, payload: { name: "" } });
+  assert.deepEqual(unnamed.json(), { error: "O nome é obrigatório e não pode estar vazio." });
+  const early = await app.inject({ method: "POST", url: "/tierlists", headers: portuguese, payload: { name: "X", access: "anonymous" } });
+  assert.deepEqual(early.json(), { error: "Escolha livros e níveis antes de publicar." });
+  assert.deepEqual((await app.inject({ method: "POST", url: "/tierlists", headers: headers("t-pt"), payload: { name: "" } })).json(), { error: "name is required and must be non-empty." });
+  await app.close();
+});
+
+test("a Portuguese ballot that does not match the board gets a Portuguese error", async () => {
+  const { service, code } = openPoll();
+  const { body } = await call(service, { method: "POST", url: `/tierlists/voting/${code}/ballot`, headers: { "accept-language": "pt-PT" }, payload: { placements: [{ workId: titleWork("Not On Board"), tierId: "s" }] } });
+  assert.deepEqual(body, { error: "Essas posições não correspondem a esta tabela de níveis." } as never);
+  const closed = await call(service, { method: "GET", url: "/tierlists/voting/nope", headers: { "accept-language": "pt-PT" } });
+  assert.deepEqual(closed.body, { error: "Não existe nenhuma tabela de níveis nessa ligação." } as never);
 });

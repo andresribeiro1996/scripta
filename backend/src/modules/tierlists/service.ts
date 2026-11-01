@@ -3,6 +3,7 @@
 // module's service.ts.
 
 import { randomUUID } from "node:crypto";
+import type { BackendKey } from "../../i18n/index.js";
 import { generateVoteCode } from "../../voteCode.js";
 import type { GameByWork } from "../works/index.js";
 import { characterSnapshot, DEFAULT_TIER_PRESET, type CharacterSubject, type PublicBookData, type ResolvedTierlist, type TierlistData, type VotedTierlist } from "@scripta/shared";
@@ -98,7 +99,7 @@ function knownFor(works: TierlistWorks, data: unknown): Map<string, string> {
 
 export type TierlistWriteOutcome =
   | { ok: true; tierlist: Tierlist; data: TierlistData }
-  | { ok: false; reason: "not-found" | "invalid"; error: string }
+  | { ok: false; reason: "not-found" | "invalid"; error: BackendKey }
   | { ok: false; reason: "duplicate-work"; title: string | null };
 
 type StoredBoard = { ok: true; data: TierlistData } | Exclude<TierlistWriteOutcome, { ok: true }>;
@@ -255,10 +256,10 @@ export type EmitVotedOn = (voterUserId: string, tierlistId: string, tierlistName
 export function createTierlistsService(repo: TierlistsRepository, works: TierlistWorks, emitPublished?: EmitPublished, emitVotedOn?: EmitVotedOn, peekCovers?: CoverPeek): TierlistsService {
   function storedBoard(board: TierlistData, subject: CharacterSubject | null): StoredBoard {
     const all = [...board.tiers.flatMap((tier) => tier.workIds), ...board.pool];
-    if (new Set(all).size !== all.length) return { ok: false, reason: "invalid", error: "Duplicate tier or book." };
+    if (new Set(all).size !== all.length) return { ok: false, reason: "invalid", error: "tierlists.duplicateTierOrBook" };
     if (subject) {
       const cast = new Set(subject.characters.map((character) => character.id));
-      if (!all.every((id) => cast.has(id))) return { ok: false, reason: "invalid", error: "A character is not in this list." };
+      if (!all.every((id) => cast.has(id))) return { ok: false, reason: "invalid", error: "tierlists.characterNotInList" };
       return { ok: true, data: board };
     }
     const ids = works.knownWorkIds(all);
@@ -281,20 +282,20 @@ export function createTierlistsService(repo: TierlistsRepository, works: Tierlis
     createTierlist(userId, { name, data, characters, access, ranksWorstFirst = false }) {
       let subject: CharacterSubject | null = null;
       if (characters) {
-        if (data || access) return { ok: false, reason: "invalid", error: "Choose either books or characters." };
+        if (data || access) return { ok: false, reason: "invalid", error: "tierlists.chooseBooksOrCharacters" };
         const cast = works.castOf(characters.workId);
         const wanted = new Set(characters.characterIds);
-        if (!cast || wanted.size !== characters.characterIds.length || wanted.size < 4) return { ok: false, reason: "invalid", error: "Choose at least 4 characters from the cast." };
+        if (!cast || wanted.size !== characters.characterIds.length || wanted.size < 4) return { ok: false, reason: "invalid", error: "tierlists.chooseFourCharacters" };
         const selected = cast.characters.filter((character) => wanted.has(character.id));
-        if (selected.length !== wanted.size) return { ok: false, reason: "invalid", error: "Choose at least 4 characters from the cast." };
+        if (selected.length !== wanted.size) return { ok: false, reason: "invalid", error: "tierlists.chooseFourCharacters" };
         const { kind, key, label, coverUrl } = cast.scope;
         subject = { kind: "characters", scope: { kind, key, label, coverUrl }, characters: selected.map(({ id, name: characterName }) => ({ id, name: characterName })) };
       }
-      if (access && !data) return { ok: false, reason: "invalid", error: "Choose books and tiers before publishing." };
+      if (access && !data) return { ok: false, reason: "invalid", error: "tierlists.chooseBooksAndTiers" };
       if (data) {
         const tierIds = data.tiers.map((tier) => tier.id);
-        if (new Set(tierIds).size !== tierIds.length) return { ok: false, reason: "invalid", error: "Duplicate tier or book." };
-        if (access && (!data.pool.length || data.tiers.some((tier) => tier.workIds.length))) return { ok: false, reason: "invalid", error: "Public tier lists need an unranked book pool." };
+        if (new Set(tierIds).size !== tierIds.length) return { ok: false, reason: "invalid", error: "tierlists.duplicateTierOrBook" };
+        if (access && (!data.pool.length || data.tiers.some((tier) => tier.workIds.length))) return { ok: false, reason: "invalid", error: "tierlists.needsUnrankedPool" };
       }
       let board: TierlistData;
       let publicBooks: PublicBookData[] = [];
@@ -306,7 +307,7 @@ export function createTierlistsService(repo: TierlistsRepository, works: Tierlis
         board = stored.data;
         if (access) {
           publicBooks = booksInOrder(userId, board.pool);
-          if (publicBooks.length !== board.pool.length) return { ok: false, reason: "invalid", error: "A selected book is no longer in your library." };
+          if (publicBooks.length !== board.pool.length) return { ok: false, reason: "invalid", error: "tierlists.bookNoLongerInLibrary" };
         }
       } else {
         board = { tiers: DEFAULT_TIER_PRESET.map((t) => ({ id: randomUUID(), label: t.label, color: t.color, workIds: [] })), pool: [] };
@@ -341,7 +342,7 @@ export function createTierlistsService(repo: TierlistsRepository, works: Tierlis
 
     updateTierlist(userId, id, patch) {
       const existing = repo.getOwned(id, userId);
-      if (!existing || existing.vote_code !== null) return { ok: false, reason: "not-found", error: "No tier list with that id." };
+      if (!existing || existing.vote_code !== null) return { ok: false, reason: "not-found", error: "tierlists.notFound" };
       const current = toTierlist(existing);
       let board: TierlistData;
       if (patch.data !== undefined) {
@@ -355,7 +356,7 @@ export function createTierlistsService(repo: TierlistsRepository, works: Tierlis
         ...(patch.name !== undefined ? { name: patch.name } : {}),
         ...(patch.data !== undefined ? { data: JSON.stringify(board) } : {})
       });
-      if (!row) return { ok: false, reason: "not-found", error: "No tier list with that id." };
+      if (!row) return { ok: false, reason: "not-found", error: "tierlists.notFound" };
       return { ok: true, tierlist: toTierlist(row), data: board };
     },
 
