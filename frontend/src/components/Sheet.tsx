@@ -2,6 +2,7 @@ import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import type { OptionsMenuItem } from "./OptionsMenu";
 import { useDismissible } from "../hooks/useDismissible";
 import { useScrollLock } from "../hooks/useScrollLock";
+import { useT } from "../i18n";
 import { keepTabInside } from "../lib/keepTabInside";
 
 /** The shared shell behind every bottom sheet: backdrop, Escape and
@@ -33,6 +34,7 @@ export function Sheet({
   role?: "dialog" | "alertdialog";
   "aria-describedby"?: string;
 }) {
+  const t = useT();
   useScrollLock();
   useDismissible(onClose);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -63,7 +65,7 @@ export function Sheet({
           {onBack && (
             <button
               onClick={onBack}
-              aria-label="Back to books"
+              aria-label={t("shell.backToBooks")}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-(--color-text-dim) hover:bg-(--color-surface-hover)"
             >
               <svg
@@ -84,7 +86,7 @@ export function Sheet({
           <button
             ref={closeRef}
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("shell.close")}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-(--color-text-dim) hover:bg-(--color-surface-hover)"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

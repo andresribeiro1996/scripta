@@ -14,13 +14,14 @@ import {
   authLabelClass,
   authSubmitClass
 } from "../auth/AuthStage";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
 /** Where a Google sign-in without a username yet gets routed (see
  *  RequireUsername). Not shown to password-signup accounts — they pick a
  *  username at signup time and never have a null one to begin with. */
 export function ChooseUsernamePage() {
   const locale = useLocale();
+  const t = useT();
   const { session, setUsername } = useAuth();
   const navigate = useNavigate();
   const [username, setUsernameInput] = useState("");
@@ -48,7 +49,7 @@ export function ChooseUsernamePage() {
       // password account takes after registering.
       navigate("/welcome-avatar", { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setError(err instanceof Error ? err.message : t("shell.somethingWentWrong"));
     } finally {
       setSubmitting(false);
     }
@@ -58,15 +59,15 @@ export function ChooseUsernamePage() {
     <AuthStage>
       <AuthCard>
         <AuthHeading
-          title="One more thing"
-          subtitle={`Choose a username for ${session.user.email}. You'll be able to log in with it or your email from now on.`}
+          title={t("shell.oneMoreThing")}
+          subtitle={t("shell.chooseUsernameSubtitle", { email: session.user.email })}
         />
 
         <AuthServerError message={error} />
 
         <form onSubmit={handleSubmit}>
           <label className={authLabelClass} htmlFor="username">
-            Username
+            {t("shell.username")}
           </label>
           <input
             id="username"
@@ -75,7 +76,7 @@ export function ChooseUsernamePage() {
             minLength={3}
             maxLength={30}
             pattern="[a-zA-Z0-9_.]+"
-            title="Letters, numbers, underscores, and periods only."
+            title={t("shell.usernameRule")}
             autoComplete="username"
             value={username}
             onChange={(e) => {
@@ -90,7 +91,7 @@ export function ChooseUsernamePage() {
           {fieldError ? <AuthFieldError id="username-error" message={fieldError} /> : <p id="username-hint" className={authHintClass}>{usernameHint(locale)}</p>}
 
           <button type="submit" disabled={submitting} className={`${authSubmitClass} mt-6`}>
-            {submitting ? "Saving…" : "Continue"}
+            {submitting ? t("shell.saving") : t("shell.continue")}
           </button>
         </form>
       </AuthCard>

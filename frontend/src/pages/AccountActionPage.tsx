@@ -5,10 +5,11 @@ import { publicFetch } from "../api/client";
 import { setSession } from "../auth/tokenStore";
 import { PasswordInput } from "../auth/PasswordInput";
 import { AuthCard, AuthHeading, AuthServerError, AuthStage, authFieldClass, authHintClass, authLabelClass, authLinkClass, authSubmitClass } from "../auth/AuthStage";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
 export function AccountActionPage({ action }: { action: "forgot" | "reset" | "verify" }) {
   const locale = useLocale();
+  const t = useT();
   const location = useLocation();
   const navigate = useNavigate();
   const [token] = useState(() => new URLSearchParams(location.hash.slice(1)).get("token") ?? "");
@@ -30,14 +31,14 @@ export function AccountActionPage({ action }: { action: "forgot" | "reset" | "ve
     event.preventDefault();
     if (busy || (action === "forgot" && cooldown > 0)) return;
     setError(null);
-    if (action === "reset" && password !== confirm) { setError("Passwords don’t match."); return; }
+    if (action === "reset" && password !== confirm) { setError(t("shell.passwordsDontMatch")); return; }
     setBusy(true);
     try {
       await publicFetch(`/auth/${action === "forgot" ? "forgot-password" : action === "reset" ? "reset-password" : "verify-email"}`, {
         method: "POST", body: JSON.stringify(action === "forgot" ? { email: email.trim() } : { token, password }),
       });
       if (action === "reset") {
-        navigate("/login", { replace: true, state: { message: "Password updated. Log in with your new password. All other sessions were signed out." } });
+        navigate("/login", { replace: true, state: { message: t("shell.passwordUpdatedLogIn") } });
         setSession(null);
         return;
       }
@@ -45,27 +46,27 @@ export function AccountActionPage({ action }: { action: "forgot" | "reset" | "ve
       setPassword("");
       setConfirm("");
       if (action === "forgot") setCooldown(60);
-    } catch (reason) { setError(reason instanceof TypeError ? "Couldn’t connect. Check your connection and try again." : reason instanceof Error ? reason.message : "Please try again."); }
+    } catch (reason) { setError(reason instanceof TypeError ? t("shell.connectFailed") : reason instanceof Error ? reason.message : t("shell.pleaseTryAgain")); }
     finally { setBusy(false); }
   }
 
   return <AuthStage><AuthCard>
-    <AuthHeading title={action === "forgot" ? "Recover your account" : action === "reset" ? "Choose a new password" : "Verify your email"} subtitle={action === "forgot" ? "Enter your account's email and we’ll send instructions for choosing a new password." : undefined} />
+    <AuthHeading title={action === "forgot" ? t("shell.recoverTitle") : action === "reset" ? t("shell.resetTitle") : t("shell.verifyTitle")} subtitle={action === "forgot" ? t("shell.recoverSubtitle") : undefined} />
     <AuthServerError message={error} />
-    {done && <p role="status" className="mb-5 text-center text-sm">{action === "forgot" ? recoveryMessage(locale) : action === "reset" ? "Password updated. Log in with your new password. Your other sessions have been signed out." : "Email verified. You can return to Atmyshelf. If you changed your email, log in with the new address."}</p>}
+    {done && <p role="status" className="mb-5 text-center text-sm">{action === "forgot" ? recoveryMessage(locale) : action === "reset" ? t("shell.resetDone") : t("shell.verifyDone")}</p>}
     {(!done || action === "forgot") && <form onSubmit={submit} className="space-y-4">
       <fieldset disabled={busy} className="space-y-4">
-        {action === "forgot" ? <div><label htmlFor="recovery-email" className={authLabelClass}>Email</label><input id="recovery-email" type="email" required autoComplete="email" autoCapitalize="none" value={email} onChange={(event) => { setEmail(event.target.value); setDone(false); }} className={authFieldClass} /></div> : action === "reset" && token ? <>
-          <div><label htmlFor="new-password" className={authLabelClass}>New password</label><PasswordInput id="new-password" required minLength={8} maxLength={128} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} className={authFieldClass} /><p className={authHintClass}>{passwordHint(locale)}</p></div>
-          <div><label htmlFor="confirm-password" className={authLabelClass}>Confirm new password</label><PasswordInput id="confirm-password" required autoComplete="new-password" value={confirm} onChange={(event) => setConfirm(event.target.value)} className={authFieldClass} /></div>
-        </> : !token ? <p role="alert" className="text-center text-sm">{`This link is missing its ${action === "reset" ? "reset" : "verification"} code.`}</p> : <p className="text-center text-sm">Confirm this email address for your Atmyshelf account.</p>}
-        {(action === "forgot" || token) && <button className={authSubmitClass} disabled={busy || (action === "forgot" && cooldown > 0)}>{busy ? "Working…" : action === "forgot" ? cooldown > 0 ? `Resend in ${cooldown}s` : done ? "Resend email" : "Send recovery email" : action === "reset" ? "Update password" : "Verify email"}</button>}
+        {action === "forgot" ? <div><label htmlFor="recovery-email" className={authLabelClass}>{t("shell.email")}</label><input id="recovery-email" type="email" required autoComplete="email" autoCapitalize="none" value={email} onChange={(event) => { setEmail(event.target.value); setDone(false); }} className={authFieldClass} /></div> : action === "reset" && token ? <>
+          <div><label htmlFor="new-password" className={authLabelClass}>{t("shell.newPassword")}</label><PasswordInput id="new-password" required minLength={8} maxLength={128} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} className={authFieldClass} /><p className={authHintClass}>{passwordHint(locale)}</p></div>
+          <div><label htmlFor="confirm-password" className={authLabelClass}>{t("shell.confirmNewPassword")}</label><PasswordInput id="confirm-password" required autoComplete="new-password" value={confirm} onChange={(event) => setConfirm(event.target.value)} className={authFieldClass} /></div>
+        </> : !token ? <p role="alert" className="text-center text-sm">{action === "reset" ? t("shell.missingResetCode") : t("shell.missingVerifyCode")}</p> : <p className="text-center text-sm">{t("shell.confirmEmailPrompt")}</p>}
+        {(action === "forgot" || token) && <button className={authSubmitClass} disabled={busy || (action === "forgot" && cooldown > 0)}>{busy ? t("shell.working") : action === "forgot" ? cooldown > 0 ? t("shell.resendIn", { seconds: cooldown }) : done ? t("shell.resendEmail") : t("shell.sendRecoveryEmail") : action === "reset" ? t("shell.updatePassword") : t("shell.verifyEmail")}</button>}
       </fieldset>
     </form>}
     <div className="mt-4 flex flex-col items-center gap-2 text-center text-sm">
-      {action === "reset" && !done && <Link to="/forgot-password" className={`flex min-h-11 items-center ${authLinkClass}`}>Request a new reset link</Link>}
-      {action === "verify" && <Link to="/dashboard/settings" className={`flex min-h-11 items-center ${authLinkClass}`}>Open Settings to resend or correct your email</Link>}
-      <Link to="/login" className={`flex min-h-11 items-center ${authLinkClass}`}>Back to login</Link>
+      {action === "reset" && !done && <Link to="/forgot-password" className={`flex min-h-11 items-center ${authLinkClass}`}>{t("shell.requestNewReset")}</Link>}
+      {action === "verify" && <Link to="/dashboard/settings" className={`flex min-h-11 items-center ${authLinkClass}`}>{t("shell.openSettingsForEmail")}</Link>}
+      <Link to="/login" className={`flex min-h-11 items-center ${authLinkClass}`}>{t("shell.backToLogin")}</Link>
     </div>
   </AuthCard></AuthStage>;
 }

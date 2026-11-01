@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import type { Session } from "../../auth/tokenStore";
+import { t, useT } from "../../i18n";
 import { area, footerAreas } from "../../lib/areas";
 import { Avatar } from "../Avatar";
 import { OptionsMenu, type OptionsMenuItem } from "../OptionsMenu";
@@ -12,9 +13,9 @@ export function accountMenuItems({ username, isAdmin, navigate, logout }: {
   logout: () => void;
 }): OptionsMenuItem[] {
   return [
-    { label: "My shelf", onClick: () => navigate(`/community/u/${username}`) },
+    { label: t("shell.myShelf"), onClick: () => navigate(`/community/u/${username}`) },
     ...[area("settings"), ...footerAreas(isAdmin)].map((item) => ({ label: item.label, onClick: () => navigate(item.to) })),
-    { label: "Log out", onClick: logout, danger: true }
+    { label: t("shell.logOut"), onClick: logout, danger: true }
   ];
 }
 
@@ -24,11 +25,12 @@ export function AccountMenu({ user, isAdmin, active, onLogout }: {
   active: boolean;
   onLogout: () => void;
 }) {
+  const translate = useT();
   const navigate = useNavigate();
   const username = user.username ?? user.email;
   return (
     <OptionsMenu
-      title="Account menu"
+      title={translate("shell.accountMenu")}
       heading={`@${username}`}
       items={accountMenuItems({ username, isAdmin, navigate, logout: onLogout })}
       triggerClassName={`inline-flex min-h-11 items-center gap-1.5 rounded-full pl-1 pr-2 text-(--color-text-dim) hover:bg-(--color-surface-hover)${active ? " bg-(--color-surface-hover)" : ""}`}

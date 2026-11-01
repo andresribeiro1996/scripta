@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useT } from "../i18n";
 import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
 import { Sheet } from "./Sheet";
 
@@ -34,6 +35,7 @@ interface ConfirmContextValue {
 const ConfirmContext = createContext<ConfirmContextValue | null>(null);
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const t = useT();
   const [pending, setPending] = useState<PendingConfirm | null>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const bodyId = useId();
@@ -69,13 +71,13 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           footer={
             <>
               <button ref={cancelButtonRef} onClick={() => settle(false)} className={BUTTON_SECONDARY}>
-                Cancel
+                {t("shell.cancel")}
               </button>
               <button
                 onClick={() => settle(true)}
                 className={pending.danger === false ? BUTTON_PRIMARY : BUTTON_DANGER}
               >
-                {pending.confirmLabel ?? "Delete"}
+                {pending.confirmLabel ?? t("shell.delete")}
               </button>
             </>
           }

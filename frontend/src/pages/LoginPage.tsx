@@ -22,7 +22,7 @@ import {
   authSecondaryClass,
   authSubmitClass
 } from "../auth/AuthStage";
-import { useLocale } from "../i18n";
+import { useLocale, useT } from "../i18n";
 
 // Google's own official "G" mark (Identity branding guidelines) — inlined
 // rather than fetched from Google's asset host, same offline-friendly
@@ -39,6 +39,7 @@ const GoogleLogo = () => (
 
 export function LoginPage() {
   const locale = useLocale();
+  const t = useT();
   const { session, login, signup } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -93,7 +94,7 @@ export function LoginPage() {
     } catch {
       locked.current = false;
       setSubmitting(false);
-      setError("Your browser couldn’t save this sign-in. Allow site storage and try again.");
+      setError(t("shell.storageBlocked"));
     }
   }
 
@@ -131,7 +132,7 @@ export function LoginPage() {
       if (err instanceof ApiError && err.field) {
         setFieldErrors({ [err.field]: err.message });
         document.getElementById(err.field)?.focus();
-      } else setError(err instanceof TypeError ? "Couldn’t connect. Check your connection and try again." : err instanceof Error ? err.message : "Something went wrong.");
+      } else setError(err instanceof TypeError ? t("shell.connectFailed") : err instanceof Error ? err.message : t("shell.somethingWentWrong"));
     } finally {
       locked.current = false;
       setSubmitting(false);
@@ -150,7 +151,7 @@ export function LoginPage() {
     <AuthStage>
       <AuthCard>
         <AuthHeading
-          title={mode === "login" ? "Welcome back" : "A shelf that feels like you"}
+          title={mode === "login" ? t("shell.loginWelcome") : t("shell.signupHeading")}
         />
 
         {message && <p role="status" className="mb-5 text-sm">{message}</p>}
@@ -160,7 +161,7 @@ export function LoginPage() {
           <fieldset disabled={submitting}>
             <div className="mb-4">
               <label className={authLabelClass} htmlFor="identifier">
-                {mode === "login" ? "Email or username" : "Email"}
+                {mode === "login" ? t("shell.emailOrUsername") : t("shell.email")}
               </label>
               <input
                 id="identifier"
@@ -185,7 +186,7 @@ export function LoginPage() {
               <div className="-mx-1 overflow-hidden px-1">
                 <div className="pb-4">
                   <label className={authLabelClass} htmlFor="username">
-                    Username
+                    {t("shell.username")}
                   </label>
                   <input
                     id="username"
@@ -195,7 +196,7 @@ export function LoginPage() {
                     minLength={3}
                     maxLength={30}
                     pattern="[a-zA-Z0-9_.]+"
-                    title="Letters, numbers, underscores, and periods only."
+                    title={t("shell.usernameRule")}
                     autoComplete="username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
@@ -211,7 +212,7 @@ export function LoginPage() {
 
             <div className="mb-2">
               <label className={authLabelClass} htmlFor="password">
-                Password
+                {t("shell.password")}
               </label>
               <PasswordInput
                 key={mode}
@@ -231,11 +232,11 @@ export function LoginPage() {
             </div>
 
             <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 text-sm">
-              <label className="flex min-h-11 items-center gap-2 text-(--color-text-dim)"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} className={CHECKBOX_CLASS} />Remember me</label>
-              {mode === "login" && <Link to={`/forgot-password?email=${encodeURIComponent(identifier.includes("@") ? identifier : "")}`} className={`flex min-h-11 items-center ${authLinkClass}`}>Forgot password?</Link>}
+              <label className="flex min-h-11 items-center gap-2 text-(--color-text-dim)"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} className={CHECKBOX_CLASS} />{t("shell.rememberMe")}</label>
+              {mode === "login" && <Link to={`/forgot-password?email=${encodeURIComponent(identifier.includes("@") ? identifier : "")}`} className={`flex min-h-11 items-center ${authLinkClass}`}>{t("shell.forgotPassword")}</Link>}
             </div>
             <button type="submit" disabled={submitting} className={`${authSubmitClass} gap-3`}>
-              {submitting ? (mode === "login" ? "Logging in…" : "Creating account…") : mode === "login" ? "Log in" : "Create account"}
+              {submitting ? (mode === "login" ? t("shell.loggingIn") : t("shell.creatingAccount")) : mode === "login" ? t("shell.logIn") : t("shell.createAccount")}
               <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14m-5-5 5 5-5 5" /></svg>
             </button>
           </fieldset>
@@ -245,20 +246,20 @@ export function LoginPage() {
           <>
             <div className="my-5 flex items-center gap-3 text-xs text-(--color-text-dim)">
               <span className="h-px flex-1 bg-(--color-border)" />
-              or
+              {t("shell.or")}
               <span className="h-px flex-1 bg-(--color-border)" />
             </div>
             <a href={`${API_URL}/auth/google`} onClick={startGoogleSignIn} className={authSecondaryClass}>
               <GoogleLogo />
-              Continue with Google
+              {t("shell.continueWithGoogle")}
             </a>
           </>
         )}
 
         <p className="mt-6 text-center text-[13px] text-(--color-text-dim)">
-          {mode === "login" ? "New to Atmyshelf?" : "Already have an account?"}{" "}
+          {mode === "login" ? t("shell.newToAtmyshelf") : t("shell.alreadyHaveAccount")}{" "}
           <button type="button" onClick={switchMode} disabled={submitting} className={`inline-flex min-h-11 items-center ${authLinkClass}`}>
-            {mode === "login" ? "Create an account" : "Log in"}
+            {mode === "login" ? t("shell.createAnAccount") : t("shell.logIn")}
           </button>
         </p>
       </AuthCard>

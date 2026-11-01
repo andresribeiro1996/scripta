@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import { Link } from "react-router-dom";
+import { useT } from "../../i18n";
 import type { Area, AreaId } from "../../lib/areas";
 import { ArenaIcon, CommunityIcon, HomeIcon, InfoIcon, LibraryIcon, MuralsIcon, ReaderCardIcon, SettingsIcon } from "../NavIcons";
 
@@ -21,6 +22,7 @@ export function SidebarNav({ areas, activeId, homeBadge, onNavigate, withDescrip
   onNavigate?: () => void;
   withDescriptions?: boolean;
 }) {
+  const t = useT();
   return (
     <>
       {areas.map((item) => {
@@ -33,7 +35,7 @@ export function SidebarNav({ areas, activeId, homeBadge, onNavigate, withDescrip
             to={item.to}
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
-            aria-label={badge ? `${item.label}, ${badge} new` : undefined}
+            aria-label={badge ? t("shell.badgeNew", { label: item.label, badge }) : undefined}
             className={`flex min-h-11 items-start gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
               active
                 ? "bg-(--color-accent-soft) text-(--color-accent)"

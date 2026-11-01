@@ -8,6 +8,7 @@ import { consumeGoogleOAuthState } from "../auth/googleOAuthState";
 import { useAuth } from "../auth/AuthContext";
 import { afterSignIn } from "../auth/returnTo";
 import { setSession } from "../auth/tokenStore";
+import { useT } from "../i18n";
 
 interface ExchangeResponse {
   user: { id: string; email: string; username: string | null; avatarId: string | null };
@@ -28,6 +29,7 @@ interface ExchangeResponse {
  *  case: RequireUsername (nested under it, see App.tsx) catches the
  *  missing username and redirects to /choose-username itself. */
 export function OAuthSuccessPage() {
+  const t = useT();
   const { session } = useAuth();
   const [status, setStatus] = useState<"working" | "done" | "error">("working");
   // React 18 StrictMode double-invokes effects in dev mode (mount, run,
@@ -86,11 +88,11 @@ export function OAuthSuccessPage() {
       <AuthStage>
         <div role="alert">
           <EmptyState
-            title="Couldn't sign you in"
-            body="Something went wrong signing you in with Google."
+            title={t("shell.signInFailedTitle")}
+            body={t("shell.signInFailedBody")}
             action={
               <a href="/login" className={BUTTON_PRIMARY}>
-                Try again
+                {t("shell.tryAgain")}
               </a>
             }
           />
@@ -101,7 +103,7 @@ export function OAuthSuccessPage() {
 
   return (
     <AuthStage>
-      <p role="status" className="text-center text-sm text-(--color-text-dim)">Signing you in…</p>
+      <p role="status" className="text-center text-sm text-(--color-text-dim)">{t("shell.signingYouIn")}</p>
     </AuthStage>
   );
 }

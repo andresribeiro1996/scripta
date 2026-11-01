@@ -102,7 +102,7 @@ test("Settings password fields use the shared field class, not the grey page-col
 });
 
 test("Delete account names quizzes and comments", () => {
-  assert.match(src("auth/DeleteAccountSection"), /tournaments, quizzes, comments, follows and connected accounts/);
+  assert.match(readFileSync(new URL("../src/i18n/messages/en/shell.ts", import.meta.url), "utf8"), /tournaments, quizzes, comments, follows and connected accounts/);
 });
 
 test("destructive buttons are danger buttons", () => {

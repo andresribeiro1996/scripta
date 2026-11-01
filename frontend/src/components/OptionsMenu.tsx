@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useDismissible } from "../hooks/useDismissible";
+import { useT } from "../i18n";
 import { MoreIcon } from "./NavIcons";
 
 export interface OptionsMenuItem {
@@ -42,7 +43,7 @@ const EDGE_GAP = 8;
  *  any item. */
 export function OptionsMenu({
   items,
-  title = "Settings",
+  title,
   heading,
   triggerClassName,
   trigger
@@ -58,6 +59,8 @@ export function OptionsMenu({
   triggerClassName?: string;
   trigger?: ReactNode;
 }) {
+  const t = useT();
+  const menuTitle = title ?? t("shell.areaSettings");
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<{ top?: number; bottom?: number; left: number; maxHeight: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -96,7 +99,7 @@ export function OptionsMenu({
 
   return (
     <>
-      <button ref={triggerRef} type="button" onClick={toggle} title={title} aria-label={title} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined} className={triggerClassName ?? "flex h-11 w-11 items-center justify-center"}>
+      <button ref={triggerRef} type="button" onClick={toggle} title={menuTitle} aria-label={menuTitle} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined} className={triggerClassName ?? "flex h-11 w-11 items-center justify-center"}>
         {trigger ??
           (triggerClassName ? (
             <MoreIcon size={16} />
@@ -113,7 +116,7 @@ export function OptionsMenu({
             ref={menuRef}
             id={menuId}
             role="menu"
-            aria-label={title}
+            aria-label={menuTitle}
             onKeyDown={(event) => {
               if (event.key === "Tab") {
                 close();

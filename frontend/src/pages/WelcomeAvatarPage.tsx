@@ -4,6 +4,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { AuthCard, AuthHeading, AuthServerError, AuthStage, authSecondaryClass, authSubmitClass } from "../auth/AuthStage";
 import { Avatar } from "../components/Avatar";
+import { useT } from "../i18n";
 
 /** The skippable last step of the signup journey (password signups land
  *  here right after registering; Google signups right after choosing a
@@ -13,6 +14,7 @@ import { Avatar } from "../components/Avatar";
  *  where a picture gets added, changed, or removed afterwards, so no
  *  "dismissed" flag needs persisting anywhere. */
 export function WelcomeAvatarPage() {
+  const t = useT();
   const { session, uploadAvatar } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -30,7 +32,7 @@ export function WelcomeAvatarPage() {
     try {
       await uploadAvatar(file);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setError(err instanceof Error ? err.message : t("shell.somethingWentWrong"));
     } finally {
       setUploading(false);
     }
@@ -42,8 +44,8 @@ export function WelcomeAvatarPage() {
     <AuthStage>
       <AuthCard>
         <AuthHeading
-          title="Add a profile picture"
-          subtitle="Shown next to your name around the app. You can change it anytime in Settings, or skip this for now."
+          title={t("shell.addProfilePicture")}
+          subtitle={t("shell.profilePictureSubtitle")}
         />
 
         <div className="mb-6 flex justify-center">
@@ -65,7 +67,7 @@ export function WelcomeAvatarPage() {
           onClick={() => fileInputRef.current?.click()}
           className={hasAvatar ? authSecondaryClass : authSubmitClass}
         >
-          {uploading ? "Uploading…" : hasAvatar ? "Choose a different photo" : "Choose a photo"}
+          {uploading ? t("shell.uploading") : hasAvatar ? t("shell.chooseDifferentPhoto") : t("shell.choosePhoto")}
         </button>
 
         {/* Both buttons do the same navigation — the only difference is the
@@ -76,7 +78,7 @@ export function WelcomeAvatarPage() {
           onClick={() => navigate(takeAuthReturnTo(), { replace: true })}
           className={`${hasAvatar ? authSubmitClass : authSecondaryClass} mt-3`}
         >
-          {hasAvatar ? "Continue" : "Skip for now"}
+          {hasAvatar ? t("shell.continue") : t("shell.skipForNow")}
         </button>
       </AuthCard>
     </AuthStage>

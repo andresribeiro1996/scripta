@@ -1,11 +1,13 @@
 import { useRef, useState } from "react";
+import { useT } from "../i18n";
 
 export type SaveState = "idle" | "saving" | "saved";
 
-const LABELS: Record<SaveState, string> = { idle: "", saving: "Saving…", saved: "Saved" };
+const LABEL_KEYS = { saving: "shell.saving", saved: "shell.saved" } as const;
 
 export function SaveStatus({ state }: { state: SaveState }) {
-  return <span role="status" className="block min-h-5">{LABELS[state]}</span>;
+  const t = useT();
+  return <span role="status" className="block min-h-5">{state === "idle" ? "" : t(LABEL_KEYS[state])}</span>;
 }
 
 export function useSaveState(): [SaveState, <T>(save: Promise<T>) => Promise<T>] {

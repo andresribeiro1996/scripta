@@ -1,5 +1,6 @@
 import { createContext, useContext, useSyncExternalStore, type ReactNode } from "react";
 import { apiFetch, publicFetch } from "../api/client";
+import { t } from "../i18n";
 import { getSession, setSession, subscribeToSession, type Session } from "./tokenStore";
 
 interface AuthTokenResponse {
@@ -65,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function setUsername(username: string) {
     const current = getSession();
-    if (!current) throw new Error("Not signed in.");
+    if (!current) throw new Error(t("shell.notSignedIn"));
     const body = (await apiFetch("/auth/username", {
       method: "POST",
       body: JSON.stringify({ username })
@@ -75,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function uploadAvatar(file: File) {
     const current = getSession();
-    if (!current) throw new Error("Not signed in.");
+    if (!current) throw new Error(t("shell.notSignedIn"));
     const form = new FormData();
     form.append("image", file, file.name);
     const body = (await apiFetch("/auth/avatar", { method: "POST", body: form })) as { user: Session["user"] };
@@ -84,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function removeAvatar() {
     const current = getSession();
-    if (!current) throw new Error("Not signed in.");
+    if (!current) throw new Error(t("shell.notSignedIn"));
     const body = (await apiFetch("/auth/avatar", { method: "DELETE" })) as { user: Session["user"] };
     setSession({ ...current, user: body.user });
   }
