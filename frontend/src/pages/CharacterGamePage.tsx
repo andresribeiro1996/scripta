@@ -106,7 +106,7 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
       <label className="flex flex-col gap-1 text-sm font-semibold">{t("library.groupName")}
         <input value={name} onChange={(event) => setName(event.target.value)} maxLength={200} className={FIELD_CLASS} />
       </label>
-      <p className="text-sm text-(--color-text-dim)">{mode === "tournament" ? t("arena.charactersOfSize", { count: ticked.length, size }) : shared("shared.helpers.characters", { count: ticked.length })}</p>
+      <p className="text-sm text-(--color-text-dim)">{mode === "tournament" ? t("arena.charactersOfSize", { count: ticked.length, size }) : t("arena.charactersCount", { count: ticked.length })}</p>
       <div className="space-y-2">
         {cast.characters.map((character) => {
           const checked = selected.has(character.id);

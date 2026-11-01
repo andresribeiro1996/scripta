@@ -190,7 +190,7 @@ export function ArenaListPage() {
             />
           )}
 
-          {votedTierlists.length > 0 && <h3 className="mb-3 text-sm font-semibold">{t("arena.createdByYou")}</h3>}
+          {votedTierlists.length > 0 && <h3 className="mb-3 text-sm font-semibold">{t("arena.createdByYouTierlists")}</h3>}
 
           <div className="game-ticket-grid">
             {tierlists.map((tl) =>
@@ -284,7 +284,7 @@ export function ArenaListPage() {
                 kind="quiz"
                 name={quiz.name}
                 to={`/dashboard/arena/quiz/${quiz.id}`}
-                meta={shared("shared.helpers.books", { count: quiz.data.books.length })}
+                meta={t("arena.quizBooks", { count: quiz.data.books.length })}
                 badges={<QuizStatusBadge status={quizStatus(quiz)} />}
                 stats={[{ value: quiz.data.questionCount, label: shared("shared.helpers.questionNoun", { count: quiz.data.questionCount }) }]}
                 covers={[]}

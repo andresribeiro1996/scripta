@@ -12,6 +12,7 @@ export const arena = {
   "arena.noTournaments": "No tournaments yet.",
   "arena.noTournamentsBody": "Pit your books against each other in a bracket.",
   "arena.createdByYou": "Created by you",
+  "arena.createdByYouTierlists": "Created by you",
   "arena.votingIn": "Voting in",
   "arena.nothingMatches": "Nothing matches “{search}”.",
   "arena.couldntSaveName": "Couldn't save that name.",
@@ -27,6 +28,7 @@ export const arena = {
   "arena.loadingQuizzes": "Loading quizzes",
   "arena.noQuizzes": "No quizzes yet.",
   "arena.noQuizzesBody": "A quiz turns your books into trivia — guess the title from a blurred cover, or the book from a famous line.",
+  "arena.quizBooks": { one: "{count} books", other: "{count} books" },
   "arena.quizSettings": "Quiz settings",
   "arena.created": "Created {date}",
 
@@ -104,6 +106,7 @@ export const arena = {
   "arena.gameType": "Game type",
   "arena.bracketSize": "Bracket size",
   "arena.roundDuration": "Round duration (hours)",
+  "arena.charactersCount": { one: "{count} characters", other: "{count} characters" },
   "arena.charactersOfSize": "{count} of {size} characters",
   "arena.creating": "Creating…",
   "arena.createTierlist": "Create tier list",

@@ -192,3 +192,30 @@ test("the character game page speaks Portuguese", () => {
   assert.match(html, />Criar tabela de níveis</);
   assert.match(html, /4 personagens/);
 });
+
+test("count-1 plurals: English keeps its old wording, Portuguese reads correctly", () => {
+  const oneCharacter = (client: QueryClient) => client.setQueryData(["works", "w1", "cast"], { scope: { kind: "work", label: "Dune", coverUrl: null, workCount: 1 }, characters: [{ id: "c1", name: "Paul" }] });
+  const page = () => createElement(Routes, null, createElement(Route, { path: "/work/:id/game", element: createElement(CharacterGamePage) }));
+  const tierlist = (client: QueryClient) => oneCharacter(client);
+  assert.match(rendered(page, tierlist, "/work/w1/game"), /1 characters/);
+  assert.match(inPortuguese(() => rendered(page, tierlist, "/work/w1/game")), /1 personagem</);
+  const listPage = () => createElement(ArenaListPage);
+  const votedLists = (client: QueryClient) => {
+    client.setQueryData(["arenas", "mine"], []);
+    client.setQueryData(["arenas", "voted"], []);
+    client.setQueryData(["quizzes"], []);
+    client.setQueryData(["tierlists"], []);
+    client.setQueryData(["tierlists", "voted"], [{ id: "v1", name: "Fantasy", voteCode: "abc", covers: [], poolSize: 3, ballotCount: 1, votingOpen: true, viewerVoted: true, promotedAt: null, subject: null }]);
+  };
+  assert.match(rendered(listPage, votedLists, "/dashboard/arena?tab=tierlists"), />Created by you</);
+  assert.match(inPortuguese(() => rendered(listPage, votedLists, "/dashboard/arena?tab=tierlists")), />Criadas por si</);
+  const quiz = (client: QueryClient) => {
+    client.setQueryData(["arenas", "mine"], []);
+    client.setQueryData(["arenas", "voted"], []);
+    client.setQueryData(["tierlists"], []);
+    client.setQueryData(["tierlists", "voted"], []);
+    client.setQueryData(["quizzes"], [{ id: "q1", name: "Quiz", voteCode: null, data: { books: [{}], questionCount: 1, questions: [] } }]);
+  };
+  assert.match(rendered(listPage, quiz, "/dashboard/arena?tab=quizzes"), /1 books/);
+  assert.match(inPortuguese(() => rendered(listPage, quiz, "/dashboard/arena?tab=quizzes")), /1 livro</);
+});

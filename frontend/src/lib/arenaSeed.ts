@@ -11,8 +11,8 @@
 
 import { resolveCover } from "../api/covers";
 import type { SeedBook, Tournament } from "../api/arena";
-import { en } from "../i18n/messages/en";
-import { ptPT } from "../i18n/messages/pt-PT";
+import { arena as en } from "../i18n/messages/en/arena";
+import { arena as ptPT } from "../i18n/messages/pt-PT/arena";
 import { getLocale, t } from "../i18n";
 import { seedCoverLookup, toSeedBook as createSeedBook, type createArenaApi } from "@scripta/shared";
 
