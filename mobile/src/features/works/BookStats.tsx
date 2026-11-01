@@ -1,13 +1,15 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import type { BookStatsModel } from "@scripta/shared";
 import { Text } from "../../ui/Text";
+import { useT } from "../../i18n";
 import { Icon, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 
 export function StatsTiles({ tiles, onPress }: { tiles: BookStatsModel["tiles"]; onPress: () => void }) {
+  const t = useT();
   const { colors } = useTheme();
   if (tiles.length === 0) return null;
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`Book stats: ${tiles.map((tile) => `${tile.value} ${tile.caption}`).join("; ")}`} hitSlop={{ top: 14, bottom: 14 }} onPress={onPress} style={styles.tiles}>
+    <Pressable accessibilityRole="button" accessibilityLabel={t("book.statsLabel", { summary: tiles.map((tile) => `${tile.value} ${tile.caption}`).join("; ") })} hitSlop={{ top: 14, bottom: 14 }} onPress={onPress} style={styles.tiles}>
       {tiles.map((tile, index) => (
         <View key={tile.key} style={styles.tile}>
           <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{`${tile.value} ${tile.caption}${index < tiles.length - 1 ? " ·" : ""}`}</Text>
@@ -19,6 +21,7 @@ export function StatsTiles({ tiles, onPress }: { tiles: BookStatsModel["tiles"];
 }
 
 export function StatsSections({ model }: { model: BookStatsModel }) {
+  const t = useT();
   const { colors } = useTheme();
   const { ratings, tierBar, tiersEmpty, tournamentRun, tournamentsEmpty } = model;
   const heading = (title: string) => <Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text }]}>{title}</Text>;
@@ -26,13 +29,13 @@ export function StatsSections({ model }: { model: BookStatsModel }) {
   return (
     <View style={styles.sections}>
       <View style={styles.section}>
-        {heading("Ratings")}
+        {heading(t("book.ratings"))}
         {ratings.openLibrary ? dim(ratings.openLibrary) : null}
         {ratings.community ? (
           <>
             <Text {...dynamicType} style={[typography.heading, { color: colors.text }]}>{ratings.community.feeling}</Text>
             {dim(ratings.community.summary)}
-            <View accessible accessibilityRole="image" accessibilityLabel={`Ratings by feeling: ${ratings.community.columns.map((column) => `${column.label} ${column.count}`).join(", ")}`} style={styles.columns}>
+            <View accessible accessibilityRole="image" accessibilityLabel={t("book.ratingsByFeeling", { columns: ratings.community.columns.map((column) => `${column.label} ${column.count}`).join(", ") })} style={styles.columns}>
               {ratings.community.columns.map((column) => (
                 <View key={column.label} style={[styles.column, { height: `${Math.round(column.fraction * 100)}%`, backgroundColor: column.top ? colors.accent : colors.textDim, opacity: column.top ? 1 : 0.75 }]} />
               ))}
@@ -47,7 +50,7 @@ export function StatsSections({ model }: { model: BookStatsModel }) {
         {ratings.empty ? dim(ratings.empty) : null}
       </View>
       <View style={styles.section}>
-        {heading("Tier lists")}
+        {heading(t("book.tierLists"))}
         {tierBar ? (
           <>
             <Text {...dynamicType} style={[typography.heading, { color: colors.text }]}>{tierBar.band}</Text>
@@ -55,28 +58,28 @@ export function StatsSections({ model }: { model: BookStatsModel }) {
               <View style={[styles.dot, { left: `${Math.round(tierBar.marker * 100)}%`, backgroundColor: colors.accent }]} />
             </View>
             <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.trackLabels}>
-              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Top</Text>
-              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Bottom</Text>
+              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("book.tierTop")}</Text>
+              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("book.tierBottom")}</Text>
             </View>
             {dim(tierBar.summary)}
           </>
         ) : dim(tiersEmpty ?? "")}
       </View>
       <View style={styles.section}>
-        {heading("Tournaments")}
+        {heading(t("book.tournaments"))}
         {tournamentRun ? (
           <>
             {tournamentRun.path.length > 0 ? (
               <View style={styles.path}>
                 {tournamentRun.path.map((step) => (
                   <View key={step.label} style={styles.step}>
-                    <View accessible accessibilityLabel={`${step.label}, ${step.reached ? "reached" : "not reached"}`} style={[styles.pill, { borderColor: step.reached ? colors.accent : colors.border }]}>
+                    <View accessible accessibilityLabel={t(step.reached ? "book.stepReached" : "book.stepNotReached", { label: step.label })} style={[styles.pill, { borderColor: step.reached ? colors.accent : colors.border }]}>
                       <Text numberOfLines={1} {...dynamicType} style={[typography.caption, step.reached ? styles.strong : null, { color: step.reached ? colors.accent : colors.textDim }]}>{step.label}</Text>
                     </View>
                     <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><Icon name="chevronRight" size={12} color={colors.textDim} /></View>
                   </View>
                 ))}
-                <View accessible accessibilityLabel={tournamentRun.champion ? "Won a title" : "No title"} style={[styles.pill, { borderColor: tournamentRun.champion ? colors.accent : colors.border, opacity: tournamentRun.champion ? 1 : 0.5 }]}>
+                <View accessible accessibilityLabel={tournamentRun.champion ? t("book.wonTitle") : t("book.noTitle")} style={[styles.pill, { borderColor: tournamentRun.champion ? colors.accent : colors.border, opacity: tournamentRun.champion ? 1 : 0.5 }]}>
                   <Text numberOfLines={1} {...dynamicType} style={typography.caption}>🏆</Text>
                 </View>
               </View>

@@ -5,6 +5,7 @@ import { ErrorState, Icon, Skeleton, dynamicType, searchDockClearance, spacing, 
 import { DiscoverRow } from "../community/DiscoverRow";
 import { fetchDiscover, fetchSuggestedReaderPortraits } from "../community/api";
 import type { useFollowToggle } from "../community/useFollowToggle";
+import { useT } from "../../i18n";
 import { NEW_GAMES, idleSections, type SearchScope } from "./searchModel";
 import { SectionTitle } from "./SearchResultRow";
 import { ReaderPortraitCard } from "./ReaderPortraitCard";
@@ -17,6 +18,7 @@ export function SearchIdle({ scope, recent, onRecent, onClearRecent, follow, scr
   follow: ReturnType<typeof useFollowToggle>;
   scrollProps: SearchDockScrollProps;
 }) {
+  const t = useT();
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const readerWidth = Math.min(220, (width - spacing.lg * 2) * 0.68);
@@ -36,12 +38,12 @@ export function SearchIdle({ scope, recent, onRecent, onClearRecent, follow, scr
     <ScrollView {...scrollProps} contentContainerStyle={styles.list}>
       {recent.length > 0 ? (
         <View>
-          <SectionTitle title="Recent" action={{ label: "Clear", onPress: onClearRecent }} />
+          <SectionTitle title={t("book.recent")} action={{ label: t("book.clear"), onPress: onClearRecent }} />
           {recent.map((text) => (
             <Pressable
               key={text}
               accessibilityRole="button"
-              accessibilityLabel={`Search for ${text}`}
+              accessibilityLabel={t("book.searchFor", { text })}
               onPress={() => onRecent(text)}
               style={({ pressed }) => [styles.recent, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}
             >
@@ -53,9 +55,9 @@ export function SearchIdle({ scope, recent, onRecent, onClearRecent, follow, scr
       ) : null}
       {show.readers && (readers.isPending || !readers.data || readers.data.length > 0) ? (
         <View>
-          <SectionTitle title="Readers you might like" />
+          <SectionTitle title={t("book.readersYouMightLike")} />
           {!readers.data && readers.isError ? (
-            <View style={styles.pad}><ErrorState body="Couldn't load readers." actionLabel="Retry" onAction={() => void readers.refetch()} /></View>
+            <View style={styles.pad}><ErrorState body={t("book.readersLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void readers.refetch()} /></View>
           ) : readers.isPending ? (
             <View style={styles.pad}><Skeleton height={280} /></View>
           ) : (
@@ -76,9 +78,9 @@ export function SearchIdle({ scope, recent, onRecent, onClearRecent, follow, scr
       ) : null}
       {show.newGames && (games.isPending || !games.data || newGames.length > 0) ? (
         <View>
-          <SectionTitle title="New games" />
+          <SectionTitle title={t("book.newGames")} />
           {!games.data && games.isError ? (
-            <View style={styles.pad}><ErrorState body="Couldn't load games." actionLabel="Retry" onAction={() => void games.refetch()} /></View>
+            <View style={styles.pad}><ErrorState body={t("book.gamesLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void games.refetch()} /></View>
           ) : games.isPending ? (
             <View style={styles.pad}><Skeleton height={120} /></View>
           ) : (

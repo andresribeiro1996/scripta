@@ -1,13 +1,15 @@
 import { bookKey, canonicalIsbn, isCertainMatch, statusLabel, type BookSearchResult, type LibraryBook } from "@scripta/shared";
 import type { DiscoverItem, PersonResult } from "@scripta/shared/community";
-import { getLocale } from "../../i18n";
+import { getLocale, type MobileMessages } from "../../i18n";
+
+type MessageKey = Extract<keyof MobileMessages, string>;
 
 export const SEARCH_SCOPES = [
-  { value: "all", label: "All" },
-  { value: "books", label: "Books" },
-  { value: "people", label: "People" },
-  { value: "games", label: "Games" },
-] as const;
+  { value: "all", labelKey: "book.scopeAll" },
+  { value: "books", labelKey: "book.books" },
+  { value: "people", labelKey: "book.people" },
+  { value: "games", labelKey: "shell.tabGames" },
+] as const satisfies readonly { value: string; labelKey: MessageKey }[];
 
 export type SearchScope = (typeof SEARCH_SCOPES)[number]["value"];
 export type ResultSection = "library" | "books" | "people" | "games";
@@ -17,12 +19,12 @@ export const RECENT_LIMIT = 8;
 export const NEW_GAMES = 5;
 const MIN_NETWORK_QUERY = 2;
 
-export const SECTION_TITLES: Record<ResultSection, string> = { library: "In your library", books: "Books", people: "People", games: "Games" };
-export const SECTION_ERRORS: Record<ResultSection, string> = {
-  library: "Couldn't load your library.",
-  books: "Couldn't search books.",
-  people: "Couldn't search people.",
-  games: "Couldn't search games.",
+export const SECTION_TITLES: Record<ResultSection, MessageKey> = { library: "book.inYourLibrary", books: "book.books", people: "book.people", games: "shell.tabGames" };
+export const SECTION_ERRORS: Record<ResultSection, MessageKey> = {
+  library: "shell.libraryLoadFailed",
+  books: "book.searchBooksFailed",
+  people: "book.searchPeopleFailed",
+  games: "book.searchGamesFailed",
 };
 export const SCOPE_OF: Record<ResultSection, SearchScope> = { library: "books", books: "books", people: "people", games: "games" };
 

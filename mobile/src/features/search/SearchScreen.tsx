@@ -15,10 +15,12 @@ import { SearchIdle } from "./SearchIdle";
 import { SearchResultRow, type ResultActions } from "./SearchResultRow";
 import { SEARCH_SCOPES, isNetworkQuery, mergeBookResults, searchQueryFromParam, searchRows, type ResultSection, type SearchScope } from "./searchModel";
 import { useRecentSearches } from "./useRecentSearches";
+import { useT } from "../../i18n";
 
 type TabsNavigation = { addListener: (type: "tabPress", listener: () => void) => () => void };
 
-export function SearchScreen({ q, t }: { q?: string | string[]; t?: string | string[] }) {
+export function SearchScreen({ q, t: nonceParam }: { q?: string | string[]; t?: string | string[] }) {
+  const t = useT();
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<SearchScope>("all");
   const [submitted, setSubmitted] = useState<string | null>(null);
@@ -86,7 +88,7 @@ export function SearchScreen({ q, t }: { q?: string | string[]; t?: string | str
   useEffect(() => receiveScans((isbn) => searchBooksRef.current(isbn)), []);
 
   const incoming = searchQueryFromParam(q);
-  const nonce = searchQueryFromParam(t);
+  const nonce = searchQueryFromParam(nonceParam);
   useEffect(() => {
     if (incoming) searchBooksRef.current(incoming);
   }, [incoming, nonce]);
@@ -95,6 +97,7 @@ export function SearchScreen({ q, t }: { q?: string | string[]; t?: string | str
     if (navigation.isFocused()) inputRef.current?.focus();
   }), [navigation]);
 
+  const scopeOptions = SEARCH_SCOPES.map(({ value, labelKey }) => ({ value, label: t(labelKey) }));
   const retries: Record<ResultSection, () => unknown> = { library: library.refetch, books: catalog.refetch, people: people.refetch, games: games.refetch };
   const actions: ResultActions = {
     query: needle,
@@ -109,7 +112,7 @@ export function SearchScreen({ q, t }: { q?: string | string[]; t?: string | str
 
   return (
     <Screen top={false}>
-      <Stack.Screen options={{ title: "Search", headerShown: true, headerLargeTitleEnabled: false, headerRight: () => <IconButton name="scan" accessibilityLabel="Scan a book's barcode" onPress={() => router.push("/scan" as never)} /> }} />
+      <Stack.Screen options={{ title: t("shell.tabSearch"), headerShown: true, headerLargeTitleEnabled: false, headerRight: () => <IconButton name="scan" accessibilityLabel={t("book.scanBarcode")} onPress={() => router.push("/scan" as never)} /> }} />
       <SearchDock
         value={query}
         onChangeText={(text) => {
@@ -118,13 +121,13 @@ export function SearchScreen({ q, t }: { q?: string | string[]; t?: string | str
         }}
         onSubmitEditing={() => submit(query)}
         inputRef={inputRef}
-        accessibilityLabel="Search books, people and games"
-        placeholder="Books, people, games"
+        accessibilityLabel={t("book.searchLabel")}
+        placeholder={t("book.searchPlaceholder")}
       >
         {(scrollProps) => (
           <SwipeableTabs
-            accessibilityLabel="Search in"
-            options={SEARCH_SCOPES}
+            accessibilityLabel={t("book.searchIn")}
+            options={scopeOptions}
             value={scope}
             onChange={setScope}
             renderPage={(pageScope) =>
@@ -142,7 +145,7 @@ export function SearchScreen({ q, t }: { q?: string | string[]; t?: string | str
                     pageScope !== "games" ? undefined : games.isFetchingNextPage ? (
                       <View style={styles.footer}><Skeleton height={80} /></View>
                     ) : games.isFetchNextPageError ? (
-                      <View style={styles.footer}><ErrorState body="Couldn't load more." actionLabel="Retry" onAction={() => void games.fetchNextPage()} /></View>
+                      <View style={styles.footer}><ErrorState body={t("book.loadMoreFailed")} actionLabel={t("shell.retry")} onAction={() => void games.fetchNextPage()} /></View>
                     ) : undefined
                   }
                   renderItem={({ item }) => <SearchResultRow row={item} actions={actions} />}

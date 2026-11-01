@@ -19,7 +19,7 @@ import { statusBadgeLabel } from "./bookPage";
 import { CharactersSheet } from "./CharactersSheet";
 import { EditionsSheet } from "./EditionsSheet";
 import { StatusSheet } from "./StatusSheet";
-import { useLocale } from "../../i18n";
+import { t as translate, useLocale, useT } from "../../i18n";
 
 const COVER_WIDTH = 150;
 const COVER_HEIGHT = 225;
@@ -73,7 +73,7 @@ export function WashBackdrop({ color, topAlpha, scrollY, headerHeight }: { color
 
 export function bookMenuItems(model: BookScreenModel, key: string, segments: readonly string[]): ActionItem[] {
   const to = (tool: "style" | "cover") => () => router.push(bookToolPath(key, tool, segments) as never);
-  return model.menu.flatMap<ActionItem>((item) => (item === "style" ? [{ label: "Card style", icon: "style", onPress: to("style") }] : item === "cover" ? [{ label: "Change cover", icon: "image", onPress: to("cover") }] : []));
+  return model.menu.flatMap<ActionItem>((item) => (item === "style" ? [{ label: translate("shell.cardStyle"), icon: "style", onPress: to("style") }] : item === "cover" ? [{ label: translate("book.changeCover"), icon: "image", onPress: to("cover") }] : []));
 }
 
 function SheetRow({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
@@ -88,9 +88,10 @@ function SheetRow({ icon, label, onPress }: { icon: IconName; label: string; onP
 }
 
 function StatusBadge({ label, finished, onPress }: { label: string; finished: boolean; onPress: () => void }) {
+  const t = useT();
   const { colors } = useTheme();
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`Reading status: ${label}`} hitSlop={{ top: 8, bottom: 8 }} onPress={onPress} style={[styles.badge, { backgroundColor: colors.accentSoft }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={t("book.readingStatus", { label })} hitSlop={{ top: 8, bottom: 8 }} onPress={onPress} style={[styles.badge, { backgroundColor: colors.accentSoft }]}>
       {finished ? <Icon name="confirm" size={14} color={colors.accent} /> : null}
       <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.shrink, { color: colors.accent }]}>{label}</Text>
       <Icon name="chevronDown" size={14} color={colors.accent} />
@@ -112,19 +113,20 @@ function SeriesLine({ series, signedIn, segments }: { series: NonNullable<BookSc
 }
 
 function DeleteNote({ book, bookmarkId }: { book: Record<string, unknown>; bookmarkId: string }) {
+  const t = useT();
   const { colors } = useTheme();
   const { deleteNote } = useLibraryActions();
   const [confirming, setConfirming] = useState(false);
   return (
     <>
       <Text accessibilityRole="button" {...dynamicType} onPress={() => setConfirming(true)} style={[typography.caption, styles.strong, { color: colors.danger }]}>
-        Delete
+        {t("library.delete")}
       </Text>
       <ConfirmDialog
         visible={confirming}
-        title="Delete this note?"
-        body="This can't be undone."
-        confirmLabel="Delete"
+        title={t("book.deleteNoteTitle")}
+        body={t("library.cantBeUndone")}
+        confirmLabel={t("library.delete")}
         destructive
         onConfirm={() => {
           setConfirming(false);
@@ -138,6 +140,7 @@ function DeleteNote({ book, bookmarkId }: { book: Record<string, unknown>; bookm
 
 export function BookScreen({ page, book, model, signedIn, onSelectEdition, scrollY, headerInset = 0 }: { page: WorkPage | null; book: Record<string, unknown> | null; model: BookScreenModel; signedIn: boolean; onSelectEdition?: (bookId: string) => void; scrollY?: SharedValue<number>; headerInset?: number }) {
   const locale = useLocale();
+  const t = useT();
   const { colors, mode } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const coverColor = model.cover.color;
@@ -151,7 +154,7 @@ export function BookScreen({ page, book, model, signedIn, onSelectEdition, scrol
   const [statusOpen, setStatusOpen] = useState(false);
   const [charactersOpen, setCharactersOpen] = useState(false);
   const [editionsOpen, setEditionsOpen] = useState(false);
-  const tab = model.tabs.some((t) => t.key === selected) ? selected : model.tabs[0]?.key;
+  const tab = model.tabs.some((entry) => entry.key === selected) ? selected : model.tabs[0]?.key;
   const card = [styles.card, { backgroundColor: colors.surface, borderColor: colors.border }];
   const heading = (title: string) => (
     <Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text }]}>{title}</Text>
@@ -175,7 +178,7 @@ export function BookScreen({ page, book, model, signedIn, onSelectEdition, scrol
           {book && showOwnCover ? <CoverImage book={book} size="full" /> : <BookCover key={model.cover.url ?? "none"} cover={model.cover.url} title={model.title} width={COVER_WIDTH} height={COVER_HEIGHT} />}
         </View>
         <Text {...dynamicType} style={[typography.heading, styles.centeredText, { color: colors.text }]}>{model.title}</Text>
-        <Text {...dynamicType} style={[typography.input, styles.centeredText, { color: colors.textDim }]}>{`by ${model.author}`}</Text>
+        <Text {...dynamicType} style={[typography.input, styles.centeredText, { color: colors.textDim }]}>{t("book.byAuthor", { author: model.author })}</Text>
         {book && badgeLabel ? <StatusBadge label={badgeLabel} finished={model.status?.options.find((o) => o.selected)?.value === 2} onPress={() => setStatusOpen(true)} /> : null}
         {model.series || model.year !== null || model.rating ? (
           <View style={styles.metaRow}>
@@ -214,7 +217,7 @@ export function BookScreen({ page, book, model, signedIn, onSelectEdition, scrol
             ))}
             {model.possibleGenres.map((genre) => (
               <View key={genre} style={[styles.chip, styles.possibleChip, { borderColor: colors.border }]}>
-                <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{`Possibly ${genre}`}</Text>
+                <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("book.possibleGenre", { genre })}</Text>
               </View>
             ))}
           </View>
@@ -222,19 +225,19 @@ export function BookScreen({ page, book, model, signedIn, onSelectEdition, scrol
       </View>
 
       {model.tabs.length > 1 && tab ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityLabel="Book sections" accessibilityRole="tablist" style={[styles.tabs, { borderColor: colors.border }]} contentContainerStyle={styles.tabsContent}>
-          {model.tabs.map((t) => {
-            const checked = t.key === tab;
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityLabel={t("book.sections")} accessibilityRole="tablist" style={[styles.tabs, { borderColor: colors.border }]} contentContainerStyle={styles.tabsContent}>
+          {model.tabs.map((entry) => {
+            const checked = entry.key === tab;
             return (
               <Pressable
-                key={t.key}
-                accessibilityLabel={t.label}
+                key={entry.key}
+                accessibilityLabel={entry.label}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: checked }}
-                onPress={() => setSelected(t.key)}
+                onPress={() => setSelected(entry.key)}
                 style={[styles.tab, { borderColor: checked ? colors.accent : "transparent" }]}
               >
-                <Text numberOfLines={1} {...dynamicType} style={[typography.body, checked ? styles.strong : null, { color: checked ? colors.accent : colors.textDim }]}>{t.label}</Text>
+                <Text numberOfLines={1} {...dynamicType} style={[typography.body, checked ? styles.strong : null, { color: checked ? colors.accent : colors.textDim }]}>{entry.label}</Text>
               </Pressable>
             );
           })}
@@ -248,22 +251,22 @@ export function BookScreen({ page, book, model, signedIn, onSelectEdition, scrol
               <Text {...dynamicType} style={[typography.input, styles.synopsis, { color: colors.text }]}>{aboutOpen || !about.preview ? about.summary : about.preview}</Text>
               {about.preview ? (
                 <Pressable accessibilityRole="button" onPress={() => setAboutOpen(!aboutOpen)} style={styles.link}>
-                  <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.accent }]}>{aboutOpen ? "Show less" : "Show more"}</Text>
+                  <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.accent }]}>{aboutOpen ? t("book.showLess") : t("book.showMore")}</Text>
                 </Pressable>
               ) : null}
             </View>
           ) : null}
           <View style={styles.rows}>
-            {onSelectEdition && about.editions.length >= 2 ? <SheetRow icon="library" label={`${about.editions.length} editions`} onPress={() => setEditionsOpen(true)} /> : null}
-            {allCharacters.length > 0 ? <SheetRow icon="characters" label={`${allCharacters.length} ${allCharacters.length === 1 ? "character" : "characters"}`} onPress={() => setCharactersOpen(true)} /> : null}
-            {book ? <SheetRow icon="image" label="Change cover" onPress={() => router.push(bookToolPath(bookKey(book), "cover", segments) as never)} /> : null}
+            {onSelectEdition && about.editions.length >= 2 ? <SheetRow icon="library" label={t("book.editionCount", { count: about.editions.length })} onPress={() => setEditionsOpen(true)} /> : null}
+            {allCharacters.length > 0 ? <SheetRow icon="characters" label={t("book.characterCount", { count: allCharacters.length })} onPress={() => setCharactersOpen(true)} /> : null}
+            {book ? <SheetRow icon="image" label={t("book.changeCover")} onPress={() => router.push(bookToolPath(bookKey(book), "cover", segments) as never)} /> : null}
           </View>
         </>
       ) : null}
 
       {tab === "highlights" ? (
         <View style={styles.section}>
-          {model.highlights.length === 0 ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>No highlights yet.</Text> : null}
+          {model.highlights.length === 0 ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("book.noHighlights")}</Text> : null}
           {model.highlights.map((h, i) => (
             <View key={String(h.BookmarkID ?? i)} style={[styles.highlight, { borderColor: colors.border }]}>
               <Text {...dynamicType} style={[typography.body, styles.quote, { color: colors.text }]}>{String(h.Text)}</Text>
@@ -296,7 +299,7 @@ export function BookScreen({ page, book, model, signedIn, onSelectEdition, scrol
                     </>
                   );
                   return row.linksToProfile && signedIn ? (
-                    <Pressable key={row.username} accessibilityRole="button" accessibilityLabel={`Open ${row.username}'s profile, ${row.status}`} onPress={() => openProfile(row.username)} style={[card, styles.row]}>
+                    <Pressable key={row.username} accessibilityRole="button" accessibilityLabel={t("book.openProfileStatus", { username: row.username, status: row.status })} onPress={() => openProfile(row.username)} style={[card, styles.row]}>
                       {body}
                     </Pressable>
                   ) : (
@@ -308,9 +311,9 @@ export function BookScreen({ page, book, model, signedIn, onSelectEdition, scrol
           </View>
 
           <View style={styles.section}>
-            {heading("Games")}
+            {heading(t("shell.tabGames"))}
             {community.games.length === 0 ? (
-              <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>No public games use this book yet.</Text>
+              <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("book.noPublicGames")}</Text>
             ) : (
               community.games.map((game) => (
                 <Pressable key={game.key} accessibilityRole="button" accessibilityLabel={`${game.title}, ${game.detail}`} onPress={() => router.push(game.path as never)} style={card}>

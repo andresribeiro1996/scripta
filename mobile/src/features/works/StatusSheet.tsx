@@ -6,8 +6,10 @@ import { Icon, Sheet, Toast, dynamicType, minimumTouchTarget, spacing, typograph
 import { useChangeStatus } from "../library/hooks/useChangeStatus";
 import { useLibraryActions } from "../library/hooks/useLibraryActions";
 import { FeelingChips } from "../library/components/FeelingChips";
+import { useT } from "../../i18n";
 
 export function StatusSheet({ book, model, visible, onClose }: { book: Record<string, unknown>; model: BookScreenModel; visible: boolean; onClose: () => void }) {
+  const t = useT();
   const { colors } = useTheme();
   const [error, setError] = useState<string | null>(null);
   const { setRating } = useLibraryActions(setError);
@@ -20,7 +22,7 @@ export function StatusSheet({ book, model, visible, onClose }: { book: Record<st
   if (!status) return null;
   const feelingValue = feeling?.options.find((option) => option.selected)?.rating ?? null;
   return (
-    <Sheet visible={visible} title="Your reading" onClose={onClose} onDismiss={onDismiss}>
+    <Sheet visible={visible} title={t("book.yourReading")} onClose={onClose} onDismiss={onDismiss}>
       <View style={styles.rows}>
         {status.options.map((option) => (
           <Pressable
@@ -37,7 +39,7 @@ export function StatusSheet({ book, model, visible, onClose }: { book: Record<st
       </View>
       {feeling ? (
         <View style={styles.feeling}>
-          <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>How it landed</Text>
+          <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{t("book.howItLanded")}</Text>
           <FeelingChips
             value={feelingValue}
             onChange={(rating) => {
