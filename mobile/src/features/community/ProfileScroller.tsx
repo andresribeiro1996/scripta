@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactElement, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { Pressable, StyleSheet, View, type FlatList } from "react-native";
 import Animated, { useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { useHeaderHeight } from "expo-router/react-navigation";
@@ -46,6 +46,7 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
   const headerHeight = useHeaderHeight();
   const list = useRef<FlatList<unknown>>(null);
   const scrollY = useSharedValue(0);
+  const pending = useRef<number | null>(null);
   const [heroHeight, setHeroHeight] = useState(0);
   const [viewport, setViewport] = useState(0);
   const onScroll = useAnimatedScrollHandler((event) => {
@@ -54,10 +55,24 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
   const backdropStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -Math.max(scrollY.get(), 0) }] }));
   const rows: readonly unknown[] = [TAB_BAR, ...(section.data.length ? section.data : [EMPTY])];
 
+  function settle() {
+    const offset = pending.current;
+    pending.current = null;
+    if (offset === null) return;
+    scrollY.set(offset);
+    list.current?.scrollToOffset({ offset, animated: false });
+  }
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(settle);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+
   function select(next: T) {
-    const offset = pinnedOffset(scrollY.get(), heroHeight);
+    const current = scrollY.get();
+    pending.current = pinnedOffset(current, heroHeight) ?? current;
     onChange(next);
-    if (offset !== null) list.current?.scrollToOffset({ offset, animated: false });
+    if (next === value) settle();
   }
 
   const tabBar = (
