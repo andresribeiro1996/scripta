@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
-import { Pressable, StyleSheet, View, type FlatList } from "react-native";
+import { Platform, Pressable, RefreshControl, StyleSheet, View, type FlatList } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { useAnimatedScrollHandler, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
-import { scheduleOnRN } from "react-native-worklets";
+import Animated, { scrollTo, useAnimatedRef, useAnimatedScrollHandler, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
+import { scheduleOnRN, scheduleOnUI } from "react-native-worklets";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { Text } from "../../ui/Text";
 import { dynamicType, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
@@ -59,9 +59,9 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
 }) {
   const { colors } = useTheme();
   const headerHeight = useHeaderHeight();
-  const list = useRef<FlatList<unknown>>(null);
+  const list = useAnimatedRef<FlatList<unknown>>();
   const scrollY = useSharedValue(0);
-  const pending = useRef<number | null>(null);
+  const leaving = useSharedValue<T | null>(null);
   const heroTop = useSharedValue(0);
   const slideFrom = useRef(0);
   const reducedMotion = useReducedMotion();
@@ -71,32 +71,28 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
     scrollY.set(event.contentOffset.y);
   });
   const backdropStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -Math.max(scrollY.get(), 0) }] }));
+  const rowStyle = useAnimatedStyle(() => ({ opacity: leaving.get() === value ? 0 : 1 }));
   const rows: readonly unknown[] = [TAB_BAR, ...(section.data.length ? section.data : [EMPTY])];
-
-  function settle() {
-    const offset = pending.current;
-    pending.current = null;
-    if (offset === null) return;
-    scrollY.set(offset);
-    list.current?.scrollToOffset({ offset, animated: false });
-  }
-
-  useEffect(() => {
-    const frame = requestAnimationFrame(settle);
-    return () => cancelAnimationFrame(frame);
-  }, [value]);
 
   useEffect(() => {
     slideFrom.current = 0;
   }, [value]);
 
   function select(next: T) {
-    const current = scrollY.get();
-    pending.current = pinnedOffset(current, heroHeight) ?? current;
+    const offset = pinnedOffset(scrollY.get(), heroHeight);
+    const from = offset !== null && next !== value ? value : null;
     const direction = Math.sign(tabs.findIndex((tab) => tab.value === next) - tabs.findIndex((tab) => tab.value === value));
     slideFrom.current = reducedMotion ? 0 : direction * SLIDE_DISTANCE;
-    onChange(next);
-    if (next === value) settle();
+    scheduleOnUI(() => {
+      leaving.set(from);
+      requestAnimationFrame(() => {
+        if (offset !== null) {
+          scrollY.set(offset);
+          scrollTo(list, 0, offset, false);
+        }
+        scheduleOnRN(onChange, next);
+      });
+    });
   }
 
   const latest = useRef({ select, value, order: tabs.map((tab) => tab.value) });
@@ -158,14 +154,13 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
         onScroll={onScroll}
         scrollEventThrottle={16}
         stickyHeaderIndices={[1]}
-        refreshing={section.refreshing}
-        onRefresh={section.onRefresh}
+        refreshControl={section.onRefresh || Platform.OS === "android" ? <RefreshControl enabled={Boolean(section.onRefresh)} refreshing={section.refreshing ?? false} onRefresh={section.onRefresh} /> : undefined}
         onEndReached={section.onEndReached}
         onEndReachedThreshold={0.4}
         ListHeaderComponent={<View onLayout={(event) => { heroTop.set(event.nativeEvent.layout.height); setHeroHeight(event.nativeEvent.layout.height); }}>{hero}</View>}
         ListFooterComponent={section.ListFooterComponent}
         keyExtractor={(item, index) => (item === TAB_BAR ? "tab-bar" : item === EMPTY ? `${value}:empty` : `${value}:${section.keyExtractor(item, index - 1)}`)}
-        renderItem={({ item, index }) => (item === TAB_BAR ? tabBar : <Animated.View entering={slideFrom.current ? slideIn(slideFrom.current) : undefined}>{item === EMPTY ? section.ListEmptyComponent ?? null : section.renderItem(item, index - 1)}</Animated.View>)}
+        renderItem={({ item, index }) => (item === TAB_BAR ? tabBar : <Animated.View entering={slideFrom.current ? slideIn(slideFrom.current) : undefined} style={rowStyle}>{item === EMPTY ? section.ListEmptyComponent ?? null : section.renderItem(item, index - 1)}</Animated.View>)}
       />
       </View>
       </GestureDetector>
