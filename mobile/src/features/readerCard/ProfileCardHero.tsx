@@ -5,7 +5,6 @@ import { hasChosen, renderReaderCard, resolvePrint, type IdentityKey, type Reade
 import { cardFontFamily, dynamicType, Skeleton, spacing, typography, useTheme } from "../../ui";
 import { Text } from "../../ui/Text";
 import { useT } from "../../i18n";
-import { AuthorAvatar } from "../community/AuthorAvatar";
 import { ReaderGlyph } from "../community/ReaderGlyph";
 import { CARD_MONO_FAMILY, CARD_SCRIPT_FAMILY } from "../../ui/fontAssets";
 import { PLATE_RATIO } from "../murals/ReaderCardImage";
@@ -55,13 +54,12 @@ export function ProfileCardHero({ input, width, withBackdrop = true, children }:
   );
 }
 
-export function ProfileHeroIdentity({ username, avatarUrl, glyph, finished }: { username: string; avatarUrl: string | null; glyph?: IdentityKey; finished?: number }) {
+export function ProfileHeroIdentity({ username, glyph, finished }: { username: string; glyph?: IdentityKey; finished?: number }) {
   const t = useT();
   const { colors } = useTheme();
   return (
     <View style={styles.identity}>
       <View style={styles.nameRow}>
-        <AuthorAvatar username={username} avatarUrl={avatarUrl} size={40} />
         <Text numberOfLines={1} {...dynamicType} style={[typography.heading, styles.name, { color: colors.text }]}>{username}</Text>
         <ReaderGlyph identity={glyph} />
       </View>
@@ -88,5 +86,5 @@ const styles = StyleSheet.create({
   children: { paddingHorizontal: spacing.lg, gap: spacing.md, alignItems: "center" },
   identity: { alignItems: "center", gap: spacing.xs, maxWidth: "100%" },
   nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, maxWidth: "100%" },
-  name: { flexShrink: 1, fontWeight: "700" },
+  name: { flexShrink: 1, fontFamily: cardFontFamily("sans"), fontWeight: "700" },
 });

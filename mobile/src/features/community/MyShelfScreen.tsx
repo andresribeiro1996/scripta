@@ -240,11 +240,8 @@ export function MyShelfScreen() {
   const glyph = ownData.published && ownData.feedSettings.readerGlyph && card?.input.card.state === "settled" ? card.input.card.identity ?? undefined : undefined;
   const cardActions = card ? (
     <>
-      <ProfileHeroIdentity username={username} avatarUrl={profile?.avatarUrl ?? null} glyph={glyph} finished={card.input.card.facts?.finished} />
-      <View style={styles.pills}>
-        <IconButton framed name="share" label={t("readerCard.shareCard")} accessibilityLabel={t("readerCard.shareCard")} disabled={!cardShare.data} onPress={() => setSharingCard(true)} />
-        <IconButton framed name="edit" label={t("murals.editCard")} accessibilityLabel={t("murals.editCard")} onPress={() => router.push("/reader-card" as never)} />
-      </View>
+      <ProfileHeroIdentity username={username} glyph={glyph} finished={card.input.card.facts?.finished} />
+      <IconButton framed name="share" tone="accent" label={t("readerCard.shareCard")} accessibilityLabel={t("readerCard.shareCard")} disabled={!cardShare.data} onPress={() => setSharingCard(true)} />
       {card.progress ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{card.progress}</Text> : null}
       {cardShare.isError ? <Text accessibilityRole="alert" {...dynamicType} style={[typography.caption, { color: colors.danger }]}>{t("community.somethingWentWrongRetry")}</Text> : null}
     </>
@@ -270,6 +267,7 @@ export function MyShelfScreen() {
 
   const menuGroups: ActionItem[][] = [
     [
+      ...(card ? [{ label: t("murals.editCard"), icon: "edit" as const, onPress: () => router.push("/reader-card" as never) }] : []),
       ...(hasMural ? [{ label: t("community.editShelf"), icon: "edit" as const, onPress: () => router.push(`/murals/${ownData.muralId}` as never) }] : []),
       { label: t("community.switchShelfMural"), icon: "murals", onPress: () => setSwitchingMural(true) },
     ],
@@ -374,7 +372,6 @@ const styles = StyleSheet.create({
   tabPad: { flex: 1, padding: spacing.lg },
   canvasScroll: { paddingHorizontal: spacing.sm, paddingTop: spacing.lg },
   cardError: { padding: spacing.lg, gap: spacing.md },
-  pills: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: spacing.sm },
   sharePreview: { alignItems: "center" },
   dialogGap: { gap: spacing.md },
 });
