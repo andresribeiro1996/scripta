@@ -12,6 +12,16 @@ import { pinnedOffset, swipeTarget } from "./pinnedOffset";
 const SLIDE_DISTANCE = 24;
 const SLIDE_DURATION = 180;
 
+function slideIn(from: number) {
+  return () => {
+    "worklet";
+    return {
+      initialValues: { opacity: 0, transform: [{ translateX: from }] },
+      animations: { opacity: withTiming(1, { duration: SLIDE_DURATION }), transform: [{ translateX: withTiming(0, { duration: SLIDE_DURATION }) }] },
+    };
+  };
+}
+
 export type ProfileSection<T = unknown> = {
   data: readonly T[];
   keyExtractor(item: T, index: number): string;
@@ -53,7 +63,7 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
   const scrollY = useSharedValue(0);
   const pending = useRef<number | null>(null);
   const heroTop = useSharedValue(0);
-  const slide = useSharedValue(0);
+  const slideFrom = useRef(0);
   const reducedMotion = useReducedMotion();
   const [heroHeight, setHeroHeight] = useState(0);
   const [viewport, setViewport] = useState(0);
@@ -61,7 +71,6 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
     scrollY.set(event.contentOffset.y);
   });
   const backdropStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -Math.max(scrollY.get(), 0) }] }));
-  const slideStyle = useAnimatedStyle(() => ({ opacity: 1 - Math.abs(slide.get()) / SLIDE_DISTANCE, transform: [{ translateX: slide.get() }] }));
   const rows: readonly unknown[] = [TAB_BAR, ...(section.data.length ? section.data : [EMPTY])];
 
   function settle() {
@@ -77,14 +86,15 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
     return () => cancelAnimationFrame(frame);
   }, [value]);
 
+  useEffect(() => {
+    slideFrom.current = 0;
+  }, [value]);
+
   function select(next: T) {
     const current = scrollY.get();
     pending.current = pinnedOffset(current, heroHeight) ?? current;
     const direction = Math.sign(tabs.findIndex((tab) => tab.value === next) - tabs.findIndex((tab) => tab.value === value));
-    if (direction && !reducedMotion) {
-      slide.set(direction * SLIDE_DISTANCE);
-      slide.set(withTiming(0, { duration: SLIDE_DURATION }));
-    }
+    slideFrom.current = reducedMotion ? 0 : direction * SLIDE_DISTANCE;
     onChange(next);
     if (next === value) settle();
   }
@@ -138,9 +148,10 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
         {backdrop}
       </Animated.View>
       <GestureDetector gesture={swipe}>
+      <View collapsable={false} style={[styles.root, { marginTop: headerHeight }]}>
       <Animated.FlatList
         ref={list}
-        style={[styles.root, { marginTop: headerHeight }]}
+        style={styles.root}
         contentContainerStyle={[styles.content, { minHeight: heroHeight + viewport }]}
         data={rows}
         onLayout={(event) => setViewport(event.nativeEvent.layout.height)}
@@ -154,8 +165,9 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
         ListHeaderComponent={<View onLayout={(event) => { heroTop.set(event.nativeEvent.layout.height); setHeroHeight(event.nativeEvent.layout.height); }}>{hero}</View>}
         ListFooterComponent={section.ListFooterComponent}
         keyExtractor={(item, index) => (item === TAB_BAR ? "tab-bar" : item === EMPTY ? `${value}:empty` : `${value}:${section.keyExtractor(item, index - 1)}`)}
-        renderItem={({ item, index }) => (item === TAB_BAR ? tabBar : <Animated.View style={slideStyle}>{item === EMPTY ? section.ListEmptyComponent ?? null : section.renderItem(item, index - 1)}</Animated.View>)}
+        renderItem={({ item, index }) => (item === TAB_BAR ? tabBar : <Animated.View entering={slideFrom.current ? slideIn(slideFrom.current) : undefined}>{item === EMPTY ? section.ListEmptyComponent ?? null : section.renderItem(item, index - 1)}</Animated.View>)}
       />
+      </View>
       </GestureDetector>
       {notice ? <View pointerEvents="box-none" style={[styles.notice, { top: headerHeight }]}>{notice}</View> : null}
     </View>
