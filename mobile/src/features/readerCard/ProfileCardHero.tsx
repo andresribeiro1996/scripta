@@ -47,7 +47,7 @@ export function ProfileCardBackdrop({ input }: { input: ReaderCardBase }) {
       onLayout={(event) => setSize(event.nativeEvent.layout)}
       style={[StyleSheet.absoluteFill, styles.clip]}
     >
-      {backdrop ? <SvgXml xml={backdrop} style={{ position: "absolute", top: grow, bottom: grow, left: grow, right: grow }} /> : null}
+      {backdrop && size ? <SvgXml xml={backdrop} width={size.width - 2 * grow} height={size.height - 2 * grow} style={{ position: "absolute", top: grow, left: grow }} /> : null}
       <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" viewBox="0 0 1 1" preserveAspectRatio="none">
         <Defs>
           <LinearGradient id={fadeId} x1="0" y1="0" x2="0" y2="1">
