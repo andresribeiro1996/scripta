@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type ReactNode } from "react";
+import { useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Platform, Pressable, StyleSheet, View } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop, SvgXml } from "react-native-svg";
 import { cardRatio, readerCardGround, readerCardShine, renderReaderCard, resolvePrint, type IdentityKey, type ReaderCardBase } from "@scripta/shared";
@@ -14,6 +14,7 @@ import { readerCardXml } from "../murals/readerCardXml";
 import { ReaderCardViewer } from "../murals/ReaderCardViewer";
 import { backdropXml, viewBlurSupported } from "./backdropXml";
 
+const TAP_SLOP = 10;
 const BACKDROP_GROW = 0.16;
 const BACKDROP_BLUR = 0.085;
 const BACKDROP_SATURATE = 1.4;
@@ -67,6 +68,7 @@ export function ProfileCardBackdrop({ input }: { input: ReaderCardBase }) {
 export function ProfileCardHero({ input, width, withBackdrop = true, badge, onEdit, children }: { input: ReaderCardBase; width: number; withBackdrop?: boolean; badge?: ReactNode; onEdit?: () => void; children?: ReactNode }) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  const pressX = useRef<number | null>(null);
   const cardWidth = heroCardWidth(width);
   const cardHeight = cardWidth * cardRatio(input.crop);
   const shine = readerCardShine(input.style.finish);
@@ -75,7 +77,7 @@ export function ProfileCardHero({ input, width, withBackdrop = true, badge, onEd
       {withBackdrop ? <ProfileCardBackdrop input={input} /> : null}
       <View style={styles.band}>
         <View style={{ width: cardWidth, height: cardHeight }}>
-          <Pressable accessibilityRole="button" accessibilityLabel={t("readerCard.openCard")} onPress={() => setOpen(true)}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t("readerCard.openCard")} onPressIn={(event) => { pressX.current = event.nativeEvent.pageX; }} onPress={(event) => { if (pressX.current === null || Math.abs(event.nativeEvent.pageX - pressX.current) < TAP_SLOP) setOpen(true); pressX.current = null; }}>
             <ReaderCardImage input={input} width={cardWidth} />
             {shine ? <CardShine kind={shine} width={cardWidth} height={cardHeight} live={false} /> : null}
           </Pressable>
