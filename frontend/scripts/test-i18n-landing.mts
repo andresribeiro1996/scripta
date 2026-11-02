@@ -73,7 +73,7 @@ test("the reader card preview draws its plate in Portuguese, not from the Englis
   const preview = () => renderToStaticMarkup(createElement(ReaderCardPreview));
   const portuguese = inPortuguese(() => decoded(preview()).join("\n"));
   assert.ok(portuguese.length > 0);
-  assert.doesNotMatch(portuguese, /EXAMPLE READER|Cartographer|Annotator|Lamplighter|Stargazer|Archivist|Correspondent|Wayfarer|Loyalist/);
+  assert.doesNotMatch(portuguese, new RegExp(`\\b(EXAMPLE READER|${shared.READER_PLATES.map((plate) => plateName(plate.key, "en")).join("|")})\\b`));
   assert.match(portuguese, /LEITOR DE EXEMPL/);
   assert.ok(shared.READER_PLATES.some((plate) => portuguese.includes(plateName(plate.key, "pt-PT"))));
   const english = decoded(preview()).join("\n");
