@@ -696,3 +696,79 @@ Asked by the user on 2026-11-02: "yes, add the colour wash fallback for older ph
 - [ ] **Step 2: Implement** the Interfaces above.
 - [ ] **Step 3: Run the checks and confirm they pass.** Run `node scripts/gate.mjs`. Expected: PASS.
 - [ ] **Step 4: Commit and push.** Run `git add -A mobile packages docs && git commit -m "Fall back to a colour wash where the view blur is missing"`, then push.
+
+### Task 14: Mural blocks float on the profile page (option C)
+
+Asked by the user on 2026-11-02 after seeing the blend mockups (`.superpowers/device/task12/mural-blend-options.png`): "i would say C". On a profile, the mural's canvas background is not painted, so there is no light slab on a dark page. Only the mural's blocks show, in their own theme colours, each with a soft shadow, on the app's background. Applies to web and mobile, and only on profile pages. The mural editor and every other mural view keep the canvas background.
+
+**Files:**
+- Modify: `mobile/src/features/murals/MuralCanvas.tsx`
+- Modify: `frontend/src/components/murals/MuralCanvas.tsx`
+- Modify: `frontend/src/pages/CommunityProfilePage.tsx`
+- Modify: `frontend/src/components/OwnShelfView.tsx`
+
+**Interfaces:**
+- **Mobile:** `profileInHero` already marks the profile use. When it is true, the canvas gets no `backgroundColor` and each block gets a soft shadow.
+  - The shadow is about `0 6 18` at 45% black on dark app themes. On light themes use a lighter one, about `0 4 14` at 12% black.
+  - Use the existing elevation or shadow tokens from `DESIGN.md` / `mobile/src/ui/theme` if one fits.
+- **Web:** add `floating?: boolean` to `MuralCanvas`. With it, the canvas drops its theme background but keeps `muralThemeStyle`'s colour variables, so the blocks keep their theme. Blocks get the matching shadow.
+  - `CommunityProfilePage` passes it to the profile mural, the first `MuralCanvas`.
+  - `OwnShelfView` passes it to the shelf mural, the first `MuralCanvas`.
+  - The preview canvases stay as they are.
+
+- [ ] **Step 1: Implement** the Interfaces above.
+- [ ] **Step 2: Run the checks and confirm they pass.** Run `node scripts/gate.mjs`. Expected: PASS.
+- [ ] **Step 3: Commit and push.** Run `git commit -m "Float mural blocks on the profile page instead of a canvas slab"`, then push.
+
+### Task 15: Avatar before the name in the mobile hero
+
+Asked by the user on 2026-11-02: "add the user avatar before the name". This reverses Task 10's "no avatar". The web hero already shows one.
+
+**Files:**
+- Modify: `mobile/src/features/readerCard/ProfileCardHero.tsx`
+- Modify: `mobile/src/features/community/MyShelfScreen.tsx`
+- Modify: `mobile/src/features/community/ProfileScreen.tsx`
+
+**Interfaces:**
+- `ProfileHeroIdentity` gains `avatarUrl: string | null`. It renders `AuthorAvatar` (`mobile/src/features/community/AuthorAvatar.tsx`) at size 32 before the name, in the same centred row as the name and glyph.
+- `MyShelfScreen` passes the signed-in user's avatar. `ProfileScreen` passes the profile user's avatar.
+
+- [ ] **Step 1: Implement** the Interfaces above.
+- [ ] **Step 2: Run the checks and confirm they pass.** Run `node scripts/gate.mjs`. Expected: PASS.
+- [ ] **Step 3: Commit and push.** Run `git commit -m "Show the avatar before the name in the profile hero"`, then push.
+
+### Task 16: Swipe to switch profile tabs on mobile
+
+Asked by the user on 2026-11-02: "the menus should be swipeable". Answering a question, the user chose "swipe to switch" over a full pager. A horizontal swipe on the tab content switches to the neighbouring tab with a short slide. The next tab does not follow the finger. The single native scroller from Task 10 stays.
+
+**Files:**
+- Modify: `mobile/src/features/community/ProfileScroller.tsx`
+- Modify: `mobile/src/features/community/pinnedOffset.ts`
+- Test: `mobile/src/features/community/profileScroller.test.ts`
+
+**Interfaces:**
+- `swipeTarget<T>(tabs: readonly T[], value: T, translationX: number, velocityX: number): T | null` in `pinnedOffset.ts`. It returns the next tab for a left swipe and the previous tab for a right swipe, and `null` at either end or below the threshold.
+  - The threshold is |translationX| ≥ 64 or |velocityX| ≥ 600, in the swipe's direction.
+- `ProfileScroller` wraps the list in a `react-native-gesture-handler` 3 `Gesture.Pan()` with `activeOffsetX([-24, 24])` and `failOffsetY([-12, 12])`.
+  - The pan simultaneously allows the list's native scroll, so vertical scrolling and pull-to-refresh are unchanged.
+  - It must not fire when the gesture starts on a horizontally scrollable child (a mural block carousel, for example). Use the child's native gesture or a blocking relation, so the inner scroll wins.
+  - It must not fire on the hero card.
+  - On end it calls the existing `select()` with `swipeTarget(...)`, so a swipe and a tap land in the same state, pinned offset included.
+- **Slide:** the rows after the tab bar enter with a 180 ms translateX from ±24 plus a fade, from the side of the swipe. Taps use the same slide, from the side of the tapped tab. Under reduced motion there is no slide.
+
+- [ ] **Step 1: Test.** In `profileScroller.test.ts`, with tabs `["shelf","activity","daily"]`:
+  - `("shelf", -80, 0)` gives `"activity"`.
+  - `("activity", 80, 0)` gives `"shelf"`.
+  - `("daily", -80, 0)` gives `null`.
+  - `("shelf", -30, -700)` gives `"activity"`.
+  - `("shelf", -30, 0)` gives `null`.
+  - `("shelf", 80, 0)` gives `null`.
+- [ ] **Step 2: Implement** the Interfaces above.
+- [ ] **Step 3: Run the checks and confirm they pass.** Run `node scripts/gate.mjs`. Expected: PASS.
+- [ ] **Step 4: Commit and push.** Run `git commit -m "Swipe between profile tabs"`, then push.
+- [ ] **Step 5: Device pass (`device-checker`), covering Tasks 13–16.** Check your own shelf and `fixture_alice`'s profile, in dark and light themes. It passes if:
+  - the blocks float with shadows and there is no canvas slab;
+  - the avatar sits before the name;
+  - a left or right swipe switches tabs with a slide, both at the top and while the tab bar is pinned;
+  - vertical scroll, pull-to-refresh and tab taps behave as before;
+  - a swipe on the card does not switch tabs.
