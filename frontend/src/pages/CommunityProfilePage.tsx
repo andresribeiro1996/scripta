@@ -1,6 +1,7 @@
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { readerCardInputOf } from "@scripta/shared";
 import { contentDetail, followFailureMessage, contentKindLabel, contentTarget, type CommunityAuthor } from "@scripta/shared/community";
 import { followUser, unfollowUser } from "../api/community";
 import type { GalleryImage } from "../api/gallery";
@@ -15,6 +16,7 @@ import { MuralCanvas } from "../components/murals/MuralCanvas";
 import { OwnShelfView } from "../components/OwnShelfView";
 import { ProfileActivity } from "../components/ProfileActivity";
 import { ProfileLibraryPanel } from "../components/ProfileLibraryPanel";
+import { ProfileCardHero } from "../components/readerCard/ProfileCardHero";
 import { ReaderGlyph } from "../components/ReaderGlyph";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { SwipeTabs } from "../components/SwipeTabs";
@@ -37,6 +39,7 @@ export function CommunityProfilePage() {
   const { view, isLoading, isNotFound } = useCommunityProfile(otherUsername);
   const activity = useCommunityActivity(otherUsername);
   const library = useCommunityLibrary(otherUsername, Boolean(view));
+  const cardInput = useMemo(() => (view && !view.private && view.readerCard ? readerCardInputOf([], [], view.profile.user.username, locale, view.readerCard) : null), [view, locale]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<ProfileTab>("mural");
@@ -114,24 +117,27 @@ export function CommunityProfilePage() {
   ];
 
   const user = view.profile.user;
+  const header = (
+    <ProfileHeader
+      user={user}
+      action={
+        <FollowControls
+          busy={busy}
+          following={view.profile.viewerFollows === true}
+          onToggle={(next) =>
+            run(async () => {
+              if (next === "unfollow") await unfollowUser(user.userId);
+              else await followUser(user.userId);
+            })
+          }
+        />
+      }
+    />
+  );
 
   return (
     <Page title={null} back={backTo("profile")}>
-      <ProfileHeader
-        user={user}
-        action={
-          <FollowControls
-            busy={busy}
-            following={view.profile.viewerFollows === true}
-            onToggle={(next) =>
-              run(async () => {
-                if (next === "unfollow") await unfollowUser(user.userId);
-                else await followUser(user.userId);
-              })
-            }
-          />
-        }
-      />
+      {cardInput ? <ProfileCardHero input={cardInput}>{header}</ProfileCardHero> : header}
       <div className="mt-6">
         {error && <p className="mb-4 text-sm text-(--color-danger)">{error}</p>}
         <SwipeTabs tabs={PROFILE_TABS.map((entry) => ({ value: entry.value, label: t(entry.label) }))} value={tab} onChange={setTab} label={t("community.profileSections")}>

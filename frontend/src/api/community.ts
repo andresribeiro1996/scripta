@@ -27,4 +27,7 @@ export const {
   saveContent,
   fetchSavedState,
   fetchSavedContent,
+  fetchCardShare,
+  shareCard,
+  unshareCard,
 } = createCommunityApi(request);

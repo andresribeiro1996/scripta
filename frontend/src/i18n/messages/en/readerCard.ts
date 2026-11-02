@@ -41,5 +41,8 @@ export const readerCard = {
   "readerCard.pageN": "Page {page}",
   "readerCard.pages": "Pages",
   "readerCard.pagesRegion": "Reader card pages",
-  "readerCard.editCard": "Edit card"
+  "readerCard.editCard": "Edit card",
+  "readerCard.shareCard": "Share card",
+  "readerCard.openInApp": "Open in Atmyshelf",
+  "readerCard.sharedInvalid": "This card link is invalid or no longer active."
 } satisfies Messages;
