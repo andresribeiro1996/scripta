@@ -5,6 +5,7 @@ import { cardRatio, readerCardGround, readerCardShine, renderReaderCard, resolve
 import { cardFontFamily, dynamicType, Skeleton, spacing, typography, useTheme } from "../../ui";
 import { Text } from "../../ui/Text";
 import { useT } from "../../i18n";
+import { AuthorAvatar } from "../community/AuthorAvatar";
 import { ReaderGlyph } from "../community/ReaderGlyph";
 import { CARD_MONO_FAMILY, CARD_SCRIPT_FAMILY } from "../../ui/fontAssets";
 import { CardShine } from "../murals/CardShine";
@@ -87,12 +88,13 @@ export function ProfileCardHero({ input, width, withBackdrop = true, badge, onEd
   );
 }
 
-export function ProfileHeroIdentity({ username, glyph, finished }: { username: string; glyph?: IdentityKey; finished?: number }) {
+export function ProfileHeroIdentity({ username, avatarUrl, glyph, finished }: { username: string; avatarUrl: string | null; glyph?: IdentityKey; finished?: number }) {
   const t = useT();
   const { colors } = useTheme();
   return (
     <View style={styles.identity}>
       <View style={styles.nameRow}>
+        <AuthorAvatar username={username} avatarUrl={avatarUrl} size={32} />
         <Text numberOfLines={1} {...dynamicType} style={[typography.heading, styles.name, { color: colors.text }]}>{username}</Text>
         <ReaderGlyph identity={glyph} />
       </View>

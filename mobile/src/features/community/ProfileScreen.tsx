@@ -130,7 +130,7 @@ export function ProfileScreen({ username }: { username: string }) {
 
   const heroBody = (
     <>
-      <ProfileHeroIdentity username={profileUser.username} glyph={profileUser.readerGlyph} finished={cardInput?.card.facts?.finished} />
+      <ProfileHeroIdentity username={profileUser.username} avatarUrl={profileUser.avatarUrl} glyph={profileUser.readerGlyph} finished={cardInput?.card.facts?.finished} />
       {profileUser.userId !== user?.id ? (
         <IconButton framed name={following ? "confirm" : "follow"} tone={following ? "default" : "accent"} label={followLabel} accessibilityLabel={followLabel} disabled={busy} onPress={() => void toggleFollow()} />
       ) : null}
