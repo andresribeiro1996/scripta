@@ -670,3 +670,26 @@ Asked by the user on 2026-11-02: "the blurry needs to be identical with the one 
 - [ ] **Step 3: Off-device side-by-side.** Render mock D (from `compare.mjs`) and our recipe at the same proportions for the reversed "star" card and the paper card. Save the result as `.superpowers/device/task12/mock-vs-ours.png`. The two backdrops must be indistinguishable.
 - [ ] **Step 4: Run the checks and confirm they pass.** Run `node scripts/gate.mjs`. Expected: PASS.
 - [ ] **Step 5: Commit and push.** Run `git add -A mobile frontend docs && git commit -m "Match the hero backdrop to mockup D's blur"`, then push.
+
+### Task 13: Colour-wash backdrop where the view blur is missing
+
+Asked by the user on 2026-11-02: "yes, add the colour wash fallback for older phones". Task 12's mobile blur is RN's view `filter` blur. It only works on Android 12 (API 31) and later, and RN doesn't support it on iOS. On those platforms the backdrop currently shows the card unblurred.
+
+**Files:**
+- Modify: `mobile/src/features/readerCard/ProfileCardHero.tsx`
+- Test: `mobile/src/features/readerCard/profileCardHero.test.ts`
+
+**Interfaces:**
+- `viewBlurSupported(os: string, version: number | string): boolean` is true only for `"android"` with `version >= 31`. `ProfileCardBackdrop` calls it with `Platform.OS` and `Platform.Version`.
+- When it is false, the backdrop renders no card SVG. In its place, a flat fill in the card's own ground colour covers the backdrop box, under the same overlay as Task 12.
+  - Take the ground colour from `@scripta/shared`'s reader-card render path, not a hard-coded table. That is the colour the plate's first `rect` is filled with, for the card's resolved print and finish; see `packages/shared/src/readerCards/finishes.ts`.
+  - If shared has no export for it, add the smallest one next to where it's computed.
+  - The tone should be the one the blurred card averages to. If the ground alone reads noticeably off from the blurred result, report it; don't invent a mix.
+
+- [ ] **Step 1: Test.**
+  - `viewBlurSupported("android", 31)` and `("android", 34)` return true.
+  - `("android", 30)`, `("ios", "17.0")` and `("web", 0)` return false.
+  - The ground colour for a reversed card and a paper card matches the fill of the first `rect` in `renderReaderCard`'s output for the same input.
+- [ ] **Step 2: Implement** the Interfaces above.
+- [ ] **Step 3: Run the checks and confirm they pass.** Run `node scripts/gate.mjs`. Expected: PASS.
+- [ ] **Step 4: Commit and push.** Run `git add -A mobile packages docs && git commit -m "Fall back to a colour wash where the view blur is missing"`, then push.
