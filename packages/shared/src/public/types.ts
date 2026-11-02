@@ -38,7 +38,6 @@ export interface PublicLibraryData {
   currentlyReading: PublicBookData[];
   stats: Record<string, number>;
   shelfTheme?: ShelfTheme;
-  readerCard?: PublicReaderCard;
 }
 
 export interface MuralPublicPayload {

@@ -3,7 +3,6 @@ import { sharedT } from "../i18n/sharedT.js";
 import { bookKey } from "../library/merge.js";
 import type { Group } from "../library/groups.js";
 import { DEFAULT_BLOCK_STYLE, type BlockStyle } from "../library/libraryStyle.js";
-import { readerIdentity } from "../library/readerIdentity.js";
 import { eligiblePassages } from "./home.js";
 import { ensureBookBlockHeights, newId, type BlockLayout, type MuralBlock } from "./murals.js";
 
@@ -90,17 +89,8 @@ export function buildMuralPreset(id: MuralPresetId, books: Book[], locale: Local
     const hasPassage = eligiblePassages(library).length > 0;
     const profileBottom = 5;
     blocks.push({ ...at(0, 0, 12, profileBottom), type: "profile", bio: "", favoriteGenres: [] });
-    const hasCard = readerIdentity(library, groups, locale).state === "settled";
-    let statsY: number;
-    if (hasCard) {
-      blocks.push({ ...at(0, profileBottom, 6, 6), type: "readerCard" });
-      blocks.push({ ...at(6, profileBottom, 6, 6), type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"] });
-      statsY = profileBottom + 6;
-    } else {
-      blocks.push({ ...at(0, profileBottom, 12, 4), type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"] });
-      statsY = profileBottom + 4;
-    }
-    let y = statsY;
+    blocks.push({ ...at(0, profileBottom, 12, 4), type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"] });
+    let y = profileBottom + 4;
     if (reading.length) { blocks.push({ ...at(0, y, 12, 6), type: "currentlyReading" }); y += 6; }
     if (finished.length) { blocks.push({ ...at(0, y, 12, 5), type: "shelf", title: t("shared.murals.shelfFinished"), role: "finished", bookKeys: keys(finished) }); y += 5; }
     const width = hasPassage && loved.length ? 6 : 12;

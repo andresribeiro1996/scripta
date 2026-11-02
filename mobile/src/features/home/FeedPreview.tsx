@@ -49,7 +49,7 @@ function MuralPreview({ item }: { item: Extract<DigestItem, { kind: "mural" }> }
   const payload = profile.data?.mural?.mural.id === item.mural.id ? profile.data.mural : null;
   const preview = useMemo(() => (payload?.mural.blocks.length ? muralPreviewOf(payload) : null), [payload]);
   return <View style={[styles.mural, { backgroundColor: palette.background }]}>
-    {item.mural.coverImageUrl ? <Image source={item.mural.coverImageUrl} style={StyleSheet.absoluteFill} contentFit="cover" /> : preview && payload ? <MuralThumbnail mural={preview.mural} canvasWidth={width - spacing.sm * 2} books={preview.books} images={preview.images} tierlists={preview.tierlists} profile={profile.data?.profile.user} shelfThemeOverride={payload.library.shelfTheme} readerCardOverride={payload.library.readerCard} statsOverride={payload.library.stats} /> : <Icon name="murals" size={48} color={palette.accent} />}
+    {item.mural.coverImageUrl ? <Image source={item.mural.coverImageUrl} style={StyleSheet.absoluteFill} contentFit="cover" /> : preview && payload ? <MuralThumbnail mural={preview.mural} canvasWidth={width - spacing.sm * 2} books={preview.books} images={preview.images} tierlists={preview.tierlists} profile={profile.data?.profile.user} shelfThemeOverride={payload.library.shelfTheme} statsOverride={payload.library.stats} /> : <Icon name="murals" size={48} color={palette.accent} />}
   </View>;
 }
 

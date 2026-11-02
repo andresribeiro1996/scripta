@@ -84,14 +84,15 @@ export type MuralBlock =
   | (MuralBlockBase & { type: "currentlyReading" })
   | (MuralBlockBase & { type: "stats"; metrics: StatMetric[] })
   | (MuralBlockBase & { type: "empty" })
-  | (MuralBlockBase & { type: "tierlist"; tierlistId: string })
-  | (MuralBlockBase & { type: "readerCard" });
+  | (MuralBlockBase & { type: "tierlist"; tierlistId: string });
 
 export type BlockType = MuralBlock["type"];
 
 export const RETIRED_BLOCK_TYPES: readonly string[] = ["readerCard"];
 
 export function dropRetiredBlocks<T extends { type: string }>(blocks: T[]): T[] {
+  "worklet";
+  if (!blocks.some((block) => RETIRED_BLOCK_TYPES.includes(block?.type))) return blocks;
   return blocks.filter((block) => !RETIRED_BLOCK_TYPES.includes(block?.type));
 }
 
@@ -162,7 +163,8 @@ export function newId(): string {
 // a 1x1 sliver the user has to resize before it's even legible.
 export const GRID_COLUMNS = 12;
 
-export function ensureBookBlockHeights(blocks: MuralBlock[]): MuralBlock[] {
+export function ensureBookBlockHeights(allBlocks: MuralBlock[]): MuralBlock[] {
+  const blocks = dropRetiredBlocks(allBlocks);
   const boundaries = new Map<number, number>();
   for (const block of blocks) {
     const minimum = minBlockHeight(block.type);
@@ -202,8 +204,9 @@ export function withMuralBlockLayout(block: MuralBlock, layout: BlockLayout): Mu
   return { ...rest, layout, ...(Object.keys(remaining).length ? { expandedFrom: remaining } : {}) };
 }
 
-export function compactMuralBlocks(blocks: MuralBlock[]): MuralBlock[] {
+export function compactMuralBlocks(allBlocks: MuralBlock[]): MuralBlock[] {
   "worklet";
+  const blocks = dropRetiredBlocks(allBlocks);
   if (blocks.some((block) => !Object.values(block.layout).every(Number.isSafeInteger) || !isValidBlockLayout(block.layout, []))) return blocks;
   const placed = new Map<string, BlockLayout>();
   for (const block of [...blocks].sort((a, b) => a.layout.y - b.layout.y || a.layout.x - b.layout.x)) {

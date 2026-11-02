@@ -269,7 +269,17 @@ test("compaction preserves expansion insets and rejects invalid geometry", () =>
 
 test("dropRetiredBlocks removes readerCard blocks and leaves the rest untouched", () => {
   const profile: MuralBlock = { id: "p", type: "profile", bio: "", favoriteGenres: [], layout: { x: 0, y: 0, w: 6, h: 4 } };
-  const card: MuralBlock = { id: "c", type: "readerCard", layout: { x: 0, y: 4, w: 6, h: 6 } };
+  const card = { id: "c", type: "readerCard", layout: { x: 0, y: 4, w: 6, h: 6 } } as unknown as MuralBlock;
   const stats: MuralBlock = { id: "s", type: "stats", metrics: ["totalBooks"], layout: { x: 6, y: 4, w: 6, h: 6 } };
   assert.deepEqual(dropRetiredBlocks([profile, card, stats]), [profile, stats]);
+});
+
+test("ensureBookBlockHeights drops a stale readerCard block instead of throwing", () => {
+  const card = { id: "c", type: "readerCard", layout: { x: 0, y: 3, w: 6, h: 6 } } as unknown as MuralBlock;
+  assert.deepEqual(ensureBookBlockHeights([text("above", 0, 3), card]).map((block) => block.id), ["above"]);
+});
+
+test("compactMuralBlocks drops a stale readerCard block", () => {
+  const card = { id: "c", type: "readerCard", layout: { x: 0, y: 0, w: 6, h: 6 } } as unknown as MuralBlock;
+  assert.deepEqual(compactMuralBlocks([card, text("below", 6, 2)]).map((block) => [block.id, block.layout.y]), [["below", 0]]);
 });

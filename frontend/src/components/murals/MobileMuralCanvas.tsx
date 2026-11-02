@@ -1,4 +1,4 @@
-import { blockEffects, blockTextColors, moveMuralBlock, resolveBlockColor, type Group, type PublicReaderCard } from "@scripta/shared";
+import { blockEffects, blockTextColors, moveMuralBlock, resolveBlockColor } from "@scripta/shared";
 import { themes, type ThemeColors } from "@scripta/shared/themes";
 import GridLayout from "react-grid-layout";
 import { DndContext } from "@dnd-kit/core";
@@ -67,9 +67,7 @@ function BlockFrame({
   books,
   images,
   profile,
-  groups,
   shelfThemeOverride,
-  readerCardOverride,
   statsOverride,
   tierlistData,
   onActivate,
@@ -86,9 +84,7 @@ function BlockFrame({
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   profile?: ReaderProfile;
-  groups?: Group[];
   shelfThemeOverride?: ShelfTheme;
-  readerCardOverride?: PublicReaderCard;
   statsOverride?: Record<string, number>;
   tierlistData?: (tierlistId: string) => ResolvedTierlist | undefined;
   onActivate: () => void;
@@ -147,7 +143,7 @@ function BlockFrame({
       } as CSSProperties}
     >
       <div className="pointer-events-none h-full origin-top-left" style={{ width: `${scale * 100}%`, height: `${scale * 100}%`, transform: `scale(${1 / scale})`, fontSize: 14 } as CSSProperties}>
-        <MobileBlockPreview block={block} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} editing={editing} width={((CANVAS_WIDTH - PADDING * 2 + MARGIN) / GRID_COLUMNS * block.layout.w - MARGIN) * scale} height={(block.layout.h * (ROW_HEIGHT + MARGIN) - MARGIN) * scale} />
+        <MobileBlockPreview block={block} books={books} images={images} profile={profile} shelfThemeOverride={shelfThemeOverride} statsOverride={statsOverride} tierlistData={tierlistData} editing={editing} width={((CANVAS_WIDTH - PADDING * 2 + MARGIN) / GRID_COLUMNS * block.layout.w - MARGIN) * scale} height={(block.layout.h * (ROW_HEIGHT + MARGIN) - MARGIN) * scale} />
       </div>
       {effects.fadeColor && effects.fadeOpacity > 0 ? <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-[inherit]" style={{ backgroundColor: effects.fadeColor, opacity: effects.fadeOpacity }} /> : null}
     </div>
@@ -160,9 +156,7 @@ export function MobileMuralCanvas({
   books,
   images,
   profile,
-  groups,
   shelfThemeOverride,
-  readerCardOverride,
   selectedBlockId,
   draft,
   busy,
@@ -189,9 +183,7 @@ export function MobileMuralCanvas({
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   profile?: ReaderProfile;
-  groups?: Group[];
   shelfThemeOverride?: ShelfTheme;
-  readerCardOverride?: PublicReaderCard;
   selectedBlockId?: string | null;
   draft?: MobileMuralDraft | null;
   busy?: boolean;
@@ -328,9 +320,7 @@ export function MobileMuralCanvas({
                     books={books}
                     images={images}
                     profile={profile}
-                    groups={groups}
                     shelfThemeOverride={shelfThemeOverride}
-                    readerCardOverride={readerCardOverride}
                     statsOverride={statsOverride}
                     tierlistData={tierlistData}
                     onActivate={() => activate(block)}
@@ -431,9 +421,7 @@ export function MobileMuralCanvas({
           books={books}
           images={images}
           profile={profile}
-          groups={groups}
           shelfThemeOverride={shelfThemeOverride}
-          readerCardOverride={readerCardOverride}
           statsOverride={statsOverride}
           tierlistData={tierlistData}
           onClose={() => {

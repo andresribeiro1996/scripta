@@ -149,7 +149,6 @@ export function CommunityProfilePage() {
                       images={images}
                       profile={user}
                       shelfThemeOverride={muralData.library.shelfTheme}
-                      readerCardOverride={muralData.library.readerCard}
                       statsOverride={muralData.library.stats}
                       tierlistData={(tierlistId) => muralData.tierlists[tierlistId]}
                     />

@@ -126,7 +126,6 @@ export function SharedMuralPage() {
             images={images}
             profile={data.profile}
             shelfThemeOverride={data.shelfTheme}
-            readerCardOverride={data.readerCard}
             statsOverride={data.stats}
             tierlistData={(tierlistId) => data.tierlists[tierlistId]}
           />

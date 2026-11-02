@@ -142,12 +142,6 @@ export function BlockConfigPanel({
           </p>
         )}
 
-        {draft.type === "readerCard" && (
-          <p className="text-sm text-(--color-text-dim)">
-            {t("muralEditor.readerCardNote")}
-          </p>
-        )}
-
         {draft.type === "empty" && (
           <p className="text-sm text-(--color-text-dim)">
             {t("muralEditor.emptyBlockNote")}

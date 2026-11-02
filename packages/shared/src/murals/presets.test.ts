@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { bookKey } from "../library/merge.js";
-import { readerIdentity } from "../library/readerIdentity.js";
 import { buildMuralPreset, muralPresets, presetAvailability, shelfPresetSummary } from "./presets.js";
 import { DEFAULT_BLOCK_STYLE } from "../library/libraryStyle.js";
 import { ensureBookBlockHeights, updateBlock, type Mural, type MuralBlock } from "./murals.js";
@@ -126,27 +125,13 @@ test("editing a shelf block through updateBlock keeps its role", () => {
   assert.equal(saved.type === "shelf" ? saved.role : undefined, "finished");
 });
 
-test("the My shelf preset places a settled reader card beside stats, below the profile", () => {
+test("the My shelf preset has no reader card block", () => {
   const books = Array.from({ length: 10 }, (_, i) => ({ Title: `Book ${i}`, Attribution: `Author ${i}`, ReadStatus: 2 }));
-  const groups = [{ id: "g", type: "series" as const, name: "S", bookKeys: books.slice(0, 3).map(bookKey), createdAt: "", updatedAt: "" }];
-  const blocks = buildMuralPreset("shelf", books, "en", groups).blocks;
-  const card = blocks.find((block) => block.type === "readerCard");
+  const blocks = buildMuralPreset("shelf", books, "en").blocks;
+  assert.equal(blocks.some((block) => (block.type as string) === "readerCard"), false);
   const stats = blocks.find((block) => block.type === "stats")!;
   const profile = blocks.find((block) => block.type === "profile")!;
-  assert.ok(card, "settled card is placed");
-  const cardBottom = profile.layout.y + profile.layout.h;
-  assert.deepEqual(card!.layout, { x: 0, y: cardBottom, w: 6, h: 6 });
-  assert.deepEqual(stats.layout, { x: 6, y: cardBottom, w: 6, h: 6 });
-  assert.equal(buildMuralPreset("shelf", books.slice(0, 4), "en", []).blocks.some((block) => block.type === "readerCard"), false);
-});
-
-test("the My shelf preset omits a reader card while leaning", () => {
-  const seriesBooks = Array.from({ length: 3 }, (_, i) => ({ Title: `Series ${i}`, Attribution: `Author ${i}`, ReadStatus: 2 }));
-  const otherBooks = Array.from({ length: 9 }, (_, i) => ({ Title: `Standalone ${i}`, Attribution: `Author ${i + 3}`, ReadStatus: 2 }));
-  const books = [...seriesBooks, ...otherBooks];
-  const groups = [{ id: "g", type: "series" as const, name: "S", bookKeys: seriesBooks.map(bookKey), createdAt: "", updatedAt: "" }];
-  assert.equal(readerIdentity(books, groups, "en").state, "leaning");
-  assert.equal(buildMuralPreset("shelf", books, "en", groups).blocks.some((block) => block.type === "readerCard"), false);
+  assert.deepEqual(stats.layout, { x: 0, y: profile.layout.y + profile.layout.h, w: 12, h: 4 });
 });
 
 test("a Portuguese preset writes its names and block titles in Portuguese", () => {
