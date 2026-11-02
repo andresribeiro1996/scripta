@@ -1,32 +1,30 @@
 import { useId, useMemo, type ReactNode } from "react";
-import { Image } from "expo-image";
 import { StyleSheet, View } from "react-native";
-import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
-import { hasChosen, readerCardDataUri, resolvePrint, type ReaderCardBase } from "@scripta/shared";
-import { spacing, useTheme } from "../../ui";
+import Svg, { Defs, LinearGradient, Rect, Stop, SvgXml } from "react-native-svg";
+import { hasChosen, renderReaderCard, resolvePrint, type ReaderCardBase } from "@scripta/shared";
+import { cardFontFamily, spacing, useTheme } from "../../ui";
+import { CARD_MONO_FAMILY, CARD_SCRIPT_FAMILY } from "../../ui/fontAssets";
+import { readerCardXml } from "../murals/readerCardXml";
 import { ReaderCardTurner } from "../murals/ReaderCardTurner";
+import { backdropXml } from "./backdropXml";
 
-const BLUR_RADIUS = 40;
 const BACKDROP_OPACITY = 0.7;
-const BACKDROP_SCALE = 1.5;
 const CARD_WIDTH_SHARE = 0.78;
 const CARD_WIDTH_MAX = 320;
-
-export function backdropXml(svg: string): string {
-  const viewBox = /viewBox="([^"]+)"/.exec(svg)![1];
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}"><defs><filter id="blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="18"/></filter></defs><g filter="url(#blur)">${svg}</g></svg>`;
-}
 
 export function ProfileCardHero({ input, width, children }: { input: ReaderCardBase; width: number; children?: ReactNode }) {
   const { colors, mode } = useTheme();
   const fadeId = useId();
-  const backdrop = useMemo(() => readerCardDataUri({ ...input, print: resolvePrint(input.style.print, mode === "dark") }), [input, mode]);
+  const backdrop = useMemo(
+    () => backdropXml(readerCardXml(renderReaderCard({ ...input, print: resolvePrint(input.style.print, mode === "dark") }), { serif: cardFontFamily("playfairDisplay"), sans: cardFontFamily("sans"), mono: CARD_MONO_FAMILY, script: CARD_SCRIPT_FAMILY })),
+    [input, mode],
+  );
   const cardWidth = Math.min(width * CARD_WIDTH_SHARE, CARD_WIDTH_MAX);
   return (
     <View style={[styles.hero, { width }]}>
       <View style={styles.band}>
         <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={StyleSheet.absoluteFill}>
-          <Image source={{ uri: backdrop }} blurRadius={BLUR_RADIUS} contentFit="cover" style={[StyleSheet.absoluteFill, styles.backdrop]} />
+          <SvgXml xml={backdrop} width="100%" height="100%" style={[StyleSheet.absoluteFill, styles.backdrop]} />
           <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" viewBox="0 0 1 1" preserveAspectRatio="none">
             <Defs>
               <LinearGradient id={fadeId} x1="0" y1="0" x2="0" y2="1">
@@ -47,6 +45,6 @@ export function ProfileCardHero({ input, width, children }: { input: ReaderCardB
 const styles = StyleSheet.create({
   hero: { gap: spacing.md },
   band: { alignItems: "center", overflow: "hidden", paddingTop: spacing.xl, paddingBottom: spacing.xs },
-  backdrop: { opacity: BACKDROP_OPACITY, transform: [{ scale: BACKDROP_SCALE }] },
+  backdrop: { opacity: BACKDROP_OPACITY },
   children: { paddingHorizontal: spacing.lg, gap: spacing.md },
 });

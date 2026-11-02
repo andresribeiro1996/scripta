@@ -3,7 +3,7 @@ import { router, Stack } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { readerCardInputOf } from "@scripta/shared";
-import { isPermanentError } from "../../core/apiClient";
+import { ApiError } from "../../core/api";
 import { Button, dynamicType, ErrorState, Screen, Skeleton, spacing, typography, useTheme } from "../../ui";
 import { Text } from "../../ui/Text";
 import { useLocale, useT } from "../../i18n";
@@ -21,10 +21,10 @@ export function SharedCardScreen({ token }: { token: string }) {
 
   if (query.isPending) return <View style={[styles.center, { backgroundColor: colors.background }]}><Skeleton height={180} /></View>;
   if (query.isError || !input) {
-    const permanent = isPermanentError(query.error);
+    const invalid = query.error instanceof ApiError && query.error.status === 404;
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <ErrorState body={t("readerCard.sharedInvalid")} actionLabel={permanent ? t("shell.notFoundAction") : t("shell.retry")} onAction={permanent ? () => router.replace("/") : () => void query.refetch()} />
+        <ErrorState body={t(invalid ? "readerCard.sharedInvalid" : "readerCard.sharedLoadFailed")} actionLabel={invalid ? t("shell.notFoundAction") : t("shell.retry")} onAction={invalid ? () => router.replace("/") : () => void query.refetch()} />
       </View>
     );
   }

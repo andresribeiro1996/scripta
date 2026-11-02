@@ -68,4 +68,5 @@ export const readerCard = {
   "readerCard.finishHintRiso": "Two misregistered inks",
   "readerCard.shareCard": "Share card",
   "readerCard.sharedInvalid": "This card link is invalid or no longer active.",
+  "readerCard.sharedLoadFailed": "Couldn't load this card.",
 } satisfies Messages;

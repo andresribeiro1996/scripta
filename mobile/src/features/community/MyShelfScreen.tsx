@@ -11,11 +11,11 @@ import { fetchGalleryImages } from "../gallery/api";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { MuralCanvas } from "../murals";
 import { NO_GROUPS } from "../murals/MuralCanvas";
-import { ReaderCardImage } from "../murals/ReaderCardImage";
+import { PLATE_RATIO, ReaderCardImage } from "../murals/ReaderCardImage";
 import { fetchMural } from "../murals/api";
 import { useMurals } from "../murals/useMurals";
 import { ProfileCardHero } from "../readerCard/ProfileCardHero";
-import { useOwnCardStyle } from "../readerCard/useReaderCardStyle";
+import { useOwnCardStyle, useReaderCardStyle } from "../readerCard/useReaderCardStyle";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import { fetchTierlists } from "../tierlists/api";
 import { DailyChapterProfileSection } from "../dailyChapter/daily-chapter-profile-section";
@@ -38,13 +38,15 @@ let lastTab: MyShelfTab = "shelf";
 
 const CARD_SHARE_KEY = ["community", "card-share"] as const;
 const SHARE_CARD_WIDTH = 300;
+const SHARE_SHEET_CHROME_HEIGHT = 400;
+const SHARE_SHEET_CHROME_WIDTH = 72;
 
 export function MyShelfScreen() {
   const locale = useLocale();
   const t = useT();
   const { colors, id: theme } = useTheme();
   const { user } = useAuth();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const queryClient = useQueryClient();
   const username = user?.username ?? "";
 
@@ -59,6 +61,7 @@ export function MyShelfScreen() {
   const gallery = useQuery({ queryKey: ["gallery"], queryFn: fetchGalleryImages });
   const tierlistsQuery = useQuery({ queryKey: ["tierlists"], queryFn: fetchTierlists });
   const murals = useMurals();
+  const styleQuery = useReaderCardStyle();
   const ownStyle = useOwnCardStyle();
   const cardShare = useQuery({ queryKey: CARD_SHARE_KEY, queryFn: fetchCardShare });
 
@@ -80,7 +83,7 @@ export function MyShelfScreen() {
     ? { username: user.username, avatarUrl: user.avatarId ? `${API_URL}/auth/avatar/${user.avatarId}/file` : null }
     : undefined;
 
-  const card = useMemo(() => (library ? ownProfileCard(readerCardInputOf(books, groups, username, locale, undefined, ownStyle)) : null), [library, books, groups, username, locale, ownStyle]);
+  const card = useMemo(() => (library && !styleQuery.isPending ? ownProfileCard(readerCardInputOf(books, groups, username, locale, undefined, ownStyle)) : null), [library, styleQuery.isPending, books, groups, username, locale, ownStyle]);
   const ordered = useMemo(() => orderLibraryBooks(books, groups), [books, groups]);
   const preview = useMemo(() => buildMuralPreset("shelf", ordered, locale, groups), [ordered, locale, groups]);
   const previewMural: Mural = { id: "shelf-preview", name: preview.name, theme, blocks: preview.blocks, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
@@ -288,7 +291,7 @@ export function MyShelfScreen() {
           onEnableLink={enableCardLink}
           onDisableLink={disableCardLink}
         >
-          <View style={styles.sharePreview}><ReaderCardImage input={card.input} width={SHARE_CARD_WIDTH} /></View>
+          <View style={styles.sharePreview}><ReaderCardImage input={card.input} width={Math.min(SHARE_CARD_WIDTH, width - SHARE_SHEET_CHROME_WIDTH, (height - SHARE_SHEET_CHROME_HEIGHT) / PLATE_RATIO)} /></View>
         </ContentShareSheet>
       ) : null}
       <MuralPicker
@@ -349,10 +352,10 @@ export function MyShelfScreen() {
 
 const styles = StyleSheet.create({
   tabPad: { flex: 1, padding: spacing.lg },
-  shelfScroll: { paddingBottom: spacing.xxl },
+  shelfScroll: { flexGrow: 1, paddingBottom: spacing.xxl },
   canvasScroll: { paddingHorizontal: spacing.sm, paddingTop: spacing.lg },
   heroActions: { flexDirection: "row", gap: spacing.md },
   heroAction: { flex: 1 },
-  sharePreview: { alignItems: "center", padding: spacing.md },
+  sharePreview: { alignItems: "center" },
   dialogGap: { gap: spacing.md },
 });

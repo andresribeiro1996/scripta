@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import type { Group, Mural, ReaderProfile } from "@scripta/shared";
 import { Button, dynamicType, spacing, typography, useTheme } from "../../ui";
@@ -22,14 +22,14 @@ export function ShelfPreview({ mural, summary, busy, books, groups, images, tier
   const t = useT();
   const { colors } = useTheme();
   return (
-    <ScrollView contentContainerStyle={styles.scroll}>
+    <View style={styles.scroll}>
       <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{summary}</Text>
       <View style={styles.actions}>
         <Button label={t("community.keepShelf")} loading={busy} disabled={busy} onPress={onKeep} />
         <Button label={t("community.startBlank")} variant="secondary" disabled={busy} onPress={onBlank} />
       </View>
       <MuralCanvas mural={mural} books={books} groups={groups} images={images} tierlists={tierlists} profile={profile} />
-    </ScrollView>
+    </View>
   );
 }
 
