@@ -677,6 +677,9 @@ Asked by the user on 2026-11-02: "yes, add the colour wash fallback for older ph
 
 **Files:**
 - Modify: `mobile/src/features/readerCard/ProfileCardHero.tsx`
+- Modify: `mobile/src/features/readerCard/backdropXml.ts`
+- Modify: `packages/shared/src/readerCards/render.ts`
+- Modify: `docs/superpowers/plans/2026-11-02-reader-card-prominence.md`
 - Test: `mobile/src/features/readerCard/profileCardHero.test.ts`
 
 **Interfaces:**

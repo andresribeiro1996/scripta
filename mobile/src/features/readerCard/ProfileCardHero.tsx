@@ -1,7 +1,7 @@
 import { useId, useMemo, useState, type ReactNode } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop, SvgXml } from "react-native-svg";
-import { cardRatio, readerCardShine, renderReaderCard, resolvePrint, type IdentityKey, type ReaderCardBase } from "@scripta/shared";
+import { cardRatio, readerCardGround, readerCardShine, renderReaderCard, resolvePrint, type IdentityKey, type ReaderCardBase } from "@scripta/shared";
 import { cardFontFamily, dynamicType, Skeleton, spacing, typography, useTheme } from "../../ui";
 import { Text } from "../../ui/Text";
 import { useT } from "../../i18n";
@@ -11,7 +11,7 @@ import { CardShine } from "../murals/CardShine";
 import { PLATE_RATIO, ReaderCardImage } from "../murals/ReaderCardImage";
 import { readerCardXml } from "../murals/readerCardXml";
 import { ReaderCardViewer } from "../murals/ReaderCardViewer";
-import { backdropXml } from "./backdropXml";
+import { backdropXml, viewBlurSupported } from "./backdropXml";
 
 const BACKDROP_GROW = 0.16;
 const BACKDROP_BLUR = 0.085;
@@ -28,11 +28,13 @@ export function ProfileCardBackdrop({ input }: { input: ReaderCardBase }) {
   const { colors, mode } = useTheme();
   const fadeId = useId().replace(/\W/g, "");
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
-  const card = useMemo(
-    () => readerCardXml(renderReaderCard({ ...input, print: resolvePrint(input.style.print, mode === "dark") }), { serif: cardFontFamily("playfairDisplay"), sans: cardFontFamily("sans"), mono: CARD_MONO_FAMILY, script: CARD_SCRIPT_FAMILY }),
-    [input, mode],
+  const blurs = viewBlurSupported(Platform.OS, Platform.Version);
+  const print = resolvePrint(input.style.print, mode === "dark");
+  const ground = useMemo(() => (blurs ? null : readerCardGround({ ...input, print })), [blurs, input, print]);
+  const backdrop = useMemo(
+    () => (blurs ? backdropXml(readerCardXml(renderReaderCard({ ...input, print }), { serif: cardFontFamily("playfairDisplay"), sans: cardFontFamily("sans"), mono: CARD_MONO_FAMILY, script: CARD_SCRIPT_FAMILY })) : null),
+    [blurs, input, print],
   );
-  const backdrop = useMemo(() => backdropXml(card), [card]);
   const grow = size ? -size.width * BACKDROP_GROW : 0;
   return (
     <View
@@ -42,7 +44,7 @@ export function ProfileCardBackdrop({ input }: { input: ReaderCardBase }) {
       onLayout={(event) => setSize(event.nativeEvent.layout)}
       style={[StyleSheet.absoluteFill, styles.clip]}
     >
-      {size ? (
+      {ground ? <View style={[StyleSheet.absoluteFill, { backgroundColor: ground }]} /> : size && backdrop ? (
         <View style={{ position: "absolute", top: grow, left: grow, width: size.width - 2 * grow, height: size.height - 2 * grow, filter: [{ blur: size.width * BACKDROP_BLUR }, { saturate: BACKDROP_SATURATE }] }}>
           <SvgXml xml={backdrop} width="100%" height="100%" />
         </View>

@@ -122,6 +122,11 @@ export function renderReaderCard(input: ReaderCardInput, page: ReaderCardPage = 
   return withStyle(composePlate(face, slots, finish.wrapInk), finish.palette);
 }
 
+export function readerCardGround(input: ReaderCardInput): string {
+  const { ink } = faceOf({ ...input, identity: input.card.identity, state: input.card.state });
+  return finishLayers(input.style.finish, { print: input.print, ink, streak: null, seed: input.seed, front: true, seal: null, corners: "" }).palette[0];
+}
+
 export function renderGlyph(identity: IdentityKey, size: number, print: PlatePrint): string {
   return withStyle(glyph(identity, size), inks(identity, print));
 }
