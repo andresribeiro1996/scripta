@@ -67,4 +67,6 @@ export const readerCard: CatalogOf<typeof en> = {
   "readerCard.finishHintStamp": "Tinta irregular, falhada, ligeiramente rodada",
   "readerCard.finishHintKraft": "Papel de embrulho castanho",
   "readerCard.finishHintRiso": "Duas tintas desalinhadas",
+  "readerCard.shareCard": "Partilhar cartão",
+  "readerCard.sharedInvalid": "Esta ligação do cartão é inválida ou já não está ativa.",
 };

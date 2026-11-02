@@ -31,4 +31,7 @@ export const {
   unpublishProfile,
   fetchOwnProfile,
   setShelfMural,
+  fetchCardShare,
+  shareCard,
+  unshareCard,
 } = createCommunityApi(request);

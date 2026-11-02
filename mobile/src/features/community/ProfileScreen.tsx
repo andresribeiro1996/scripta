@@ -5,13 +5,14 @@ import { FlatList, Pressable, StyleSheet, View, useWindowDimensions } from "reac
 import { useAuth } from "../../core/auth";
 import { Text } from "../../ui/Text";
 import { followFailureMessage } from "@scripta/shared/community";
-import { ensureBookBlockHeights, profileOnlyMural, readerGlyphLabel, type IdentityKey, type Mural } from "@scripta/shared";
+import { ensureBookBlockHeights, profileOnlyMural, readerCardInputOf, readerGlyphLabel, type IdentityKey, type Mural } from "@scripta/shared";
 import { Button, Dialog, EmptyState, ErrorState, Icon, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { MuralCanvas } from "../murals";
 import { useMurals } from "../murals/useMurals";
 import { reconstructBooks, reconstructTierlists } from "../public/adapters";
 import { PublicLibraryGrid } from "../public/PublicLibraryGrid";
 import type { GalleryImage } from "../gallery/api";
+import { ProfileCardHero } from "../readerCard/ProfileCardHero";
 import { DailyChapterProfileSection } from "../dailyChapter/daily-chapter-profile-section";
 import { ActivityList } from "./ActivityList";
 import { AuthorAvatar } from "./AuthorAvatar";
@@ -25,6 +26,7 @@ export function ProfileScreen({ username }: { username: string }) {
   const locale = useLocale();
   const t = useT();
   const { colors, id: viewerTheme } = useTheme();
+  const { width } = useWindowDimensions();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const profile = useQuery({
@@ -44,6 +46,7 @@ export function ProfileScreen({ username }: { username: string }) {
   const books = useMemo(() => (muralData ? reconstructBooks(muralData.library.books, muralData.library.currentlyReading, muralData.library.highlights) : []), [muralData]);
   const images = useMemo<GalleryImage[]>(() => (muralData ? Object.entries(muralData.imageUrls).filter((entry): entry is [string, string] => entry[1] !== null).map(([id, url]) => ({ id, url, filename: "", mimeType: "", width: 0, height: 0, byteSize: 0, createdAt: "" })) : []), [muralData]);
   const tierlists = useMemo(() => reconstructTierlists(muralData?.tierlists ?? {}), [muralData]);
+  const cardInput = useMemo(() => (view && !view.private && view.readerCard ? readerCardInputOf([], [], view.profile.user.username, locale, view.readerCard) : null), [view, locale]);
   const library = useQuery({
     queryKey: ["community", "profile-library", username],
     queryFn: () => fetchProfileLibrary(username),
@@ -113,6 +116,15 @@ export function ProfileScreen({ username }: { username: string }) {
 
   const profileUser = view!.profile.user;
 
+  const followButton = profileUser.userId !== user?.id ? (
+    <Button
+      label={view!.profile.viewerFollows === true ? t("book.following") : t("book.follow")}
+      variant={view!.profile.viewerFollows === true ? "secondary" : "primary"}
+      loading={busy}
+      onPress={() => void toggleFollow()}
+    />
+  ) : null;
+
   return (
     <Screen bottom top={false}>
       <Stack.Screen
@@ -146,6 +158,20 @@ export function ProfileScreen({ username }: { username: string }) {
               onRefresh={() => void profile.refetch()}
               ListHeaderComponent={
                 <View style={styles.muralHeader}>
+                  {cardInput ? (
+                    <View style={styles.heroBleed}>
+                      <ProfileCardHero input={cardInput} width={width}>
+                        <View style={styles.heroName}>
+                          <AuthorAvatar username={profileUser.username} avatarUrl={profileUser.avatarUrl} size={48} />
+                          <Text numberOfLines={1} {...dynamicType} style={[typography.heading, styles.strong, styles.metaName, { color: colors.text }]}>
+                            {profileUser.username}
+                          </Text>
+                          <ReaderGlyph identity={profileUser.readerGlyph} />
+                        </View>
+                        {followButton}
+                      </ProfileCardHero>
+                    </View>
+                  ) : null}
                   {mural && mural.blocks.length > 0 ? (
                     <MuralCanvas
                       mural={mural}
@@ -156,17 +182,10 @@ export function ProfileScreen({ username }: { username: string }) {
                       shelfThemeOverride={muralData?.library.shelfTheme}
                       statsOverride={muralData?.library.stats}
                     />
-                  ) : (
+                  ) : cardInput ? null : (
                     <MuralCanvas mural={profileOnlyMural(viewerTheme)} books={[]} images={[]} tierlists={[]} profile={profileUser} />
                   )}
-                  {view!.profile.user.userId !== user?.id ? (
-                    <Button
-                      label={view!.profile.viewerFollows === true ? t("book.following") : t("book.follow")}
-                      variant={view!.profile.viewerFollows === true ? "secondary" : "primary"}
-                      loading={busy}
-                      onPress={() => void toggleFollow()}
-                    />
-                  ) : null}
+                  {cardInput ? null : followButton}
                   <Text {...dynamicType} style={[typography.caption, styles.eyebrow, { color: colors.textDim }]}>
                     {t("community.published")}
                   </Text>
@@ -354,6 +373,8 @@ const styles = StyleSheet.create({
   list: { padding: spacing.lg, gap: spacing.sm, paddingBottom: spacing.huge },
   eyebrow: { fontWeight: "600" },
   muralHeader: { gap: spacing.lg, marginBottom: spacing.xs },
+  heroBleed: { marginHorizontal: -spacing.lg, marginTop: -spacing.lg },
+  heroName: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   card: { flexDirection: "row", alignItems: "center", gap: spacing.md, borderWidth: 1, borderRadius: radii.lg, paddingVertical: spacing.md, paddingHorizontal: spacing.lg },
   dialogGap: { gap: spacing.md },
   pickerList: { maxHeight: 240, flexGrow: 0 },

@@ -3,4 +3,4 @@ import { request } from "../../core/api";
 
 export type { PublicBookData, PublicHighlight, SharedMuralPayload } from "@scripta/shared";
 
-export const { fetchSharedLibrary, fetchSharedMural } = createPublicApi(request);
+export const { fetchSharedCard, fetchSharedLibrary, fetchSharedMural } = createPublicApi(request);
