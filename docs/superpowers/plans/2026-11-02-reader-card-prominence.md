@@ -313,6 +313,7 @@
 - Modify: `mobile/src/features/search/ReaderPortraitCard.tsx`
 - Modify: `mobile/src/features/home/FeedPreview.tsx`
 - Modify: `backend/src/modules/murals/home.test.ts`
+- Modify: `backend/src/modules/murals/routes.ts`
 - Test: `packages/shared/src/murals/murals.test.ts`
 - Test: `packages/shared/src/murals/blockKinds.test.ts`
 - Test: `packages/shared/src/murals/presets.test.ts`
