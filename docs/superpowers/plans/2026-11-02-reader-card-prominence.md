@@ -46,7 +46,7 @@
   - Reuse the existing "Edit card" keys: `readerCard.editCard` on web, `murals.editCard` on mobile.
 - **Owner progress line (Unwritten only):** the owner input's `missing`, e.g. "Finish 3 more books". It comes from `ownProfileCard` (Task 6).
 - **Public card URL:** `${env.FRONTEND_URL}/shared/cards/${token}`.
-- **Mobile hero placement (Claude's call, flagged to the user).** On mobile the hero is the first item of each profile's first tab: Mural on others' profiles, Shelf on your own. It scrolls away with that tab. On web the hero sits above `SwipeTabs`. If the user wants it above the tabs on mobile too, Task 8 changes. The other tasks don't.
+- **Mobile hero placement (changed 2026-11-02 after the user's phone test).** The hero sits above the tab bar, and its backdrop runs up under a transparent header. This is the user's decision ("go fully D, hero above the tabs"). Task 10 replaces Task 8's in-tab placement. On web the hero sits above `SwipeTabs`.
 - **Security review.** The branch touches share links and who can see what, so run the `security-review` skill before merge.
 - **No comments in code.**
 - **Rebuild shared** (`npm run build --workspace @scripta/shared`) before checking consumers.
@@ -524,3 +524,78 @@ If either is not true, stop and report. Do not create infrastructure. The `app.j
 - [ ] **Step 5: Post-deploy check (user, part of the runbook).**
   - Run `curl -s https://atmyshelf.com/shared/cards/<token> | grep og:image`. Expect the JPEG URL.
   - Run `curl -sI <that URL>`. Expect `200` and `image/jpeg`.
+
+---
+
+## PR 2 addendum — fully D on mobile (added 2026-11-02 after the user's phone test)
+
+### Task 10: Mobile profile — hero above the tabs, one native scroller
+
+The user tested PR 2 on a phone and asked for the layout to match mockup D much more closely, with the hero above the tabs. The mechanism follows the one layout already proven against scroll lag in this app, PR #231's book page (`mobile/src/features/works/BookScreen.tsx`, `WorkScreen.tsx`; lessons in `docs/superpowers/plans/2026-10-12-book-screen-followups.md`, Task 7):
+
+- **Everything that must stay glued scrolls natively.** The card, name and tab bar are content of a single list. The tab bar pins with `stickyHeaderIndices`, never with a Reanimated translate.
+- **The blurred backdrop is one non-scrolling layer behind the list**, driven by one shared value: `translateY: -max(scrollY, 0)`. It runs up under a transparent native header. Its one-frame lag is acceptable because it is a soft blur with no edge against content. That is the same reasoning #231 recorded.
+
+**Files:**
+- Create: `mobile/src/features/community/ProfileScroller.tsx`
+- Modify: `mobile/src/features/readerCard/ProfileCardHero.tsx`
+- Modify: `mobile/src/features/murals/ReaderCardTurner.tsx`
+- Modify: `mobile/src/features/murals/MuralCanvas.tsx`
+- Modify: `mobile/src/features/community/ProfileScreen.tsx`
+- Modify: `mobile/src/features/community/MyShelfScreen.tsx`
+- Modify: `mobile/src/features/community/ActivityList.tsx`
+- Modify: `mobile/src/features/public/PublicLibraryGrid.tsx`
+- Modify: `mobile/src/features/dailyChapter/daily-chapter-profile-section.tsx`
+- Modify: `mobile/src/features/public/SharedCardScreen.tsx`
+- Test: `mobile/src/features/community/profileScroller.test.ts`
+
+**Interfaces:**
+- `ProfileScroller<T extends string>(props)`, with these props:
+  - `hero: ReactNode` — transparent, with no backdrop of its own;
+  - `backdrop: ReactNode` — the blurred card layer;
+  - `tabs: readonly { value: T; label: string }[]`, `value: T`, `onChange(value: T)`;
+  - `section: ProfileSection`, the rows of the active tab;
+  - `refreshing?`, `onRefresh?`.
+
+  What it renders:
+  - The screen root holds an absolute `Animated.View` at the top for the backdrop. Its height is `headerHeight + heroHeight`, where `useHeaderHeight()` gives the header height and the hero's `onLayout` gives the hero height. It fades to `colors.background` at its bottom.
+  - Over that sits a Reanimated `Animated.FlatList` with `marginTop: headerHeight` and `scrollEventThrottle={16}`. Its `ListHeaderComponent` is `hero`. Its `data` is `[TAB_BAR, ...section.data]`, with `stickyHeaderIndices={[1]}`; the list header is index 0.
+  - The tab bar row has an opaque `colors.background` and looks like `SwipeableTabs`' row: same labels, typography and underline. Tapping a tab calls `onChange`. If `scrollY > heroHeight` at that moment, it calls `scrollToOffset({ offset: heroHeight, animated: false })`, so the bar stays pinned and the new tab starts at its top.
+  - `onEndReached` comes from `section`.
+  - There is no horizontal swipe between tabs. This is deliberate, and BookScreen has the same tab model.
+- `ProfileSection`: `{ data: readonly unknown[]; keyExtractor(item, index): string; renderItem(item): ReactElement; onEndReached?(): void; ListEmptyComponent?: ReactElement }`.
+- Tab sources are refactored to produce a `ProfileSection`. Each keeps its existing component for every other caller:
+  - `useActivitySection(username): ProfileSection` in `ActivityList.tsx`, taken from `ActivityList`'s infinite query and its `hasNextPage` guard. `ActivityList` itself stays as is for other screens.
+  - `useLibrarySection(library, width): ProfileSection` in `PublicLibraryGrid.tsx`. It chunks the books into rows of `columns` and uses the same card sizing as `LibraryGrid`, so the list keeps its virtualisation. `SharedLibraryScreen` keeps `PublicLibraryGrid`.
+  - `DailyChapterProfileSection` gets `embedded?: boolean`. When it is true it renders a `View`, not its `ScrollView`. It is one row.
+  - **Mural (others):** the rows are `[mural canvas, "Published" eyebrow, ...publishedRows]`.
+  - **Shelf (own):** one row, `shelfBody()`.
+- `ProfileCardHero` gains `withBackdrop?: boolean` (default `true`) and exports `ProfileCardBackdrop({ input }: { input: ReaderCardBase })`.
+  - The profile screens pass `withBackdrop={false}` and give `ProfileCardBackdrop` to `ProfileScroller.backdrop`.
+  - `SharedCardScreen` keeps the default.
+- `ReaderCardTurner` gains `dots?: boolean` (default `true`). The hero passes `false`, and the card is turned by tap or swipe.
+- `MuralCanvas` gains `profileInHero?: boolean`. When it is true, the `profile` block skips its avatar and handle row (`MuralCanvas.tsx:188-190`) and keeps the bio, favourite genres and shelf theme. Both profile screens pass `true`.
+- **Header on both profile routes:**
+  - `headerTransparent: true`, `headerStyle: { backgroundColor: "transparent" }`, `headerShadowVisible: false`, `headerLargeTitleEnabled: false`, `title: ""`.
+  - `MyShelfScreen` keeps its `headerRight`.
+  - The loading, error and private states set all four keys back explicitly to the opaque defaults, the way `WorkScreen.tsx:47-52`'s `plainHeader` does, because `Stack.Screen` options merge.
+- **Hero content, centred like mockup D:**
+  - avatar (40) and name in one centred row, with the glyph after the name;
+  - under it, the finished-book count from `input.card.facts?.finished` when present ("{count} books read" / "{count} livros lidos", plural forms);
+  - then compact pill buttons: Follow on others' profiles, Share card and Edit card on your own;
+  - then the progress line, own Unwritten only.
+- **Own shelf while the card isn't ready:** while `styleQuery` is pending, the hero slot keeps the card's height as a skeleton, so the tabs don't jump. When it errors, the existing retry block takes the hero slot.
+
+- [ ] **Step 1: Write a failing test.** In `profileScroller.test.ts`, test `pinnedOffset keeps the tab bar pinned when switching tabs`: `pinnedOffset(scrollY, heroHeight)` returns `heroHeight` when `scrollY > heroHeight`, and `null` otherwise. Export it from `ProfileScroller.tsx`.
+- [ ] **Step 2: Implement** `ProfileScroller` and the refactors from Interfaces, then move both profile screens onto it.
+- [ ] **Step 3: Run the checks and confirm they pass.** Run `npm run build --workspace @scripta/shared && npm run typecheck --workspace mobile && npm test --workspace mobile`. Expected: PASS.
+- [ ] **Step 4: Commit and push.** Run `git add -A mobile docs && git commit -m "Put the reader card above the profile tabs on mobile"`, then push.
+- [ ] **Step 5: Device pass (`device-checker`).** Check your own shelf and `fixture_alice`'s profile, in dark and light themes. It passes if:
+  - the backdrop starts under the status bar and header, and the back button and header actions sit over it;
+  - the card, centred name and pills appear in D's order;
+  - scrolling moves the card and the backdrop together, with no seam or band at the header's bottom edge, during a fling and on overscroll;
+  - the tab bar pins under the header;
+  - switching tabs while pinned keeps the bar pinned;
+  - the Activity tab loads more at its end;
+  - the Library tab scrolls smoothly;
+  - pull-to-refresh works on the Mural tab.
