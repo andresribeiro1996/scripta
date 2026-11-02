@@ -88,13 +88,14 @@ test("image route 404s for a revoked token", async (t) => {
   assert.equal((await app.inject({ method: "GET", url: `/community/cards/shared/${shareToken}/image.jpg` })).statusCode, 404);
 });
 
-test("image route serves image/jpeg with max-age=300 for a live token", async (t) => {
+test("image route serves image/jpeg privately cached for 300s and varying on language for a live token", async (t) => {
   const { app, as } = await cardApp();
   t.after(() => app.close());
   const { shareToken } = (await as("POST", "/community/card/share")).json();
   const res = await app.inject({ method: "GET", url: `/community/cards/shared/${shareToken}/image.jpg` });
   assert.equal(res.statusCode, 200);
   assert.equal(res.headers["content-type"], "image/jpeg");
-  assert.equal(res.headers["cache-control"], "public, max-age=300");
+  assert.equal(res.headers["cache-control"], "private, max-age=300");
+  assert.equal(res.headers.vary, "Accept-Language");
   assert.equal((await sharp(res.rawPayload).metadata()).format, "jpeg");
 });
