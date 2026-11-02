@@ -495,7 +495,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, profileI
     return { height: Math.max(height, Math.ceil(movingBottom / ROW_HEIGHT) * ROW_HEIGHT, ...Object.values(preview.get()).map((layout) => (layout.y + layout.h + 6) * ROW_HEIGHT)) };
   });
   const canvas = (
-    <Animated.View onLayout={(event) => setWidth(event.nativeEvent.layout.width)} style={[styles.canvas, profileInHero ? null : { backgroundColor: colors.background }, canvasStyle]}>
+    <Animated.View onLayout={(event) => setWidth(event.nativeEvent.layout.width)} style={[styles.canvas, profileInHero ? styles.floatingCanvas : { backgroundColor: colors.background }, canvasStyle]}>
       {width > 0 ? resolvedBlocks.map((block) => <CanvasBlock
         key={block.id}
         block={block}
@@ -537,6 +537,7 @@ export function MuralThumbnail({ canvasWidth, ...props }: ComponentProps<typeof 
 const styles = StyleSheet.create({
   thumbnail: { width: "100%", height: "100%", overflow: "hidden" },
   canvas: { position: "relative", width: "100%", overflow: "hidden" },
+  floatingCanvas: { overflow: "visible" },
   block: { position: "absolute", overflow: "hidden" },
   blockPress: { flex: 1, minHeight: minimumTouchTarget },
   blockBody: { flex: 1, gap: spacing.sm },
