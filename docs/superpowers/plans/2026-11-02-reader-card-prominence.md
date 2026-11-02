@@ -187,6 +187,7 @@
 - Modify: `packages/shared/src/community/types.ts`
 - Modify: `backend/src/modules/community/routes.test.ts`
 - Test: `backend/src/modules/community/cardShare.test.ts`
+- Test: `backend/src/modules/community/service.test.ts`
 
 **Interfaces:**
 - Consumes: `CommunityDeps.readerCardFor` (Task 1).
