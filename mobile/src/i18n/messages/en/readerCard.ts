@@ -69,4 +69,5 @@ export const readerCard = {
   "readerCard.shareCard": "Share card",
   "readerCard.sharedInvalid": "This card link is invalid or no longer active.",
   "readerCard.sharedLoadFailed": "Couldn't load this card.",
+  "readerCard.booksRead": { one: "{count} book read", other: "{count} books read" },
 } satisfies Messages;

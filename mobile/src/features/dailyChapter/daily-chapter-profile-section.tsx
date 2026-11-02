@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ScrollView, View } from "react-native";
+import { View } from "react-native";
 import { useRouter } from "expo-router";
 import { dailyThemeName } from "@scripta/shared";
 import { Text } from "../../ui/Text";
@@ -32,5 +32,5 @@ export function DailyChapterProfileSection({ userId, own }: { userId: string; ow
       {bestTheme ? <View><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("quizzes.bestAt", { theme: themeName, percent: bestTheme.percent })}</Text></View> : null}
     </>;
   }
-  return <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.huge }}>{body}</ScrollView>;
+  return <View style={{ padding: spacing.lg, gap: spacing.xl }}>{body}</View>;
 }

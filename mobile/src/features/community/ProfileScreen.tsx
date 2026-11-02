@@ -5,30 +5,31 @@ import { FlatList, Pressable, StyleSheet, View, useWindowDimensions } from "reac
 import { useAuth } from "../../core/auth";
 import { Text } from "../../ui/Text";
 import { followFailureMessage } from "@scripta/shared/community";
-import { ensureBookBlockHeights, profileOnlyMural, readerCardInputOf, readerGlyphLabel, type IdentityKey, type Mural } from "@scripta/shared";
-import { Button, Dialog, EmptyState, ErrorState, Icon, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { ensureBookBlockHeights, readerCardInputOf, type Mural } from "@scripta/shared";
+import { Button, Dialog, EmptyState, ErrorState, Icon, IconButton, Screen, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { MuralCanvas } from "../murals";
 import { useMurals } from "../murals/useMurals";
 import { reconstructBooks, reconstructTierlists } from "../public/adapters";
-import { PublicLibraryGrid } from "../public/PublicLibraryGrid";
+import { useLibrarySection } from "../public/PublicLibraryGrid";
 import type { GalleryImage } from "../gallery/api";
-import { ProfileCardHero } from "../readerCard/ProfileCardHero";
+import { ProfileCardBackdrop, ProfileCardHero, ProfileHeroIdentity } from "../readerCard/ProfileCardHero";
 import { DailyChapterProfileSection } from "../dailyChapter/daily-chapter-profile-section";
-import { ActivityList } from "./ActivityList";
+import { useActivitySection } from "./ActivityList";
 import { AuthorAvatar } from "./AuthorAvatar";
 import { fetchProfile, fetchProfileLibrary, followUser, unfollowUser, type CommunityProfileView } from "./api";
 import { contentDetail, contentKindLabel, contentTarget } from "./communityHome";
-import { ReaderGlyph } from "./ReaderGlyph";
+import { ProfileScroller, elementSection, transparentHeader, usePlainHeader, type ProfileSection } from "./ProfileScroller";
 import { useLocale, useT, type MessageKey } from "../../i18n";
 import type { Locale } from "@scripta/shared/i18n";
 
 export function ProfileScreen({ username }: { username: string }) {
   const locale = useLocale();
   const t = useT();
-  const { colors, id: viewerTheme } = useTheme();
+  const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const plainHeader = usePlainHeader();
   const profile = useQuery({
     queryKey: ["community", "profile", username],
     queryFn: () => fetchProfile(username),
@@ -53,6 +54,8 @@ export function ProfileScreen({ username }: { username: string }) {
     enabled: profile.isSuccess,
     retry: false,
   });
+  const activitySection = useActivitySection(username);
+  const librarySection = useLibrarySection(library.data?.data ?? null);
 
   async function run(action: () => Promise<void>) {
     setBusy(true);
@@ -76,12 +79,19 @@ export function ProfileScreen({ username }: { username: string }) {
     });
   }
 
-  if (profile.isPending) return <Centered><Skeleton height={180} /></Centered>;
+  if (profile.isPending) {
+    return (
+      <Centered>
+        <Stack.Screen options={{ headerShown: true, title: username, ...plainHeader }} />
+        <Skeleton height={180} />
+      </Centered>
+    );
+  }
 
   if (profile.isError) {
     return (
       <Centered>
-        <Stack.Screen options={{ headerShown: true, title: username }} />
+        <Stack.Screen options={{ headerShown: true, title: username, ...plainHeader }} />
         <EmptyState title={t("community.profilePrivate")} body={t("community.profilePrivateBody")} />
       </Centered>
     );
@@ -90,7 +100,7 @@ export function ProfileScreen({ username }: { username: string }) {
   if (view!.private) {
     return (
       <Centered>
-        <Stack.Screen options={{ headerShown: true, title: view!.profile.user.username }} />
+        <Stack.Screen options={{ headerShown: true, title: view!.profile.user.username, ...plainHeader }} />
         <View style={styles.privateAvatar}>
           <AuthorAvatar username={view!.profile.user.username} avatarUrl={view!.profile.user.avatarUrl} size={72} />
         </View>
@@ -115,108 +125,95 @@ export function ProfileScreen({ username }: { username: string }) {
     : null;
 
   const profileUser = view!.profile.user;
+  const following = view!.profile.viewerFollows === true;
+  const followLabel = following ? t("book.following") : t("book.follow");
 
-  const followButton = profileUser.userId !== user?.id ? (
-    <Button
-      label={view!.profile.viewerFollows === true ? t("book.following") : t("book.follow")}
-      variant={view!.profile.viewerFollows === true ? "secondary" : "primary"}
-      loading={busy}
-      onPress={() => void toggleFollow()}
-    />
-  ) : null;
+  const heroBody = (
+    <>
+      <ProfileHeroIdentity username={profileUser.username} avatarUrl={profileUser.avatarUrl} glyph={profileUser.readerGlyph} finished={cardInput?.card.facts?.finished} />
+      {profileUser.userId !== user?.id ? (
+        <IconButton framed name={following ? "confirm" : "follow"} tone={following ? "default" : "accent"} label={followLabel} accessibilityLabel={followLabel} disabled={busy} onPress={() => void toggleFollow()} />
+      ) : null}
+    </>
+  );
+
+  const published = publishedRows(view!, locale);
+  const muralSection: ProfileSection = {
+    ...elementSection([
+      ...(mural && mural.blocks.length > 0
+        ? [
+            <View key="canvas" style={[styles.row, styles.lead]}>
+              <MuralCanvas
+                mural={mural}
+                books={books}
+                images={images}
+                tierlists={tierlists}
+                profile={profileUser}
+                profileInHero
+                shelfThemeOverride={muralData?.library.shelfTheme}
+                statsOverride={muralData?.library.stats}
+              />
+            </View>,
+          ]
+        : []),
+      <Text key="published" {...dynamicType} style={[typography.caption, styles.eyebrow, styles.row, styles.lead, { color: colors.textDim }]}>
+        {t("community.published")}
+      </Text>,
+      ...(published.length === 0
+        ? [<View key="nothing" style={styles.row}><EmptyState title={t("community.nothingPublishedTitle")} body={t("community.nothingPublishedProfileBody")} /></View>]
+        : published.map((item) => (
+            <View key={`${item.kind}:${item.id}`} style={styles.row}>
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel={t("community.openTitle", { title: item.name })}
+                onPress={() => router.push(item.target as never)}
+                style={({ pressed }) => [styles.card, { backgroundColor: pressed ? colors.surfacePressed : colors.surface, borderColor: colors.border }]}
+              >
+                <View style={styles.grow}>
+                  <Text {...dynamicType} style={[typography.caption, styles.eyebrow, { color: colors.accent }]}>
+                    {item.label}
+                  </Text>
+                  <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>
+                    {item.name}
+                  </Text>
+                  <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
+                    {item.detail}
+                  </Text>
+                </View>
+                <Icon name="chevronRight" size={16} color={colors.textDim} />
+              </Pressable>
+            </View>
+          ))),
+    ]),
+    refreshing: profile.isRefetching,
+    onRefresh: () => void profile.refetch(),
+  };
+
+  function sectionFor(value: ProfileTab): ProfileSection {
+    if (value === "activity") return activitySection;
+    if (value === "daily") return elementSection([<DailyChapterProfileSection key="daily" userId={profileUser.userId} own={false} />]);
+    if (value === "library") {
+      if (library.isPending) return elementSection([<View key="pending" style={styles.page}><Skeleton height={180} /></View>]);
+      if (library.isError) return elementSection([<View key="error" style={styles.page}><ErrorState body={t("community.profileLibraryLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void library.refetch()} /></View>]);
+      return librarySection.section;
+    }
+    return muralSection;
+  }
 
   return (
     <Screen bottom top={false}>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          title: profileUser.username,
-          headerLargeTitleEnabled: false,
-          headerTitle: () => <ProfileHeaderTitle username={profileUser.username} identity={profileUser.readerGlyph} />,
-        }}
-      />
-      {error ? <Toast visible message={error} tone="error" /> : null}
-      <SwipeableTabs
+      <Stack.Screen options={{ headerShown: true, ...transparentHeader }} />
+      <ProfileScroller
+        notice={error ? <Toast visible message={error} tone="error" /> : null}
         accessibilityLabel={t("community.profileSections")}
-        options={PROFILE_TABS.map((tab) => ({ value: tab.value, label: t(tab.labelKey) }))}
+        hero={cardInput ? <ProfileCardHero input={cardInput} width={width} withBackdrop={false}>{heroBody}</ProfileCardHero> : <View style={styles.plainHero}>{heroBody}</View>}
+        backdrop={cardInput ? <ProfileCardBackdrop input={cardInput} /> : null}
+        tabs={PROFILE_TABS.map((entry) => ({ value: entry.value, label: t(entry.labelKey) }))}
         value={tab}
         onChange={setTab}
-        renderPage={(value) => {
-          if (value === "activity") return <ActivityList username={username} />;
-          if (value === "daily") return <DailyChapterProfileSection userId={profileUser.userId} own={false} />;
-          if (value === "library") {
-            if (library.isPending) return <View style={styles.page}><Skeleton height={180} /></View>;
-            if (library.isError) return <View style={styles.page}><ErrorState body={t("community.profileLibraryLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void library.refetch()} /></View>;
-            return <PublicLibraryGrid library={library.data.data} topInset={spacing.lg} />;
-          }
-          return (
-            <FlatList
-              data={publishedRows(view!, locale)}
-              keyExtractor={(row) => `${row.kind}:${row.id}`}
-              contentContainerStyle={styles.list}
-              refreshing={profile.isRefetching}
-              onRefresh={() => void profile.refetch()}
-              ListHeaderComponent={
-                <View style={styles.muralHeader}>
-                  {cardInput ? (
-                    <View style={styles.heroBleed}>
-                      <ProfileCardHero input={cardInput} width={width}>
-                        <View style={styles.heroName}>
-                          <AuthorAvatar username={profileUser.username} avatarUrl={profileUser.avatarUrl} size={48} />
-                          <Text numberOfLines={1} {...dynamicType} style={[typography.heading, styles.strong, styles.metaName, { color: colors.text }]}>
-                            {profileUser.username}
-                          </Text>
-                          <ReaderGlyph identity={profileUser.readerGlyph} />
-                        </View>
-                        {followButton}
-                      </ProfileCardHero>
-                    </View>
-                  ) : null}
-                  {mural && mural.blocks.length > 0 ? (
-                    <MuralCanvas
-                      mural={mural}
-                      books={books}
-                      images={images}
-                      tierlists={tierlists}
-                      profile={profileUser}
-                      shelfThemeOverride={muralData?.library.shelfTheme}
-                      statsOverride={muralData?.library.stats}
-                    />
-                  ) : cardInput ? null : (
-                    <MuralCanvas mural={profileOnlyMural(viewerTheme)} books={[]} images={[]} tierlists={[]} profile={profileUser} />
-                  )}
-                  {cardInput ? null : followButton}
-                  <Text {...dynamicType} style={[typography.caption, styles.eyebrow, { color: colors.textDim }]}>
-                    {t("community.published")}
-                  </Text>
-                </View>
-              }
-              ListEmptyComponent={<EmptyState title={t("community.nothingPublishedTitle")} body={t("community.nothingPublishedProfileBody")} />}
-              renderItem={({ item }) => (
-                <Pressable
-                  accessibilityRole="link"
-                  accessibilityLabel={t("community.openTitle", { title: item.name })}
-                  onPress={() => router.push(item.target as never)}
-                  style={({ pressed }) => [styles.card, { backgroundColor: pressed ? colors.surfacePressed : colors.surface, borderColor: colors.border }]}
-                >
-                  <View style={styles.grow}>
-                    <Text {...dynamicType} style={[typography.caption, styles.eyebrow, { color: colors.accent }]}>
-                      {item.label}
-                    </Text>
-                    <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>
-                      {item.name}
-                    </Text>
-                    <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-                      {item.detail}
-                    </Text>
-                  </View>
-                  <Icon name="chevronRight" size={16} color={colors.textDim} />
-                </Pressable>
-              )}
-            />
-          );
-        }}
+        section={sectionFor(tab)}
       />
+      {librarySection.sheet}
     </Screen>
   );
 }
@@ -244,26 +241,6 @@ function publishedRows(view: CommunityProfileView, locale: Locale): PublishedRow
     rows.push({ kind: "quiz", id: item.id, name: item.name, detail: contentDetail(item, locale), target: contentTarget(item), label: contentKindLabel(item, locale) });
   }
   return rows;
-}
-
-function ProfileHeaderTitle({ username, identity }: { username: string; identity?: IdentityKey }) {
-  const locale = useLocale();
-  const { colors } = useTheme();
-  const { width } = useWindowDimensions();
-  const label = readerGlyphLabel(identity, locale);
-  return (
-    <View
-      accessible
-      accessibilityRole="header"
-      accessibilityLabel={label ? `${username}, ${label}` : username}
-      style={[styles.headerTitleRow, { maxWidth: width * 0.6 }]}
-    >
-      <Text numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, styles.metaName, { color: colors.text }]}>
-        {username}
-      </Text>
-      <ReaderGlyph identity={identity} />
-    </View>
-  );
 }
 
 function Centered({ children }: { children: ReactNode }) {
@@ -367,14 +344,11 @@ const styles = StyleSheet.create({
   strong: { fontWeight: "700" },
   privateAvatar: { alignItems: "center" },
   centered: { flex: 1, justifyContent: "center", padding: spacing.lg, gap: spacing.md },
-  headerTitleRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
-  metaName: { flexShrink: 1 },
-  page: { flex: 1, padding: spacing.lg },
-  list: { padding: spacing.lg, gap: spacing.sm, paddingBottom: spacing.huge },
+  page: { padding: spacing.lg },
+  row: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  lead: { paddingTop: spacing.lg },
   eyebrow: { fontWeight: "600" },
-  muralHeader: { gap: spacing.lg, marginBottom: spacing.xs },
-  heroBleed: { marginHorizontal: -spacing.lg, marginTop: -spacing.lg },
-  heroName: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  plainHero: { alignItems: "center", gap: spacing.md, padding: spacing.lg },
   card: { flexDirection: "row", alignItems: "center", gap: spacing.md, borderWidth: 1, borderRadius: radii.lg, paddingVertical: spacing.md, paddingHorizontal: spacing.lg },
   dialogGap: { gap: spacing.md },
   pickerList: { maxHeight: 240, flexGrow: 0 },

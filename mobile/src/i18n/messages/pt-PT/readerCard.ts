@@ -70,4 +70,5 @@ export const readerCard: CatalogOf<typeof en> = {
   "readerCard.shareCard": "Partilhar cartão",
   "readerCard.sharedInvalid": "Esta ligação do cartão é inválida ou já não está ativa.",
   "readerCard.sharedLoadFailed": "Não foi possível carregar este cartão.",
+  "readerCard.booksRead": { one: "{count} livro lido", other: "{count} livros lidos" },
 };
