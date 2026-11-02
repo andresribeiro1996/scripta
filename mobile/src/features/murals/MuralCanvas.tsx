@@ -402,7 +402,7 @@ export function BlockPreview({ theme, block, canvasWidth, maxHeight, books, imag
   );
 }
 
-export function MuralCanvas({ mural, books, images, tierlists, profile, profileInHero, shelfThemeOverride, statsOverride, editable = false, selectedBlockId, onSelectBlock, onLayoutChange, onImageReadyChange, onDragChange, groups = NO_GROUPS, dragScroll }: {
+export function MuralCanvas({ mural, books, images, tierlists, profile, profileInHero, initialWidth = 0, shelfThemeOverride, statsOverride, editable = false, selectedBlockId, onSelectBlock, onLayoutChange, onImageReadyChange, onDragChange, groups = NO_GROUPS, dragScroll }: {
   mural: Mural;
   groups?: Group[];
   books: Array<Record<string, unknown>>;
@@ -410,6 +410,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, profileI
   tierlists: Tierlist[];
   profile?: ReaderProfile;
   profileInHero?: boolean;
+  initialWidth?: number;
   shelfThemeOverride?: ShelfTheme;
   statsOverride?: Record<string, number>;
   editable?: boolean;
@@ -424,7 +425,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, profileI
   const { mode } = useTheme();
   const theme = muralThemeId(mural.theme);
   const colors = themes[theme].colors;
-  const [width, setWidth] = useState(0);
+  const [width, setWidth] = useState(initialWidth);
   const drag = useSharedValue<DragState | null>(null);
   const preview = useSharedValue<Record<string, BlockLayout>>({});
   const drop = useSharedValue<BlockLayout | null>(null);

@@ -216,6 +216,7 @@ export function MyShelfScreen() {
             tierlists={tierlists}
             profile={profile}
             profileInHero
+            initialWidth={width - spacing.sm * 2}
           />
         </View>
       );

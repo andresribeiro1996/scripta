@@ -748,6 +748,8 @@ Asked by the user on 2026-11-02: "the menus should be swipeable". Answering a qu
 **Files:**
 - Modify: `mobile/src/features/community/ProfileScroller.tsx`
 - Modify: `mobile/src/features/community/pinnedOffset.ts`
+- Modify: `mobile/src/features/murals/MuralCanvas.tsx`
+- Modify: `mobile/src/features/community/MyShelfScreen.tsx`
 - Test: `mobile/src/features/community/profileScroller.test.ts`
 
 **Interfaces:**
