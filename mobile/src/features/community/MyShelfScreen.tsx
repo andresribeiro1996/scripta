@@ -20,7 +20,9 @@ import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import { fetchTierlists } from "../tierlists/api";
 import { DailyChapterProfileSection } from "../dailyChapter/daily-chapter-profile-section";
 import { ActivityList } from "./ActivityList";
+import { AuthorAvatar } from "./AuthorAvatar";
 import { FeedSettingsDialog } from "./FeedSettingsDialog";
+import { ReaderGlyph } from "./ReaderGlyph";
 import { ShelfPreview } from "./ShelfPreview";
 import { fetchCardShare, fetchOwnProfile, publishProfile, setShelfMural, shareCard, unpublishProfile, unshareCard } from "./api";
 import { MuralPicker } from "./ProfileScreen";
@@ -233,8 +235,14 @@ export function MyShelfScreen() {
     return <ShelfPreview mural={previewMural} summary={shelfPresetSummary(books, ownData.published, locale)} busy={busy} books={books} groups={groups} images={images} tierlists={tierlists} profile={profile} onKeep={() => void keepShelf()} onBlank={() => void startBlank()} />;
   }
 
+  const glyph = ownData.published && ownData.feedSettings.readerGlyph && card?.input.card.state === "settled" ? card.input.card.identity ?? undefined : undefined;
   const cardActions = card ? (
     <>
+      <View style={styles.heroName}>
+        <AuthorAvatar username={username} avatarUrl={profile?.avatarUrl ?? null} size={48} />
+        <Text numberOfLines={1} {...dynamicType} style={[typography.heading, styles.strong, styles.metaName, { color: colors.text }]}>{username}</Text>
+        <ReaderGlyph identity={glyph} />
+      </View>
       {card.progress ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{card.progress}</Text> : null}
       <View style={styles.heroActions}>
         <View style={styles.heroAction}><Button label={t("readerCard.shareCard")} variant="secondary" disabled={!cardShare.data} onPress={() => setSharingCard(true)} /></View>
@@ -365,6 +373,9 @@ const styles = StyleSheet.create({
   shelfScroll: { flexGrow: 1, paddingBottom: spacing.xxl },
   canvasScroll: { paddingHorizontal: spacing.sm, paddingTop: spacing.lg },
   cardError: { padding: spacing.lg, gap: spacing.md },
+  heroName: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  strong: { fontWeight: "700" },
+  metaName: { flexShrink: 1 },
   heroActions: { flexDirection: "row", gap: spacing.md },
   heroAction: { flex: 1 },
   sharePreview: { alignItems: "center" },

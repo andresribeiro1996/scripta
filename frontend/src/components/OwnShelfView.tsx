@@ -179,17 +179,8 @@ export function OwnShelfView({ username }: { username: string }) {
     ? { username: session.user.username, avatarUrl: session.user.avatarId ? avatarUrlFor(session.user.avatarId) : null }
     : undefined;
 
-  return (
-    <Page title={null} back={backTo("profile")}>
-      {libraryQuery.isSuccess && styleQuery.isSuccess ? <ProfileCardHero input={cardInput} /> : null}
-      {libraryQuery.isSuccess && styleQuery.isError ? (
-        <div className="flex flex-wrap items-center gap-3 py-6">
-          <p className="text-sm text-(--color-danger)">{t("library.shelfActionFailed")}</p>
-          <button onClick={() => void styleQuery.refetch()} className={BUTTON_SECONDARY}>
-            {t("library.retry")}
-          </button>
-        </div>
-      ) : null}
+  const shelfHeader = (
+    <>
       <div className="flex flex-wrap items-center gap-5">
         {session?.user && <Avatar user={session.user} size={72} />}
         <h1 className="font-display min-w-0 flex-1 basis-48 break-words text-3xl font-bold lg:text-[2.5rem] lg:leading-[3rem]">@{username}</h1>
@@ -232,6 +223,26 @@ export function OwnShelfView({ username }: { username: string }) {
         </Link>
         {cardShare.isError && <p className="text-sm text-(--color-danger)">{t("library.shelfActionFailed")}</p>}
       </div>
+    </>
+  );
+
+  return (
+    <Page title={null} back={backTo("profile")}>
+      {libraryQuery.isSuccess && styleQuery.isSuccess ? (
+        <ProfileCardHero input={cardInput}>{shelfHeader}</ProfileCardHero>
+      ) : (
+        <>
+          {libraryQuery.isSuccess && styleQuery.isError ? (
+            <div className="flex flex-wrap items-center gap-3 py-6">
+              <p className="text-sm text-(--color-danger)">{t("library.shelfActionFailed")}</p>
+              <button onClick={() => void styleQuery.refetch()} className={BUTTON_SECONDARY}>
+                {t("library.retry")}
+              </button>
+            </div>
+          ) : null}
+          {shelfHeader}
+        </>
+      )}
       {sharingCard && cardShare.data && (
         <ShareModal
           title={t("shell.areaReaderCard")}

@@ -43,3 +43,7 @@ test("the backdrop is drawn from the card's own resolved print", () => {
   assert.match(decodeURIComponent(reversed), /#efe5d1/);
   assert.doesNotMatch(decodeURIComponent(paper), /#efe5d1/);
 });
+
+test("children render inside the backdrop wrapper, not after it", () => {
+  assert.match(hero(), /CHILD-MARKER<\/p><\/div><\/div>$/);
+});
