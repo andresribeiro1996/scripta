@@ -1,3 +1,4 @@
+import { publicReaderCard, readerIdentity } from "@scripta/shared";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,6 +22,8 @@ process.env.COMMUNITY_DB_PATH = join(tempRoot, "community.sqlite");
 const { openCommunityDb } = await import("./connection.js");
 const { createSqliteCommunityRepository } = await import("./sqliteCommunityRepository.js");
 const { createCommunityPublicApi, createCommunityService } = await import("../../service.js");
+
+const blankCard = publicReaderCard(readerIdentity([], [], "en"));
 
 function repo() {
   return createSqliteCommunityRepository(openCommunityDb());
@@ -781,6 +784,7 @@ test("the dashboard service pages through a real inbox newest first, narrowed to
     resolveProfiles: (ids) => new Map(ids.map((id) => [id, { username: id, avatarUrl: null }])),
     resolveLibrary: unused,
     readerGlyphFor: () => null,
+    readerCardFor: () => blankCard,
     sharedBookCounts: unused,
     sharedBooks: unused,
     userHasUsername: unused,

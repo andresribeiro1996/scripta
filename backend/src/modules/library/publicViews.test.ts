@@ -18,7 +18,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { createSqliteLibraryRepository } = await import("./adapters/sqlite/sqliteLibraryRepository.js");
 const { openLibraryDb } = await import("./adapters/sqlite/connection.js");
 const { createLibraryService } = await import("./service.js");
-const { resolvePublicLibrary, resolvePublicLibraryData, resolvePublicBooksByWork } = await import("./publicResolver.js");
+const { resolvePublicLibrary, resolvePublicLibraryData, resolvePublicBooksByWork, resolveProfileReaderCard } = await import("./publicResolver.js");
 const { buildLibraryRoutes } = await import("./routes.js");
 const { resolveWorks } = await import("../books/index.js");
 const { openBooksDb } = await import("../books/adapters/sqlite/connection.js");
@@ -1067,4 +1067,24 @@ test("the reader number reaches visitors only when the owner chose that footer",
   assert.deepEqual(card.style?.footer, { left: "readerNumber", right: "name" });
   service.patchReaderCardStyle(owner, { footer: { left: "since", right: "name" } });
   assert.equal("readerNumber" in (resolvePublicLibraryData(owner, cardRequest).readerCard!.facts ?? {}), false);
+});
+
+test("resolveProfileReaderCard returns a blank unwritten card when the user has no library", () => {
+  assert.equal(resolveProfileReaderCard("profile-card-ghost").state, "unwritten");
+});
+
+test("resolveProfileReaderCard returns a blank unwritten card when reader_card is null but meta exists", () => {
+  const owner = "profile-card-null";
+  service.saveLibrary(owner, { books: [earthsea], groups: [] });
+  openLibraryDb().prepare("UPDATE library_summary SET reader_card = NULL WHERE user_id = ?").run(owner);
+  assert.equal(resolveProfileReaderCard(owner).state, "unwritten");
+});
+
+test("resolveProfileReaderCard attaches style and chosen for a settled reader", () => {
+  const owner = "profile-card-settled";
+  service.saveLibrary(owner, { books: [earthsea], groups: [] });
+  service.patchReaderCardStyle(owner, { signature: { bookKey: bookKey(earthsea), note: "why" } });
+  const card = resolveProfileReaderCard(owner);
+  assert.ok(card.style);
+  assert.equal(card.chosen?.signature?.title, "A Wizard of Earthsea");
 });

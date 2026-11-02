@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Locale } from "@scripta/shared/i18n";
-import { normalizeWords, type IdentityKey, type ReaderProfile } from "@scripta/shared";
+import { normalizeWords, type IdentityKey, type PublicReaderCard, type ReaderProfile } from "@scripta/shared";
 import { categoryFor, contentDetail, contentTarget, decodeCursor, encodeCursor, parseRankingPreview, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityProfileView, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, OwnProfile, Page, PersonResult, PublishProfileInput, PublishedContent, RankingTierPreview, SavedContentRef, SharedBook, SuggestedReader } from "@scripta/shared/community";
 import type { CompletionItem, DashboardFeedPage, DigestItem, ParticipationItem } from "@scripta/shared/dashboard";
@@ -89,6 +89,7 @@ export interface CommunityDeps {
   resolveProfiles(userIds: string[]): Map<string, ReaderProfile>;
   resolveLibrary(userId: string): Record<string, unknown> | null;
   readerGlyphFor(userId: string): IdentityKey | null;
+  readerCardFor(userId: string): PublicReaderCard;
   sharedBookCounts(viewerId: string, candidateIds: string[]): Map<string, number>;
   sharedBooks(viewerId: string, candidateId: string, limit: number): SharedBook[];
   userHasUsername(userId: string): boolean;
@@ -410,8 +411,9 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       const row = repo.getProfileRow(userId);
       const mural = shown && row?.mural_id ? deps.murals.getMuralPublicPayload(userId, row.mural_id, locale) : null;
       const glyphOf = glyphLookup();
+      const isPrivate = visibility.isPrivate(userId);
       const view: CommunityProfileView = {
-        private: visibility.isPrivate(userId),
+        private: isPrivate,
         profile: {
           user: withGlyph(author, userId, glyphOf),
           publishedAt: published && row ? row.published_at ?? row.updated_at : null,
@@ -420,6 +422,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
           viewerFollows: viewerId ? repo.getFollow(viewerId, userId) !== undefined : undefined
         },
         mural,
+        ...(isPrivate ? {} : { readerCard: deps.readerCardFor(userId) }),
         published: {
           tierlists: shown ? deps.games.tierlist.listByOwner(userId).map((card) => feedContent(card.content)) : [],
           tournaments: shown ? deps.games.tournament.listByOwner(userId).map((card) => feedContent(card.content)) : [],

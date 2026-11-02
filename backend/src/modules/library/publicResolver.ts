@@ -185,6 +185,14 @@ function chosenOf(userId: string, style: ReaderCardStyle, byKey: Map<string, Boo
   return chosen;
 }
 
+function booksByKey(userId: string, keys: string[]): Map<string, BookRowRecord> {
+  const byKey = new Map<string, BookRowRecord>();
+  if (keys.length > 0) {
+    for (const row of getStatements().booksByKeyStmt.all(userId, JSON.stringify(keys)) as unknown as BookRowRecord[]) byKey.set(row.book_key, row);
+  }
+  return byKey;
+}
+
 function publicCardOf(userId: string, stored: string, style: ReaderCardStyle, byKey: Map<string, BookRowRecord>): PublicReaderCard {
   const card = JSON.parse(stored) as PublicReaderCard;
   const readerNumber = style.footer.left === "readerNumber" ? readerNumberOf(userId) : undefined;
@@ -206,10 +214,7 @@ export function resolvePublicLibraryData(userId: string, req: PublicDataRequest)
   const style = req.needsReaderCard ? readerCardStyleOf(userId) : null;
   const choiceKeys = [style?.signature?.bookKey, style?.highlight?.bookKey].filter((key): key is string => Boolean(key));
   const wantedKeys = [...new Set([...req.bookKeys, ...Object.values(collectionCandidates).flat(), ...req.highlightRefs.map((ref) => ref.bookKey), ...choiceKeys])];
-  const byKey = new Map<string, BookRowRecord>();
-  if (wantedKeys.length > 0) {
-    for (const row of statements.booksByKeyStmt.all(userId, JSON.stringify(wantedKeys)) as unknown as BookRowRecord[]) byKey.set(row.book_key, row);
-  }
+  const byKey = booksByKey(userId, wantedKeys);
 
   const collectionBooks: Record<string, string[]> = Object.create(null);
   for (const [id, keys] of Object.entries(collectionCandidates)) collectionBooks[id] = keys.filter((key) => byKey.has(key));
@@ -262,6 +267,14 @@ export function resolvePublicLibraryData(userId: string, req: PublicDataRequest)
     ...(req.needsReaderCard ? { readerCard: publicCardOf(userId, summary.reader_card as string, style!, byKey) } : {}),
     ...(req.collectionIds ? { collectionBooks } : {})
   };
+}
+
+export function resolveProfileReaderCard(userId: string): PublicReaderCard {
+  const summary = readSummary(userId);
+  const stored = summary?.meta != null && summary.reader_card !== null ? summary.reader_card : JSON.stringify(publicReaderCard(readerIdentity([], [], "en")));
+  const style = readerCardStyleOf(userId);
+  const byKey = booksByKey(userId, [style.signature?.bookKey, style.highlight?.bookKey].filter((key): key is string => Boolean(key)));
+  return publicCardOf(userId, stored, style, byKey);
 }
 
 export function resolvePublicLibrary(userId: string): Record<string, unknown> | null {

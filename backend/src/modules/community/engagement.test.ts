@@ -1,3 +1,4 @@
+import { publicReaderCard, readerIdentity } from "@scripta/shared";
 import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -21,6 +22,8 @@ const { createCommunityService } = await import("./service.js");
 const { createEngagementService } = await import("./engagement.js");
 const { buildEngagementRoutes } = await import("./engagementRoutes.js");
 const { ProfileNotFoundError, InvalidCursorError } = await import("./domain/errors.js");
+
+const blankCard = publicReaderCard(readerIdentity([], [], "en"));
 
 test("authenticated reactions, comments and saved content persist and enforce ownership", async () => {
   const db = openCommunityDb();
@@ -96,7 +99,7 @@ test("engagement counts only the events whose author's switch shows them, in one
   const community = createCommunityService({
     repo: communityRepo, background: unused, getDashboardSeenAt: unused, setDashboardSeenAt: unused, resolveProfile: unused,
     resolveProfiles: ids => new Map(ids.map(id => [id, { username: id, avatarUrl: null }])),
-    resolveLibrary: unused, readerGlyphFor: () => null, sharedBookCounts: unused, sharedBooks: unused, userHasUsername: unused, findUserIdByUsername: unused, searchUsernameOwners: unused, matchWorks: unused,
+    resolveLibrary: unused, readerGlyphFor: () => null, readerCardFor: () => blankCard, sharedBookCounts: unused, sharedBooks: unused, userHasUsername: unused, findUserIdByUsername: unused, searchUsernameOwners: unused, matchWorks: unused,
     murals: { ownsMural: unused, getMuralPublicPayload: unused, getMuralSummary: unused },
     games: { tierlist: unusedGame, tournament: unusedGame, quiz: unusedGame },
     rankingCovers: unused,
