@@ -1,5 +1,5 @@
 import { MuralBlockDetail } from "./MuralBlockDetail";
-import { blockEffects, blockTextColors, localDay, resolveBlockColor, resolveHomeBlock, type Group } from "@scripta/shared";
+import { blockEffects, blockTextColors, floatingBlockShadow, localDay, resolveBlockColor, resolveHomeBlock, type Group } from "@scripta/shared";
 import { themes } from "@scripta/shared/themes";
 import GridLayout from "react-grid-layout";
 import { DndContext } from "@dnd-kit/core";
@@ -11,7 +11,7 @@ import type { ResolvedTierlist } from "../../api/tierlists";
 import { BLOCK_PAD_SCALE, blockFinishImage, blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
 import { GRID_COLUMNS, blockLabel, isConfigurable, muralThemeId, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
 import { useMuralBookMetadata } from "../../hooks/useMuralBookMetadata";
-import { muralThemeStyle } from "../../lib/theme";
+import { muralThemeStyle, useResolvedTheme } from "../../lib/theme";
 import { OptionsMenu } from "../OptionsMenu";
 import { BlockRenderer } from "./BlockRenderer";
 import { MobileMuralCanvas, type MobileMuralDraft } from "./MobileMuralCanvas";
@@ -32,6 +32,7 @@ export function MuralCanvas({
   images,
   profile,
   hideProfileName,
+  floating,
   shelfThemeOverride,
   onLayoutChange,
   onDragChange,
@@ -61,6 +62,7 @@ export function MuralCanvas({
   images: GalleryImage[];
   profile?: ReaderProfile;
   hideProfileName?: boolean;
+  floating?: boolean;
   shelfThemeOverride?: ShelfTheme;
   onDragChange?: (dragging: boolean) => void;
   onLayoutChange?: (blockId: string, layout: BlockLayout) => void;
@@ -84,6 +86,7 @@ export function MuralCanvas({
 }) {
   const locale = useLocale();
   const t = useT();
+  const appScheme = themes[useResolvedTheme()].scheme;
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const drag = useMuralDrag(originalMural.blocks, canvasRef, onLayoutChange, 1, onDragChange);
@@ -135,6 +138,7 @@ export function MuralCanvas({
         onCancelDraft={onCancelMobileDraft}
         statsOverride={statsOverride}
         tierlistData={tierlistData}
+        floating={floating}
         revertNonce={revertNonce}
       />
     );
@@ -148,7 +152,7 @@ export function MuralCanvas({
   return (
     <>
     <DndContext {...drag.context}>
-    <div ref={canvasRef} className="relative overflow-hidden" onClick={(event) => { if (editMode && !(event.target as Element).closest(".react-grid-item")) onSelectBlock?.(null); }} style={{ ...muralThemeStyle(mural.theme), minHeight: editMode ? Math.max(0, ...drag.blocks.map((block) => block.layout.y + block.layout.h), drag.drop ? drag.drop.layout.y + drag.drop.layout.h : 0) * 38 + 160 : undefined }}>
+    <div ref={canvasRef} className={`relative ${floating ? "" : "overflow-hidden"}`} onClick={(event) => { if (editMode && !(event.target as Element).closest(".react-grid-item")) onSelectBlock?.(null); }} style={{ ...muralThemeStyle(mural.theme), ...(floating ? { backgroundColor: undefined } : {}), minHeight: editMode ? Math.max(0, ...drag.blocks.map((block) => block.layout.y + block.layout.h), drag.drop ? drag.drop.layout.y + drag.drop.layout.h : 0) * 38 + 160 : undefined }}>
     <ResponsiveGridLayout
       key={revertNonce}
       layout={layout}
@@ -179,7 +183,7 @@ export function MuralCanvas({
             style={{
               borderRadius: `${style.cardRadius}px`,
               opacity: effects.opacity,
-              "--block-shadow": effects.boxShadow,
+              "--block-shadow": floating ? floatingBlockShadow(effects.boxShadow, appScheme) : effects.boxShadow,
               "--block-hover-shadow": effects.hoverShadow,
               backgroundColor: resolveBlockColor(style.backgroundColor, themeColors) ?? "var(--color-surface)",
               backgroundImage: blockFinishImage(style, themeColors),

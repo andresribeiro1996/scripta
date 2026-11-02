@@ -704,8 +704,12 @@ Asked by the user on 2026-11-02 after seeing the blend mockups (`.superpowers/de
 **Files:**
 - Modify: `mobile/src/features/murals/MuralCanvas.tsx`
 - Modify: `frontend/src/components/murals/MuralCanvas.tsx`
+- Modify: `frontend/src/components/murals/MobileMuralCanvas.tsx`
 - Modify: `frontend/src/pages/CommunityProfilePage.tsx`
 - Modify: `frontend/src/components/OwnShelfView.tsx`
+- Modify: `packages/shared/src/murals/blockEffects.ts`
+- Modify: `docs/superpowers/plans/2026-11-02-reader-card-prominence.md`
+- Test: `packages/shared/src/murals/blockEffects.test.ts`
 
 **Interfaces:**
 - **Mobile:** `profileInHero` already marks the profile use. When it is true, the canvas gets no `backgroundColor` and each block gets a soft shadow.

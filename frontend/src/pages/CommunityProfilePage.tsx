@@ -154,12 +154,13 @@ export function CommunityProfilePage() {
                       books={books}
                       images={images}
                       profile={user}
+                      floating
                       shelfThemeOverride={muralData.library.shelfTheme}
                       statsOverride={muralData.library.stats}
                       tierlistData={(tierlistId) => muralData.tierlists[tierlistId]}
                     />
                   ) : (
-                    <MuralCanvas mural={profileOnlyMural(viewerTheme)} editMode={false} books={[]} images={[]} profile={user} hideProfileName />
+                    <MuralCanvas mural={profileOnlyMural(viewerTheme)} editMode={false} books={[]} images={[]} profile={user} hideProfileName floating />
                   )}
                 </div>
                 <h2 className={`${SECTION_HEADING} mb-3`}>{t("community.published")}</h2>

@@ -1,5 +1,5 @@
 import type { BlockStyle } from "../library/libraryStyle.js";
-import type { ThemeColors } from "../themes/palettes.js";
+import type { ThemeColors, ThemeScheme } from "../themes/palettes.js";
 import { parseHexColor, resolveBlockColor, type BlockThemeColorKey } from "./blockTextColors.js";
 
 export function blockEffects(style: BlockStyle, palette: Pick<ThemeColors, BlockThemeColorKey>) {
@@ -16,4 +16,9 @@ export function blockEffects(style: BlockStyle, palette: Pick<ThemeColors, Block
     fadeColor,
     fadeOpacity: fadeColor ? 1 - opacity : 0,
   };
+}
+
+export function floatingBlockShadow(boxShadow: string, scheme: ThemeScheme) {
+  if (boxShadow === "none") return boxShadow;
+  return scheme === "dark" ? "0 6px 18px rgba(0, 0, 0, 0.45)" : "0 4px 14px rgba(0, 0, 0, 0.12)";
 }

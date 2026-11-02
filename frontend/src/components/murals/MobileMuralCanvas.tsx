@@ -1,5 +1,5 @@
-import { blockEffects, blockTextColors, moveMuralBlock, resolveBlockColor } from "@scripta/shared";
-import { themes, type ThemeColors } from "@scripta/shared/themes";
+import { blockEffects, blockTextColors, floatingBlockShadow, moveMuralBlock, resolveBlockColor } from "@scripta/shared";
+import { themes, type ThemeColors, type ThemeScheme } from "@scripta/shared/themes";
 import GridLayout from "react-grid-layout";
 import { DndContext } from "@dnd-kit/core";
 import { useRef, useState, type CSSProperties } from "react";
@@ -7,7 +7,7 @@ import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import { BLOCK_PAD_SCALE, blockFinishImage, blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
 import { isConfigurable, muralBlockTitle, GRID_COLUMNS, screenPointToGrid, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
-import { muralThemeStyle } from "../../lib/theme";
+import { muralThemeStyle, useResolvedTheme } from "../../lib/theme";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../page/buttonClasses";
 import { ActionSheet } from "../Sheet";
 import { MobileBlockPreview } from "./MobileBlockPreview";
@@ -74,6 +74,7 @@ function BlockFrame({
   buttonRef,
   scale,
   themeColors,
+  floatScheme,
   editing
 }: {
   block: MuralBlock;
@@ -91,6 +92,7 @@ function BlockFrame({
   buttonRef?: (element: HTMLDivElement | null) => void;
   scale: number;
   themeColors: ThemeColors;
+  floatScheme?: ThemeScheme;
   editing: boolean;
 }) {
   const locale = useLocale();
@@ -123,7 +125,7 @@ function BlockFrame({
       style={{
         borderRadius: `${style.cardRadius}px`,
         opacity: effects.opacity * (draft ? 0.8 : 1),
-        "--block-shadow": effects.boxShadow,
+        "--block-shadow": floatScheme ? floatingBlockShadow(effects.boxShadow, floatScheme) : effects.boxShadow,
         backgroundColor: resolveBlockColor(style.backgroundColor, themeColors) ?? "var(--color-surface)",
         backgroundImage: blockFinishImage(style, themeColors),
         borderTopWidth: `${style.cardBorderSides.top ? style.cardBorderWidth : 0}px`,
@@ -176,6 +178,7 @@ export function MobileMuralCanvas({
   onCancelDraft,
   statsOverride,
   tierlistData,
+  floating,
   revertNonce = 0
 }: {
   mural: Mural;
@@ -203,9 +206,11 @@ export function MobileMuralCanvas({
   onCancelDraft?: () => void;
   statsOverride?: Record<string, number>;
   tierlistData?: (tierlistId: string) => ResolvedTierlist | undefined;
+  floating?: boolean;
   revertNonce?: number;
 }) {
   const t = useT();
+  const appScheme = themes[useResolvedTheme()].scheme;
   const viewportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
@@ -270,8 +275,8 @@ export function MobileMuralCanvas({
     <div className={`relative bg-(--color-bg) ${controlsPadding}`}>
       <div
         ref={setViewport}
-        className="mural-overview-stage relative w-full overflow-hidden"
-        style={{ ...muralThemeStyle(mural.theme), height: logicalHeight * scale, minHeight: editMode ? "52dvh" : undefined }}
+        className={`mural-overview-stage relative w-full ${floating ? "" : "overflow-hidden"}`}
+        style={{ ...muralThemeStyle(mural.theme), ...(floating ? { backgroundColor: undefined } : {}), height: logicalHeight * scale, minHeight: editMode ? "52dvh" : undefined }}
       >
         {viewportWidth > 0 && (
           <div
@@ -314,6 +319,7 @@ export function MobileMuralCanvas({
                     draggable={canDrag && (!draft || block.id === draft.block.id)}
                     scale={scale}
                     themeColors={themes[mural.theme].colors}
+                    floatScheme={floating ? appScheme : undefined}
                     editing={editMode}
                     draft={block.id === draft?.block.id}
                     invalid={block.id === draft?.block.id && !draft.valid}

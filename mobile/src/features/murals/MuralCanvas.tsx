@@ -5,6 +5,7 @@ import {
   FINISH_TILE_SIZE,
   blockFinish,
   blockEffects,
+  floatingBlockShadow,
   blockGradient,
   blockTextColors,
   calculateShelfTheme,
@@ -34,7 +35,7 @@ import {
   type ShelfTheme,
   type StatMetric,
 } from "@scripta/shared";
-import { themes, type ThemeId } from "@scripta/shared/themes";
+import { themes, type ThemeId, type ThemeScheme } from "@scripta/shared/themes";
 import { CoverImage } from "../library/components/CoverImage";
 import { Image } from "expo-image";
 import { SvgXml } from "react-native-svg";
@@ -78,7 +79,7 @@ function blockPadding(style: BlockStyle) {
   return { padding: BLOCK_PADDING[style.innerSpacing] ?? BLOCK_PADDING.normal };
 }
 
-function blockFrameStyle(style: BlockStyle, colors: ThemeColors) {
+function blockFrameStyle(style: BlockStyle, colors: ThemeColors, floatScheme?: ThemeScheme) {
   const effects = blockEffects(style, colors);
   return {
     backgroundColor: resolveBlockColor(style.backgroundColor, colors) ?? colors.surface,
@@ -88,7 +89,7 @@ function blockFrameStyle(style: BlockStyle, colors: ThemeColors) {
     borderStyle: resolveBorderStyle(style.cardBorderStyle),
     borderRadius: style.cardRadius,
     opacity: effects.opacity,
-    boxShadow: effects.boxShadow,
+    boxShadow: floatScheme ? floatingBlockShadow(effects.boxShadow, floatScheme) : effects.boxShadow,
   };
 }
 
@@ -249,7 +250,7 @@ const MOVE_ACTIONS = [
   { name: "moveDown", labelKey: "murals.moveDown" },
 ] as const;
 
-const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, selected, books, images, tierlists, profile, profileInHero, shelfThemeOverride, statsOverride, onSelect, onMove, onAssetReady, drag, preview, drop, scroll }: {
+const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, selected, books, images, tierlists, profile, profileInHero, floatScheme, shelfThemeOverride, statsOverride, onSelect, onMove, onAssetReady, drag, preview, drop, scroll }: {
   block: MuralBlock;
   columnWidth: number;
   editable: boolean;
@@ -259,6 +260,7 @@ const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, se
   tierlists: Tierlist[];
   profile?: ReaderProfile;
   profileInHero?: boolean;
+  floatScheme?: ThemeScheme;
   shelfThemeOverride?: ShelfTheme;
   statsOverride?: Record<string, number>;
   onSelect: () => void;
@@ -338,7 +340,7 @@ const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, se
   const body = <View pointerEvents={editable ? "none" : "auto"} style={styles.blockBody}><BlockContent block={block} books={books} images={images} tierlists={tierlists} profile={profile} profileInHero={profileInHero} shelfThemeOverride={shelfThemeOverride} statsOverride={statsOverride} editable={editable} onAssetReady={onAssetReady} /></View>;
   const content = <Animated.View renderToHardwareTextureAndroid={editable && selected} shouldRasterizeIOS={editable && selected} style={[
         styles.block,
-        blockFrameStyle(style, colors),
+        blockFrameStyle(style, colors, floatScheme),
         {
           left: 0,
           top: 0,
@@ -419,6 +421,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, profileI
   dragScroll?: MuralDragScroll;
 }) {
   const locale = useLocale();
+  const { mode } = useTheme();
   const theme = muralThemeId(mural.theme);
   const colors = themes[theme].colors;
   const [width, setWidth] = useState(0);
@@ -492,7 +495,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, profileI
     return { height: Math.max(height, Math.ceil(movingBottom / ROW_HEIGHT) * ROW_HEIGHT, ...Object.values(preview.get()).map((layout) => (layout.y + layout.h + 6) * ROW_HEIGHT)) };
   });
   const canvas = (
-    <Animated.View onLayout={(event) => setWidth(event.nativeEvent.layout.width)} style={[styles.canvas, { backgroundColor: colors.background }, canvasStyle]}>
+    <Animated.View onLayout={(event) => setWidth(event.nativeEvent.layout.width)} style={[styles.canvas, profileInHero ? null : { backgroundColor: colors.background }, canvasStyle]}>
       {width > 0 ? resolvedBlocks.map((block) => <CanvasBlock
         key={block.id}
         block={block}
@@ -504,6 +507,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, profileI
         tierlists={tierlists}
         profile={profile}
         profileInHero={profileInHero}
+        floatScheme={profileInHero ? mode : undefined}
         shelfThemeOverride={shelfThemeOverride}
         statsOverride={statsOverride}
         onSelect={() => onSelectBlock?.(block.id)}

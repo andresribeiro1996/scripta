@@ -272,7 +272,7 @@ export function OwnShelfView({ username }: { username: string }) {
             return (
               <div className="mb-8">
                 {shelfMural && muralHasBlocks ? (
-                  <MuralCanvas mural={shelfMural} editMode={false} groups={groups} books={books} images={images} profile={profile} />
+                  <MuralCanvas mural={shelfMural} editMode={false} groups={groups} books={books} images={images} profile={profile} floating />
                 ) : libraryQuery.isPending ? (
                   <SkeletonCardGrid count={2} label={t("library.libraryLoadingOwn")} tileClassName="min-h-[120px]" />
                 ) : libraryQuery.isError ? (
