@@ -1,8 +1,11 @@
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
+import { readerCardInputOf } from "@scripta/shared";
+import { resolvePrint } from "@scripta/shared/readerCards";
 import { z } from "zod";
 import { localeOf, t } from "../../i18n/index.js";
 import { authGuard, getOptionalAuthenticatedUser, rateLimitKey } from "../auth/index.js";
+import { renderCardImage } from "./cardImage.js";
 import { CommunityError, FollowLimitError, InvalidCursorError, ProfileNotFoundError, communityErrorMessage } from "./domain/errors.js";
 import type { CommunityService } from "./service.js";
 
@@ -96,6 +99,21 @@ export function buildCommunityRoutes(service: CommunityService) {
       return reply.code(204).send();
     });
 
+    app.get("/community/card/share", { preHandler: authGuard }, async (request, reply) => {
+      reply.header("Cache-Control", "no-store");
+      return reply.send(service.getCardShare(request.user.id));
+    });
+
+    app.post("/community/card/share", { preHandler: authGuard }, async (request, reply) => {
+      reply.header("Cache-Control", "no-store");
+      return reply.send(service.shareCard(request.user.id));
+    });
+
+    app.post("/community/card/unshare", { preHandler: authGuard }, async (request, reply) => {
+      service.unshareCard(request.user.id);
+      return reply.code(204).send();
+    });
+
     app.get("/community/profile", { preHandler: authGuard }, async (request, reply) => {
       reply.header("Cache-Control", "no-store");
       return reply.send(service.getOwnProfile(request.user.id));
@@ -165,6 +183,23 @@ export function buildPublicCommunityRoutes(service: CommunityService) {
         if (err instanceof ProfileNotFoundError) return reply.code(404).send({ error: t(localeOf(request), "community.profileNotFound") });
         throw err;
       }
+    });
+
+    app.get("/community/cards/shared/:token", async (request, reply) => {
+      const { token } = request.params as { token: string };
+      reply.header("Cache-Control", "no-store");
+      const card = service.getSharedCard(token);
+      if (!card) return reply.code(404).send({ error: t(localeOf(request), "community.profileNotFound") });
+      return reply.send(card);
+    });
+
+    app.get("/community/cards/shared/:token/image.jpg", async (request, reply) => {
+      const { token } = request.params as { token: string };
+      const payload = service.getSharedCard(token);
+      if (!payload) return reply.code(404).send({ error: t(localeOf(request), "community.profileNotFound") });
+      const base = readerCardInputOf([], [], payload.username, localeOf(request), payload.readerCard);
+      const image = await renderCardImage({ ...base, print: resolvePrint(base.style.print, false) });
+      return reply.header("Cache-Control", "private, max-age=300").header("Vary", "Accept-Language").type("image/jpeg").send(image);
     });
 
     app.get("/community/profiles/:username/activity", async (request, reply) => {

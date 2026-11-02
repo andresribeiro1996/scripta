@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import Fastify from "fastify";
-import { normalizeWords, type IdentityKey, type ReaderProfile } from "@scripta/shared";
+import { normalizeWords, publicReaderCard, readerIdentity, type IdentityKey, type ReaderProfile } from "@scripta/shared";
 import type { ActivityEventType, DiscoverItem, FeedSettings, GameParticipation, SharedBook, SuggestedReader } from "@scripta/shared/community";
 import { categoryFor, DEFAULT_FEED_SETTINGS, encodeCursor, normalizeFeedSettings } from "@scripta/shared/community";
 import type { ParticipationItem } from "@scripta/shared/dashboard";
@@ -13,6 +13,8 @@ import { FollowLimitError, InvalidCursorError, MuralNotOwnedError, NotFollowingE
 import { ACTIVITY_EVENT_TYPES, FEED_EVENT_TYPES } from "./domain/feed.js";
 import { registerTrace } from "../../trace.js";
 import { buildDiscoverItems, createBestEffortRecorder, createCommunityPublicApi, createCommunityService, type CommunityDeps, type CommunityPublicApi, type CommunityService } from "./service.js";
+
+const blankCard = publicReaderCard(readerIdentity([], [], "en"));
 
 function createRepoFake() {
   const follows = new Map<string, FollowRow>();
@@ -27,6 +29,9 @@ function createRepoFake() {
     events.filter((e) => follows.has(key(viewerId, e.user_id)) && types.includes(e.type) && (repo.getFeedSettings(e.user_id) ?? DEFAULT_FEED_SETTINGS)[categoryFor(e.type)]);
   const repo: CommunityRepository = {
     deleteUserData() {},
+    getCardShareToken: () => null,
+    setCardShareToken() {},
+    getCardShareOwner: () => null,
     insertFollow(row) {
       const k = key(row.follower_id, row.followee_id);
       if (follows.has(k)) return false;
@@ -229,6 +234,7 @@ function createDeps(repo: CommunityRepository) {
       readerGlyphCalls.push(id);
       return readerGlyphs.get(id) ?? null;
     },
+    readerCardFor: () => blankCard,
     userHasUsername: (id) => usernames.has(id),
     findUserIdByUsername: (name) => [...usernames.entries()].find(([, n]) => n === name)?.[0],
     searchUsernameOwners: (q, limit) =>
@@ -882,6 +888,40 @@ test("getProfileByUsername marks a published profile as not private", () => {
   const view = service.getProfileByUsername("alice", "en");
   assert.equal(view.private, false);
   assert.equal(view.profile.publishedAt, "2026-09-01T00:00:00.000Z");
+});
+
+test("profile view carries readerCard for a published profile", () => {
+  const { repo, profiles } = createRepoFake();
+  const { deps, usernames, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  readerProfiles.set("alice", reader("alice"));
+  profiles.set("alice", profileRow("alice"));
+  assert.equal(service.getProfileByUsername("alice", "en", "bob").readerCard, blankCard);
+});
+
+test("profile view omits readerCard for a private profile viewed by someone else", () => {
+  const { repo, profiles } = createRepoFake();
+  const { deps, usernames, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  readerProfiles.set("alice", reader("alice"));
+  profiles.set("alice", profileRow("alice", { published: 0 }));
+  const view = service.getProfileByUsername("alice", "en", "bob");
+  assert.equal(view.private, true);
+  assert.equal("readerCard" in view, false);
+});
+
+test("profile view carries readerCard for the owner of an unpublished profile", () => {
+  const { repo, profiles } = createRepoFake();
+  const { deps, usernames, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  readerProfiles.set("alice", reader("alice"));
+  profiles.set("alice", profileRow("alice", { published: 0 }));
+  const view = service.getProfileByUsername("alice", "en", "alice");
+  assert.equal(view.private, false);
+  assert.equal(view.readerCard, blankCard);
 });
 
 test("a profile mural deleted later resolves to null without breaking the view", () => {

@@ -17,7 +17,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { createSqliteMuralsRepository } = await import("./adapters/sqlite/sqliteMuralsRepository.js");
 const { createMuralsService } = await import("./service.js");
-const { buildMuralRoutes } = await import("./routes.js");
+const { buildMuralRoutes, buildPublicMuralRoutes } = await import("./routes.js");
 const { openLibraryDb } = await import("../library/adapters/sqlite/connection.js");
 const { applyBooksMigrations } = await import("../books/adapters/sqlite/connection.js");
 const { WorkResolutionError } = await import("../library/index.js");
@@ -33,6 +33,7 @@ async function muralApp(resolveWorks?: Resolver) {
   const app = Fastify();
   app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
   await app.register(buildMuralRoutes(service, resolveWorks));
+  await app.register(buildPublicMuralRoutes(service));
   const putBlocks = (muralId: string, user: string, blocks: unknown[]) =>
     app.inject({ method: "PUT", url: `/murals/${muralId}`, headers: { authorization: `Bearer ${user}` }, payload: { blocks } });
   return { app, db, service, putBlocks };
@@ -74,6 +75,32 @@ test("saving blocks echoes them byte-for-byte and stores works for their keys", 
   const rows = workRows(db, mural.id);
   assert.deepEqual(rows.map((row) => row.key), [DUNE_KEY]);
   assert.ok(rows[0]!.work_id);
+  await app.close();
+});
+
+test("saving a mural that still holds a readerCard block succeeds and stores it without the block", async () => {
+  const { app, service, putBlocks } = await muralApp();
+  const mural = service.createMural("u1", "Old bundle");
+  const profile = { id: "p", type: "profile", bio: "", favoriteGenres: [], layout: { x: 0, y: 0, w: 6, h: 4 } };
+  const stats = { id: "s", type: "stats", metrics: ["totalBooks"], layout: { x: 6, y: 4, w: 6, h: 6 } };
+  const res = await putBlocks(mural.id, "u1", [profile, { id: "c", type: "readerCard", layout: { x: 0, y: 4, w: 6, h: 6 } }, stats]);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual((res.json() as { blocks: unknown[] }).blocks, [profile, stats]);
+  assert.deepEqual(service.getMural("u1", mural.id)!.blocks, [profile, stats]);
+  await app.close();
+});
+
+test("GET /murals/shared/:token never returns a readerCard block", async () => {
+  const { app, db, service } = await muralApp();
+  const mural = service.createMural("u1", "Shared");
+  const stats = { id: "s", type: "stats", metrics: ["totalBooks"], layout: { x: 6, y: 4, w: 6, h: 6 } };
+  db.prepare("UPDATE murals SET blocks = ? WHERE id = ?").run(JSON.stringify([{ id: "c", type: "readerCard", layout: { x: 0, y: 4, w: 6, h: 6 } }, stats]), mural.id);
+  const shared = service.share("u1", mural.id)!;
+  const res = await app.inject({ method: "GET", url: `/murals/shared/${shared.shareToken}` });
+  assert.equal(res.statusCode, 200);
+  const body = res.json() as { mural: { blocks: unknown[] }; readerCard?: unknown };
+  assert.deepEqual(body.mural.blocks, [stats]);
+  assert.equal("readerCard" in body, false);
   await app.close();
 });
 

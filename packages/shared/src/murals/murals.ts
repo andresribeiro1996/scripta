@@ -89,6 +89,12 @@ export type MuralBlock =
 
 export type BlockType = MuralBlock["type"];
 
+export const RETIRED_BLOCK_TYPES: readonly string[] = ["readerCard"];
+
+export function dropRetiredBlocks<T extends { type: string }>(blocks: T[]): T[] {
+  return blocks.filter((block) => !RETIRED_BLOCK_TYPES.includes(block?.type));
+}
+
 export interface ReaderProfile {
   username: string;
   avatarUrl: string | null;

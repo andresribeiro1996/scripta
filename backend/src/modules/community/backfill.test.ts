@@ -1,3 +1,4 @@
+import { publicReaderCard, readerIdentity } from "@scripta/shared";
 import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -20,6 +21,8 @@ const { openCommunityDb } = await import("./adapters/sqlite/connection.js");
 const { createSqliteCommunityRepository } = await import("./adapters/sqlite/sqliteCommunityRepository.js");
 const { communityPlugin } = await import("./plugin.js");
 const { createCommunityService } = await import("./service.js");
+
+const blankCard = publicReaderCard(readerIdentity([], [], "en"));
 
 const NOW = Date.parse("2026-10-02T00:00:00.000Z");
 const HOUR_MS = 60 * 60 * 1000;
@@ -48,6 +51,7 @@ const baseDeps: Omit<CommunityDeps, "repo" | "background"> = {
   resolveProfiles: (ids) => new Map(ids.map((id) => [id, { username: id, avatarUrl: null }])),
   resolveLibrary: unused,
   readerGlyphFor: () => null,
+  readerCardFor: () => blankCard,
   sharedBookCounts: unused,
   sharedBooks: unused,
   userHasUsername: () => true,

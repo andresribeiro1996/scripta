@@ -14,7 +14,7 @@ process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 process.env.NODE_ENV = "test";
 
-const { resetPresetBlockStyles } = await import("./migration.js");
+const { resetPresetBlockStyles, removeRetiredBlocks } = await import("./migration.js");
 const { DEFAULT_BLOCK_STYLE } = await import("@scripta/shared");
 
 const UPDATED_AT = "2026-09-01T00:00:00.000Z";
@@ -113,4 +113,16 @@ test("a trigger that rolls the transaction back surfaces its own error and keeps
   assert.throws(() => resetPresetBlockStyles(db), /trigger boom/);
   assert.deepEqual(JSON.parse(row(db, "m1").blocks), stored);
   assert.equal(db.isTransaction, false);
+});
+
+test("removeRetiredBlocks drops readerCard blocks without moving others and is idempotent", () => {
+  const db = muralsDb();
+  const profile = { id: "p", type: "profile", bio: "", favoriteGenres: [], layout: { x: 0, y: 0, w: 6, h: 4 } };
+  const stats = { id: "s", type: "stats", metrics: ["totalBooks"], layout: { x: 6, y: 4, w: 6, h: 6 } };
+  seed(db, "m1", [profile, { id: "c", type: "readerCard", layout: { x: 0, y: 4, w: 6, h: 6 } }, stats]);
+  seed(db, "m2", [profile]);
+  assert.equal(removeRetiredBlocks(db), 1);
+  assert.deepEqual(JSON.parse(row(db, "m1").blocks), [profile, stats]);
+  assert.equal(row(db, "m1").updated_at, UPDATED_AT);
+  assert.equal(removeRetiredBlocks(db), 0);
 });

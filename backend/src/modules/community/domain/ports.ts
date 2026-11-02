@@ -52,6 +52,9 @@ export interface CommunityRepository {
   getFeedSettings(userId: string): FeedSettings | null;
   updateFeedSettings(userId: string, settings: FeedSettings): void;
   visibilityRows(userIds: string[]): VisibilityRow[];
+  getCardShareToken(userId: string): string | null;
+  setCardShareToken(userId: string, token: string | null): void;
+  getCardShareOwner(token: string): string | null;
 
   insertEvent(row: EventRow): void;
   shownEventIds(events: ReadonlyArray<Pick<EventRow, "id" | "user_id" | "type">>): string[];

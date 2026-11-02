@@ -19,7 +19,7 @@ const { createSqliteLibraryRepository } = await import("../library/adapters/sqli
 const { createLibraryService } = await import("../library/service.js");
 const { openAuthDb } = await import("../auth/adapters/sqlite/connection.js");
 const { getAuthenticatedUserFromAccessToken } = await import("../auth/tokens.js");
-const { bookKey, DEFAULT_READER_CARD_STYLE, publicStyle } = await import("@scripta/shared");
+const { bookKey } = await import("@scripta/shared");
 const saveLibrary = (db: DatabaseSync, userId: string, document: unknown) => createLibraryService(createSqliteLibraryRepository(db), () => "", 10 * 1024 * 1024).saveLibrary(userId, document);
 const authorization = (sub: string) => ({ authorization: `Bearer ${jwt.sign({ sub, email: `${sub}@example.test`, username: sub }, process.env.JWT_ACCESS_SECRET!, { expiresIn: "5m" })}` });
 
@@ -76,7 +76,7 @@ test("murals routes preserve ownership, edits and public content boundaries", as
   }
 });
 
-test("public mural payload carries the reader card without leaking titles or series names", async () => {
+test("public mural payload drops a saved reader card block without leaking titles or series names", async () => {
   const db = new DatabaseSync(":memory:");
   db.exec(readFileSync(new URL("./adapters/sqlite/schema.sql", import.meta.url), "utf8"));
   const service = createMuralsService(createSqliteMuralsRepository(db), (token) => `https://example.test/shared/${token}`, () => "light");
@@ -117,20 +117,9 @@ test("public mural payload carries the reader card without leaking titles or ser
     const withoutCardResponse = await app.inject({ method: "GET", url: `/murals/shared/${sharedWithoutCard.shareToken}` });
     assert.equal(withCardResponse.statusCode, 200, "a malformed group must not 500 the public payload");
     const withCardBody = withCardResponse.json();
-    const { dial, facts, ...cardIdentity } = withCardBody.readerCard;
-    assert.deepEqual(cardIdentity, {
-      state: "settled",
-      identity: "carto",
-      runnerUp: null,
-      streak: null,
-      signal: { counted: 3, of: 10, key: "carto", label: "3 of 10 finished books are in a series" },
-      coverage: ["genres known for 0 of 10 finished books"],
-      coverageFacts: { known: 0, n: 10, imported: false },
-      style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" },
-      chosen: {}
-    });
-    assert.ok(dial && facts);
-    assert.equal(withCardBody.profile?.username, "cardOwner");
+    assert.equal("readerCard" in withCardBody, false);
+    assert.deepEqual(withCardBody.mural.blocks, []);
+    assert.equal(withCardBody.profile, undefined);
     for (const secretValue of ["Secret Series", "Klara"]) assert.equal(withCardResponse.body.includes(secretValue), false);
     assert.equal("readerCard" in withoutCardResponse.json(), false);
 
@@ -146,15 +135,14 @@ test("public mural payload carries the reader card without leaking titles or ser
     const sharedAnno = service.share("annoOwner", annoHome.id)!;
     const annoResponse = await app.inject({ method: "GET", url: `/murals/shared/${sharedAnno.shareToken}` });
     const annoBody = annoResponse.json();
-    assert.equal(annoBody.readerCard?.identity, "anno");
-    assert.equal(annoBody.readerCard?.state, "settled");
+    assert.equal("readerCard" in annoBody, false);
     for (const secretTitle of markedTitles) assert.equal(annoResponse.body.includes(secretTitle), false);
 
     const noLibraryHome = (await app.inject({ method: "POST", url: "/murals", headers: authorization("noLibraryOwner"), payload: { name: "No library" } })).json();
     service.updateMural("noLibraryOwner", noLibraryHome.id, { blocks: [{ id: "c", type: "readerCard", layout: { x: 0, y: 0, w: 4, h: 6 } }], updatedAt: noLibraryHome.updatedAt });
     const sharedNoLibrary = service.share("noLibraryOwner", noLibraryHome.id)!;
     const noLibraryBody = (await app.inject({ method: "GET", url: `/murals/shared/${sharedNoLibrary.shareToken}` })).json();
-    assert.deepEqual(noLibraryBody.readerCard, { state: "unwritten", identity: null, runnerUp: null, streak: null, signal: null, coverage: ["genres known for 0 of 0 finished books"], coverageFacts: { known: 0, n: 0, imported: false } });
+    assert.equal("readerCard" in noLibraryBody, false);
   } finally {
     await app.close();
     library.close();

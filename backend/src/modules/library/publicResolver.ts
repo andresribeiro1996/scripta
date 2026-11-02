@@ -15,7 +15,6 @@ export interface PublicDataRequest {
   needsCurrentlyReading: boolean;
   statsMetrics: string[];
   needsShelfTheme?: boolean;
-  needsReaderCard?: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -120,10 +119,8 @@ function getStatements() {
   return cached;
 }
 
-const EMPTY_RESULT: PublicLibraryData = { books: [], highlights: [], currentlyReading: [], stats: {} };
-
-function emptyResult(req: PublicDataRequest): PublicLibraryData {
-  return req.needsReaderCard ? { ...EMPTY_RESULT, readerCard: publicReaderCard(readerIdentity([], [], "en")) } : EMPTY_RESULT;
+function emptyResult(): PublicLibraryData {
+  return { books: [], highlights: [], currentlyReading: [], stats: {} };
 }
 
 interface ParsedLibraryDocument {
@@ -185,6 +182,14 @@ function chosenOf(userId: string, style: ReaderCardStyle, byKey: Map<string, Boo
   return chosen;
 }
 
+function booksByKey(userId: string, keys: string[]): Map<string, BookRowRecord> {
+  const byKey = new Map<string, BookRowRecord>();
+  if (keys.length > 0) {
+    for (const row of getStatements().booksByKeyStmt.all(userId, JSON.stringify(keys)) as unknown as BookRowRecord[]) byKey.set(row.book_key, row);
+  }
+  return byKey;
+}
+
 function publicCardOf(userId: string, stored: string, style: ReaderCardStyle, byKey: Map<string, BookRowRecord>): PublicReaderCard {
   const card = JSON.parse(stored) as PublicReaderCard;
   const readerNumber = style.footer.left === "readerNumber" ? readerNumberOf(userId) : undefined;
@@ -193,7 +198,7 @@ function publicCardOf(userId: string, stored: string, style: ReaderCardStyle, by
 
 export function resolvePublicLibraryData(userId: string, req: PublicDataRequest): PublicLibraryData {
   const summary = readSummary(userId);
-  if (!summary || summary.meta === null) return emptyResult(req);
+  if (!summary || summary.meta === null) return emptyResult();
   const statements = getStatements();
   const meta = JSON.parse(summary.meta) as { groups?: unknown };
   const groupRecords = Array.isArray(meta.groups) ? meta.groups.filter(isRecord) : [];
@@ -203,13 +208,8 @@ export function resolvePublicLibraryData(userId: string, req: PublicDataRequest)
     const collection = groupRecords.find((group) => group.id === id && group.type === "collection");
     collectionCandidates[id] = Array.isArray(collection?.bookKeys) ? collection.bookKeys.filter((key): key is string => typeof key === "string") : [];
   }
-  const style = req.needsReaderCard ? readerCardStyleOf(userId) : null;
-  const choiceKeys = [style?.signature?.bookKey, style?.highlight?.bookKey].filter((key): key is string => Boolean(key));
-  const wantedKeys = [...new Set([...req.bookKeys, ...Object.values(collectionCandidates).flat(), ...req.highlightRefs.map((ref) => ref.bookKey), ...choiceKeys])];
-  const byKey = new Map<string, BookRowRecord>();
-  if (wantedKeys.length > 0) {
-    for (const row of statements.booksByKeyStmt.all(userId, JSON.stringify(wantedKeys)) as unknown as BookRowRecord[]) byKey.set(row.book_key, row);
-  }
+  const wantedKeys = [...new Set([...req.bookKeys, ...Object.values(collectionCandidates).flat(), ...req.highlightRefs.map((ref) => ref.bookKey)])];
+  const byKey = booksByKey(userId, wantedKeys);
 
   const collectionBooks: Record<string, string[]> = Object.create(null);
   for (const [id, keys] of Object.entries(collectionCandidates)) collectionBooks[id] = keys.filter((key) => byKey.has(key));
@@ -251,7 +251,6 @@ export function resolvePublicLibraryData(userId: string, req: PublicDataRequest)
     }
   }
 
-  if (req.needsReaderCard && summary.reader_card === null) throw new Error(`Reader card of ${userId} is unavailable.`);
   if (req.needsShelfTheme && summary.shelf_theme === null) throw new Error(`Shelf theme of ${userId} is unavailable.`);
   return {
     books: toPublicBooks(referenced),
@@ -259,9 +258,16 @@ export function resolvePublicLibraryData(userId: string, req: PublicDataRequest)
     currentlyReading,
     stats,
     ...(req.needsShelfTheme ? { shelfTheme: JSON.parse(summary.shelf_theme as string) as ShelfTheme } : {}),
-    ...(req.needsReaderCard ? { readerCard: publicCardOf(userId, summary.reader_card as string, style!, byKey) } : {}),
     ...(req.collectionIds ? { collectionBooks } : {})
   };
+}
+
+export function resolveProfileReaderCard(userId: string): PublicReaderCard {
+  const summary = readSummary(userId);
+  const stored = summary?.meta != null && summary.reader_card !== null ? summary.reader_card : JSON.stringify(publicReaderCard(readerIdentity([], [], "en")));
+  const style = readerCardStyleOf(userId);
+  const byKey = booksByKey(userId, [style.signature?.bookKey, style.highlight?.bookKey].filter((key): key is string => Boolean(key)));
+  return publicCardOf(userId, stored, style, byKey);
 }
 
 export function resolvePublicLibrary(userId: string): Record<string, unknown> | null {

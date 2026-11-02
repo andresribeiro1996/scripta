@@ -44,7 +44,7 @@ import { createBestEffortRecorder, deleteCommunityUserData, getCommunityPublicAp
 import type { RankingTierPreview } from "@scripta/shared/community";
 import { canonicalWorks, catalogGenres, enqueueBookCovers, getRecentAwards, getWorkCast, getWorkCharacters, getWorkPage, matchWorks, registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
-import { communityRatings, copyOfWork, deleteLibraryUserData, heldWorks, holdersOfWorks, koboCoverLookups, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, sweepLibraryWorks, sweepWorks, WORKS_SWEEP_INTERVAL_MS, type BookEvent } from "./modules/library/index.js";
+import { communityRatings, copyOfWork, deleteLibraryUserData, heldWorks, holdersOfWorks, koboCoverLookups, registerLibraryModule, resolvePublicLibrary, resolveProfileReaderCard, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, sweepLibraryWorks, sweepWorks, WORKS_SWEEP_INTERVAL_MS, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks, sweepMuralsWorks } from "./modules/murals/index.js";
 import { deleteQuizzesUserData, getDailyChapterPublicApi, getQuizGameSource, getQuizzesPublicApi, registerQuizzesModule } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
@@ -197,6 +197,7 @@ export function buildApp() {
     resolveProfiles: resolvePublicReaderProfiles,
     resolveLibrary: resolvePublicLibrary,
     readerGlyphFor,
+    readerCardFor: resolveProfileReaderCard,
     sharedBookCounts,
     sharedBooks,
     userHasUsername,

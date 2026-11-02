@@ -12,7 +12,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { ThemeId } from "@scripta/shared/themes";
 import type { DatabaseSync } from "node:sqlite";
-import { DEFAULT_BLOCK_STYLE } from "@scripta/shared";
+import { DEFAULT_BLOCK_STYLE, dropRetiredBlocks } from "@scripta/shared";
 import { openMuralsDb } from "./adapters/sqlite/connection.js";
 
 /** Mirrors modules/library/index.ts's own EmbeddedMuralRow shape — kept
@@ -173,6 +173,28 @@ export function resetPresetBlockStyles(db: DatabaseSync = openMuralsDb()): void 
     if (db.isTransaction) db.exec("ROLLBACK");
     throw error;
   }
+}
+
+export function removeRetiredBlocks(db: DatabaseSync = openMuralsDb()): number {
+  const update = db.prepare("UPDATE murals SET blocks = $blocks WHERE id = $id");
+  let changed = 0;
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const rows = db.prepare("SELECT id, blocks FROM murals").all() as Array<{ id: string; blocks: string }>;
+    for (const row of rows) {
+      const blocks: unknown = JSON.parse(row.blocks);
+      if (!Array.isArray(blocks)) continue;
+      const kept = dropRetiredBlocks(blocks);
+      if (kept.length === blocks.length) continue;
+      update.run({ $id: row.id, $blocks: JSON.stringify(kept) });
+      changed += 1;
+    }
+    db.exec("COMMIT");
+  } catch (error) {
+    if (db.isTransaction) db.exec("ROLLBACK");
+    throw error;
+  }
+  return changed;
 }
 
 export function backfillMuralThemes(resolveOwnerTheme: (userId: string) => ThemeId, db: DatabaseSync = openMuralsDb()): void {

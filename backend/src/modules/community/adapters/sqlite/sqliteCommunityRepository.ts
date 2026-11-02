@@ -100,6 +100,11 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
 
   const visibilityStmt = db.prepare(`SELECT user_id, published, show_publications, show_reading, show_votes, show_follows, show_reader_glyph FROM profiles WHERE user_id IN (SELECT value FROM json_each(?))`);
 
+  const getCardShareTokenStmt = db.prepare("SELECT token FROM card_shares WHERE user_id = ?");
+  const getCardShareOwnerStmt = db.prepare("SELECT user_id FROM card_shares WHERE token = ?");
+  const insertCardShareStmt = db.prepare("INSERT OR REPLACE INTO card_shares (user_id, token, created_at) VALUES (?, ?, ?)");
+  const deleteCardShareStmt = db.prepare("DELETE FROM card_shares WHERE user_id = ?");
+
   const listEventsStmt = db.prepare(`
     SELECT * FROM events WHERE user_id = ? AND ${notHidden} ORDER BY created_at DESC, id DESC LIMIT ?
   `);
@@ -138,6 +143,7 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
         db.prepare("DELETE FROM follows WHERE follower_id = ? OR followee_id = ?").run(userId, userId);
         db.prepare("DELETE FROM feed_inbox WHERE viewer_id = ? OR author_id = ?").run(userId, userId);
         db.prepare("DELETE FROM profiles WHERE user_id = ?").run(userId);
+        deleteCardShareStmt.run(userId);
         db.prepare("DELETE FROM events WHERE user_id = ? OR (ref_type = 'user' AND ref_id = ?)").run(userId, userId);
         db.prepare("DELETE FROM events_history WHERE user_id = ? OR (ref_type = 'user' AND ref_id = ?)").run(userId, userId);
       });
@@ -186,6 +192,16 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
     },
     countFollowing(userId) {
       return (countFollowingStmt.get(userId) as { n: number }).n;
+    },
+    getCardShareToken(userId) {
+      return (getCardShareTokenStmt.get(userId) as { token: string } | undefined)?.token ?? null;
+    },
+    setCardShareToken(userId, token) {
+      if (token === null) deleteCardShareStmt.run(userId);
+      else insertCardShareStmt.run(userId, token, new Date().toISOString());
+    },
+    getCardShareOwner(token) {
+      return (getCardShareOwnerStmt.get(token) as { user_id: string } | undefined)?.user_id ?? null;
     },
     getProfileRow(userId) {
       return getProfileStmt.get(userId) as ProfileRow | undefined;

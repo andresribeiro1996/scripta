@@ -1,5 +1,6 @@
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
+import { env } from "../../config/env.js";
 import { openCommunityDb } from "./adapters/sqlite/connection.js";
 import { createSqliteCommunityRepository } from "./adapters/sqlite/sqliteCommunityRepository.js";
 import { createRecapRepository } from "./adapters/sqlite/sqliteRecapRepository.js";
@@ -29,7 +30,7 @@ export async function communityPlugin(app: FastifyInstance, opts: Omit<Community
   const background = (task: () => Promise<void>): void => {
     task().catch((err) => app.log.error(err, "community feed backfill failed"));
   };
-  const service = createCommunityService({ ...opts, repo, background });
+  const service = createCommunityService({ ...opts, repo, background }, (token) => `${env.FRONTEND_URL}/shared/cards/${token}`);
   const engagementRepo = createSqliteEngagementRepository(db);
   const now = opts.now ?? Date.now;
   const gatherer = createShelfGatherer({ engagementRepo, community: { ...opts, repo }, shelf: opts, now });

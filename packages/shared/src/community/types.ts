@@ -1,3 +1,4 @@
+import type { PublicReaderCard } from "../library/readerIdentity.js";
 import type { IdentityKey } from "../readerCards/index.js";
 import type { ReaderProfile } from "../murals/murals.js";
 import type { MuralPublicPayload } from "../public/types.js";
@@ -137,6 +138,16 @@ export interface FeedSettings {
   readerGlyph?: boolean;
 }
 
+export interface CardShare {
+  shareToken: string | null;
+  shareUrl: string | null;
+}
+
+export interface LiveCardShare {
+  shareToken: string;
+  shareUrl: string;
+}
+
 export interface OwnProfile {
   muralId: string | null;
   published: boolean;
@@ -168,6 +179,7 @@ export interface CommunityProfileView {
   private: boolean;
   profile: PublishedProfile;
   mural: MuralPublicPayload | null;
+  readerCard?: PublicReaderCard;
   published: { tierlists: TierlistSummary[]; tournaments: TournamentSummary[]; quizzes: QuizSummary[] };
   feedSettings?: FeedSettings;
 }
