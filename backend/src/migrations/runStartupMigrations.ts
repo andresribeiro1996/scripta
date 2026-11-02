@@ -22,7 +22,7 @@
 
 import { readEmbeddedMurals, clearEmbeddedMuralsField, backfillLibraryDerived } from "../modules/library/index.js";
 import { getUserTheme } from "../modules/auth/index.js";
-import { insertMigratedMurals, listHomeDesignations, dropMuralHomes, resetPresetBlockStyles, backfillMuralThemes } from "../modules/murals/index.js";
+import { insertMigratedMurals, listHomeDesignations, dropMuralHomes, resetPresetBlockStyles, removeRetiredBlocks, backfillMuralThemes } from "../modules/murals/index.js";
 import { applyHomeMuralMigration } from "../modules/community/index.js";
 import { timeStep, type StepLog } from "../stallLog.js";
 
@@ -31,6 +31,7 @@ export function runStartupMigrations(log: StepLog): void {
   if (homes.length > 0) timeStep(log, "startup:home-murals", () => applyHomeMuralMigration(homes));
   timeStep(log, "startup:drop-mural-homes", () => dropMuralHomes());
   timeStep(log, "startup:preset-block-styles", () => resetPresetBlockStyles());
+  timeStep(log, "startup:retired-blocks", () => removeRetiredBlocks());
 
   const extracted = timeStep(log, "startup:embedded-murals", () => readEmbeddedMurals());
   if (extracted.length > 0) {

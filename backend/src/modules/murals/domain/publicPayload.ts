@@ -1,4 +1,4 @@
-import { blockReferences, muralThemeId, type MuralBlock, type MuralPublicPayload, type ResolvedTierlist } from "@scripta/shared";
+import { blockReferences, dropRetiredBlocks, muralThemeId, type MuralBlock, type MuralPublicPayload, type ResolvedTierlist } from "@scripta/shared";
 import type { Locale } from "@scripta/shared/i18n";
 import { env } from "../../../config/env.js";
 import { t } from "../../../i18n/index.js";
@@ -14,10 +14,11 @@ export function muralCoverImageUrl(row: MuralRow): string | null {
 
 export function resolveMuralPublicPayload(
   row: MuralRow,
-  blocks: unknown,
+  storedBlocks: unknown,
   locale: Locale,
   getTierlistData?: (ownerUserId: string, tierlistId: string) => ResolvedTierlist | undefined
 ): MuralPublicPayload {
+  const blocks = Array.isArray(storedBlocks) ? dropRetiredBlocks(storedBlocks) : storedBlocks;
   const refs = blockReferences(blocks);
 
   const tierlistIds: string[] = [];

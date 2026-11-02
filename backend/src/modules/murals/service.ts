@@ -3,7 +3,7 @@
 // module's service.ts.
 
 import { randomUUID } from "node:crypto";
-import { muralThemeId } from "@scripta/shared";
+import { dropRetiredBlocks, muralThemeId } from "@scripta/shared";
 import type { Mural as WireMural, MuralBlock } from "@scripta/shared";
 import { FolderCycleError, InvalidFolderReferenceError, MuralConflictError, MuralNameTooLongError } from "./domain/errors.js";
 import type { ThemeId } from "@scripta/shared/themes";
@@ -17,7 +17,7 @@ function toMural(row: MuralRow, publicUrlFor: (token: string) => string): WireMu
     id: row.id,
     name: row.name,
     theme: muralThemeId(row.theme),
-    blocks: JSON.parse(row.blocks) as MuralBlock[],
+    blocks: dropRetiredBlocks(JSON.parse(row.blocks) as MuralBlock[]),
     coverImageId: row.cover_image_id,
     coverImageUrl: row.cover_image_url,
     shareToken: row.share_token,
@@ -118,11 +118,12 @@ export function createMuralsService(
       const existing = repo.getOwned(id, userId);
       if (!existing) return undefined;
       if (patch.name !== undefined && patch.name.length > MAX_NAME_LENGTH && patch.name !== existing.name) throw new MuralNameTooLongError();
-      const works = patch.blocks !== undefined && resolveWorks ? resolveWorks(patch.blocks) : undefined;
+      const blocks = patch.blocks === undefined ? undefined : dropRetiredBlocks(patch.blocks as Array<{ type: string }>);
+      const works = blocks !== undefined && resolveWorks ? resolveWorks(blocks) : undefined;
       const row = repo.update(id, userId, {
         ...(patch.name !== undefined ? { name: patch.name } : {}),
         ...(patch.theme !== undefined ? { theme: patch.theme } : {}),
-        ...(patch.blocks !== undefined ? { blocks: JSON.stringify(patch.blocks) } : {}),
+        ...(blocks !== undefined ? { blocks: JSON.stringify(blocks) } : {}),
         ...(patch.folderId !== undefined ? { folder_id: patch.folderId } : {})
       }, patch.updatedAt, works);
       if (!row && patch.updatedAt !== undefined && repo.getOwned(id, userId)) throw new MuralConflictError();

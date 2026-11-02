@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { compactMuralBlocks, createDuplicateCandidate, duplicateBlock, ensureBookBlockHeights, layoutsOverlap, moveMuralBlock, muralDragScrollSpeed, muralThemeId, toggleMuralBlockExpansion, withMuralBlockLayout, type MuralBlock } from "./murals.js";
+import { compactMuralBlocks, createDuplicateCandidate, dropRetiredBlocks, duplicateBlock, ensureBookBlockHeights, layoutsOverlap, moveMuralBlock, muralDragScrollSpeed, muralThemeId, toggleMuralBlockExpansion, withMuralBlockLayout, type MuralBlock } from "./murals.js";
 
 const reading = (y: number, h: number): MuralBlock => ({ id: "r", type: "currentlyReading", layout: { x: 0, y, w: 12, h } });
 const text = (id: string, y: number, h: number): MuralBlock => ({ id, type: "text", heading: id, layout: { x: 0, y, w: 12, h } });
@@ -265,4 +265,11 @@ test("compaction preserves expansion insets and rejects invalid geometry", () =>
     const invalid = [{ ...blocks[0], layout: { ...blocks[0].layout, ...patch } }];
     assert.equal(compactMuralBlocks(invalid), invalid);
   }
+});
+
+test("dropRetiredBlocks removes readerCard blocks and leaves the rest untouched", () => {
+  const profile: MuralBlock = { id: "p", type: "profile", bio: "", favoriteGenres: [], layout: { x: 0, y: 0, w: 6, h: 4 } };
+  const card: MuralBlock = { id: "c", type: "readerCard", layout: { x: 0, y: 4, w: 6, h: 6 } };
+  const stats: MuralBlock = { id: "s", type: "stats", metrics: ["totalBooks"], layout: { x: 6, y: 4, w: 6, h: 6 } };
+  assert.deepEqual(dropRetiredBlocks([profile, card, stats]), [profile, stats]);
 });
