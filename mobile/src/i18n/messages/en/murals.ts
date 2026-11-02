@@ -146,7 +146,6 @@ export const murals = {
   "murals.ofColumns": "of {count} columns",
   "murals.ofFinished": "of {total} finished",
   "murals.openMural": "Open {name}",
-  "murals.opensReaderCard": "Opens the reader card",
   "murals.pageNumber": "Page {page}",
   "murals.pageOf": "Page {page} of {total}",
   "murals.passage": "Passage",

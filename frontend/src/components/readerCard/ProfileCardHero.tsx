@@ -1,7 +1,8 @@
 import { useMemo, type ReactNode } from "react";
-import { hasChosen, readerCardDataUri, resolvePrint, type ReaderCardBase } from "@scripta/shared";
+import { hasChosen, resolvePrint, type ReaderCardBase } from "@scripta/shared";
 import { themes } from "@scripta/shared/themes";
 import { useResolvedTheme } from "../../lib/theme";
+import { readerCardDataUri } from "./dataUri";
 import { ReaderCardTurner } from "./ReaderCardTurner";
 
 const CARD_WIDTH = "w-[min(78vw,20rem)]";

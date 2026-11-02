@@ -1,6 +1,5 @@
 export { PLATES as READER_PLATES, INKS as PLATE_INKS, PLATE_FONTS, plateEpithet, plateName, type IdentityKey } from "./plates.js";
 export * from "./render.js";
-export { readerCardDataUri } from "./dataUri.js";
 export * from "./card.js";
 export * from "./style.js";
 export * from "./api.js";

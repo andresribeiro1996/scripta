@@ -24,6 +24,7 @@ import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
 import { useOwnCardStyle } from "../hooks/useReaderCard";
+import { useReaderCardStyle } from "../hooks/useReaderCardStyle";
 import { backTo } from "../lib/areas";
 import { bookHref } from "../lib/libraryView";
 import { bookKey } from "../lib/merge";
@@ -63,6 +64,7 @@ export function OwnShelfView({ username }: { username: string }) {
   const [error, setError] = useState<string | null>(null);
   const books = useMemo(() => library?.data.books ?? [], [library]);
   const groups = useMemo(() => library?.data.groups ?? [], [library]);
+  const styleQuery = useReaderCardStyle();
   const ownStyle = useOwnCardStyle();
   const { input: cardInput, progress } = useMemo(() => ownProfileCard(readerCardInputOf(books, groups, username, locale, undefined, ownStyle)), [books, groups, username, locale, ownStyle]);
   const cardShare = useQuery({ queryKey: CARD_SHARE_KEY, queryFn: fetchCardShare });
@@ -179,7 +181,15 @@ export function OwnShelfView({ username }: { username: string }) {
 
   return (
     <Page title={null} back={backTo("profile")}>
-      {libraryQuery.data && ownStyle ? <ProfileCardHero input={cardInput} /> : null}
+      {libraryQuery.isSuccess && styleQuery.isSuccess ? <ProfileCardHero input={cardInput} /> : null}
+      {libraryQuery.isSuccess && styleQuery.isError ? (
+        <div className="flex flex-wrap items-center gap-3 py-6">
+          <p className="text-sm text-(--color-danger)">{t("library.shelfActionFailed")}</p>
+          <button onClick={() => void styleQuery.refetch()} className={BUTTON_SECONDARY}>
+            {t("library.retry")}
+          </button>
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center gap-5">
         {session?.user && <Avatar user={session.user} size={72} />}
         <h1 className="font-display min-w-0 flex-1 basis-48 break-words text-3xl font-bold lg:text-[2.5rem] lg:leading-[3rem]">@{username}</h1>
@@ -212,7 +222,7 @@ export function OwnShelfView({ username }: { username: string }) {
           />
         </div>
       </div>
-      {progress ? <p className="mt-3 text-sm text-(--color-text-dim)">{progress}</p> : null}
+      {libraryQuery.isSuccess && progress ? <p className="mt-3 text-sm text-(--color-text-dim)">{progress}</p> : null}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <button onClick={() => setSharingCard(true)} disabled={!cardShare.data} className={BUTTON_SECONDARY}>
           {t("readerCard.shareCard")}

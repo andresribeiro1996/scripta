@@ -14,7 +14,7 @@ const CARD_WIDTH_MAX = 320;
 
 export function ProfileCardHero({ input, width, children }: { input: ReaderCardBase; width: number; children?: ReactNode }) {
   const { colors, mode } = useTheme();
-  const fadeId = useId();
+  const fadeId = useId().replace(/\W/g, "");
   const backdrop = useMemo(
     () => backdropXml(readerCardXml(renderReaderCard({ ...input, print: resolvePrint(input.style.print, mode === "dark") }), { serif: cardFontFamily("playfairDisplay"), sans: cardFontFamily("sans"), mono: CARD_MONO_FAMILY, script: CARD_SCRIPT_FAMILY })),
     [input, mode],

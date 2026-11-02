@@ -3,10 +3,21 @@ import { test } from "node:test";
 import { readerCardInputOf, renderReaderCard } from "@scripta/shared";
 import { backdropXml } from "./backdropXml";
 
-test("backdropXml wraps the card in a gaussian blur filter", () => {
-  const svg = renderReaderCard({ ...readerCardInputOf([], [], "andre", "en"), print: "paper" });
+const svg = renderReaderCard({ ...readerCardInputOf([], [], "andre", "en"), print: "paper" });
+
+test("backdropXml keeps one root svg and blurs the card's own content", () => {
   const xml = backdropXml(svg);
-  assert.match(xml, /<feGaussianBlur stdDeviation="18"/);
-  assert.ok(xml.startsWith(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${/viewBox="([^"]+)"/.exec(svg)![1]}"`));
-  assert.ok(xml.includes(svg));
+  assert.equal(xml.match(/<svg\b/g)!.length, 1);
+  assert.equal(xml.match(/<\/svg>/g)!.length, 1);
+  assert.match(xml, /<filter id="backdropBlur"[^>]*><feGaussianBlur stdDeviation="18"\/><\/filter>/);
+  assert.match(xml, /<g filter="url\(#backdropBlur\)">/);
+  assert.ok(xml.includes(/viewBox="[^"]+"/.exec(svg)![0]));
+  assert.match(xml.slice(0, xml.indexOf(">") + 1), /preserveAspectRatio="xMidYMid slice"/);
+  assert.match(xml, /<\/g>\s*<\/svg>\s*$/);
+});
+
+test("backdropXml replaces a preserveAspectRatio the card already has", () => {
+  const xml = backdropXml(svg.replace("<svg ", '<svg preserveAspectRatio="none" '));
+  assert.equal(xml.match(/preserveAspectRatio/g)!.length, 1);
+  assert.match(xml, /preserveAspectRatio="xMidYMid slice"/);
 });

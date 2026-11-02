@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { readerCardInputOf } from "../library/readerCardFacts.js";
-import { readerCardDataUri } from "./dataUri.js";
-import { renderReaderCard } from "./render.js";
+import { readerCardInputOf, renderReaderCard } from "@scripta/shared";
+import { readerCardDataUri } from "../src/components/readerCard/dataUri";
 
 const PREFIX = "data:image/svg+xml;utf8,";
 
