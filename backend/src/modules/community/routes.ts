@@ -199,7 +199,7 @@ export function buildPublicCommunityRoutes(service: CommunityService) {
       if (!payload) return reply.code(404).send({ error: t(localeOf(request), "community.profileNotFound") });
       const base = readerCardInputOf([], [], payload.username, localeOf(request), payload.readerCard);
       const image = await renderCardImage({ ...base, print: resolvePrint(base.style.print, false) });
-      return reply.header("Cache-Control", "public, max-age=300").type("image/jpeg").send(image);
+      return reply.header("Cache-Control", "private, max-age=300").header("Vary", "Accept-Language").type("image/jpeg").send(image);
     });
 
     app.get("/community/profiles/:username/activity", async (request, reply) => {
