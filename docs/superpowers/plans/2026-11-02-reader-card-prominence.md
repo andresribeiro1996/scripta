@@ -638,3 +638,34 @@ Asked by the user on 2026-11-02 after the phone test: "go with B, also. clicking
   - tapping the badge opens the share sheet, not the viewer;
   - tapping the card opens the viewer, which turns the card and closes;
   - on your own shelf, Edit in the viewer opens the editor.
+
+### Task 12: Backdrop blur identical to mockup D
+
+Asked by the user on 2026-11-02: "the blurry needs to be identical with the one in the mock". Task 11's look (blur 80, scale 1.6) is replaced by mockup D's recipe from `docs/superpowers/specs/2026-11-02-reader-card-prominence-mockups/compare.mjs:15-18`.
+
+**The recipe.** The mock phone is 188px wide inside its frame. Every length below is a fraction of the screen width W, or of the hero width on web.
+- **Backdrop box:** the hero area grown by 30px of 188 (**0.16 W**) on every side. The card SVG fills it with `cover` (`xMidYMid slice`), centred, with no extra scale.
+- **Filter:** `blur(16px)` (Gaussian stdDeviation **0.085 W** in screen units), then `saturate(1.4)`.
+- **Overlay:** on the hero area only (`inset: 0`, not the grown box), `linear-gradient(to bottom, rgba(0,0,0,.08) 20%, <page background> 98%)`. The page background is the theme's background colour.
+
+**Files:**
+- Modify: `mobile/src/features/readerCard/backdropXml.ts`
+- Modify: `mobile/src/features/readerCard/ProfileCardHero.tsx`
+- Modify: `mobile/src/features/readerCard/profileCardHero.test.ts`
+- Modify: `frontend/src/components/readerCard/ProfileCardHero.tsx`
+
+**Interfaces:**
+- **Mobile:** `backdropXml(svg: string, stdDeviation: number): string`.
+  - The filter is `feGaussianBlur` then `feColorMatrix type="saturate" values="1.4"`, with a filter region large enough that the edges don't clip.
+  - `ProfileCardBackdrop` measures its box with `onLayout`. It renders the SVG absolutely, with negative insets of 0.16 W.
+  - It converts 0.085 W to card units by dividing by the slice scale, `max(boxW / vbW, boxH / vbH)`, using the card's `viewBox`.
+  - The gradient becomes the mock's overlay.
+- **Web:**
+  - The backdrop `img` uses negative insets of 16% of the hero width on every side, with `object-cover` and `filter: blur(8.5cqw) saturate(1.4)`. The hero is the size container. Drop `scale-150` and the radial mask.
+  - The overlay div becomes the mock's gradient.
+
+- [ ] **Step 1: Test.** In `profileCardHero.test.ts`, assert that `backdropXml(svg, 12.5)` contains `stdDeviation="12.5"` and `type="saturate" values="1.4"`, and no `scale(`.
+- [ ] **Step 2: Implement** the Interfaces above.
+- [ ] **Step 3: Off-device side-by-side.** Render mock D (from `compare.mjs`) and our recipe at the same proportions for the reversed "star" card and the paper card. Save the result as `.superpowers/device/task12/mock-vs-ours.png`. The two backdrops must be indistinguishable.
+- [ ] **Step 4: Run the checks and confirm they pass.** Run `node scripts/gate.mjs`. Expected: PASS.
+- [ ] **Step 5: Commit and push.** Run `git add -A mobile frontend docs && git commit -m "Match the hero backdrop to mockup D's blur"`, then push.
