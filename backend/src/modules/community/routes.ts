@@ -96,6 +96,21 @@ export function buildCommunityRoutes(service: CommunityService) {
       return reply.code(204).send();
     });
 
+    app.get("/community/card/share", { preHandler: authGuard }, async (request, reply) => {
+      reply.header("Cache-Control", "no-store");
+      return reply.send(service.getCardShare(request.user.id));
+    });
+
+    app.post("/community/card/share", { preHandler: authGuard }, async (request, reply) => {
+      reply.header("Cache-Control", "no-store");
+      return reply.send(service.shareCard(request.user.id));
+    });
+
+    app.post("/community/card/unshare", { preHandler: authGuard }, async (request, reply) => {
+      service.unshareCard(request.user.id);
+      return reply.code(204).send();
+    });
+
     app.get("/community/profile", { preHandler: authGuard }, async (request, reply) => {
       reply.header("Cache-Control", "no-store");
       return reply.send(service.getOwnProfile(request.user.id));
@@ -165,6 +180,14 @@ export function buildPublicCommunityRoutes(service: CommunityService) {
         if (err instanceof ProfileNotFoundError) return reply.code(404).send({ error: t(localeOf(request), "community.profileNotFound") });
         throw err;
       }
+    });
+
+    app.get("/community/cards/shared/:token", async (request, reply) => {
+      const { token } = request.params as { token: string };
+      reply.header("Cache-Control", "no-store");
+      const card = service.getSharedCard(token);
+      if (!card) return reply.code(404).send({ error: t(localeOf(request), "community.profileNotFound") });
+      return reply.send(card);
     });
 
     app.get("/community/profiles/:username/activity", async (request, reply) => {

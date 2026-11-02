@@ -138,6 +138,16 @@ export interface FeedSettings {
   readerGlyph?: boolean;
 }
 
+export interface CardShare {
+  shareToken: string | null;
+  shareUrl: string | null;
+}
+
+export interface LiveCardShare {
+  shareToken: string;
+  shareUrl: string;
+}
+
 export interface OwnProfile {
   muralId: string | null;
   published: boolean;

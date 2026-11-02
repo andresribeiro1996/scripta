@@ -59,3 +59,9 @@ export interface SharedMuralPayload extends Omit<PublicLibraryData, "collectionB
 export interface SharedLibraryPayload {
   data: LibraryData;
 }
+
+export interface SharedReaderCardPayload {
+  username: string;
+  readerCard: PublicReaderCard;
+  profileVisible: boolean;
+}

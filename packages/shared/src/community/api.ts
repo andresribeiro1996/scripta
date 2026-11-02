@@ -3,7 +3,7 @@ import type { ApiRequest } from "../api/port.js";
 import { dashboardQuery, isKnownDigestItem, withKnownDigestItems, type DashboardFeedPage, type DigestItem } from "../dashboard.js";
 import type { LibraryData } from "../library/index.js";
 import { isKnownContent } from "./helpers.js";
-import type { ActivityComment, ActivityEngagement, ActivityItem, CommunityProfileView, DiscoverItem, DiscoverType, FeedSettings, OwnProfile, Page, PersonResult, PublishProfileInput, SavedContentRef, SuggestedReader } from "./types.js";
+import type { ActivityComment, ActivityEngagement, ActivityItem, CardShare, CommunityProfileView, DiscoverItem, DiscoverType, FeedSettings, LiveCardShare, OwnProfile, Page, PersonResult, PublishProfileInput, SavedContentRef, SuggestedReader } from "./types.js";
 
 export function createCommunityApi(request: ApiRequest) {
   return {
@@ -79,6 +79,15 @@ export function createCommunityApi(request: ApiRequest) {
     },
     fetchOwnProfile(): Promise<OwnProfile> {
       return request<OwnProfile>("/community/profile", { auth: "required" });
+    },
+    fetchCardShare(): Promise<CardShare> {
+      return request<CardShare>("/community/card/share", { auth: "required" });
+    },
+    shareCard(): Promise<LiveCardShare> {
+      return request<LiveCardShare>("/community/card/share", { method: "POST", auth: "required" });
+    },
+    async unshareCard(): Promise<void> {
+      await request("/community/card/unshare", { method: "POST", auth: "required" });
     },
     async setShelfMural(muralId: string): Promise<void> {
       await request("/community/profile/mural", { method: "PUT", body: { muralId }, auth: "required" });

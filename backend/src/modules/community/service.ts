@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { Locale } from "@scripta/shared/i18n";
-import { normalizeWords, type IdentityKey, type PublicReaderCard, type ReaderProfile } from "@scripta/shared";
+import { normalizeWords, type IdentityKey, type PublicReaderCard, type ReaderProfile, type SharedReaderCardPayload } from "@scripta/shared";
 import { categoryFor, contentDetail, contentTarget, decodeCursor, encodeCursor, parseRankingPreview, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
-import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityProfileView, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, OwnProfile, Page, PersonResult, PublishProfileInput, PublishedContent, RankingTierPreview, SavedContentRef, SharedBook, SuggestedReader } from "@scripta/shared/community";
+import type { ActivityEventType, ActivityItem, CardShare, LiveCardShare, CommunityAuthor, CommunityProfileView, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, OwnProfile, Page, PersonResult, PublishProfileInput, PublishedContent, RankingTierPreview, SavedContentRef, SharedBook, SuggestedReader } from "@scripta/shared/community";
 import type { CompletionItem, DashboardFeedPage, DigestItem, ParticipationItem } from "@scripta/shared/dashboard";
 import type { MuralsPublicApi } from "../murals/publicApi.js";
 import { currentTrace } from "../../trace.js";
@@ -115,6 +115,10 @@ export interface CommunityService {
   getOwnProfile(userId: string): OwnProfile;
   setShelfMural(userId: string, muralId: string): void;
   getProfileByUsername(username: string, locale: Locale, viewerId?: string): CommunityProfileView;
+  getCardShare(userId: string): CardShare;
+  shareCard(userId: string): LiveCardShare;
+  unshareCard(userId: string): void;
+  getSharedCard(token: string): SharedReaderCardPayload | null;
   getDashboard(viewerId: string, cursor: string | undefined, limit: number, kinds?: ReadonlySet<string>): DashboardFeedPage & { newCount: number };
   markDashboardSeen(viewerId: string): void;
   getDiscover(type: DiscoverType, q: string, limit: number, offset: number, viewerId?: string): { items: DiscoverItem[]; nextOffset: number | null };
@@ -162,7 +166,7 @@ export function buildDiscoverItems(deps: Pick<CommunityDeps, "repo" | "games" | 
   });
 }
 
-export function createCommunityService(deps: CommunityDeps): CommunityService {
+export function createCommunityService(deps: CommunityDeps, cardShareUrlFor: (token: string) => string = (token) => `/shared/cards/${token}`): CommunityService {
   const { repo, background } = deps;
   const now = deps.now ?? Date.now;
   const windowStart = (): string => new Date(now() - FEED_WINDOW_MS).toISOString();
@@ -431,6 +435,25 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       };
       if (viewerId === userId) view.feedSettings = settingsFor(userId);
       return view;
+    },
+    getCardShare(userId) {
+      const shareToken = repo.getCardShareToken(userId);
+      return { shareToken, shareUrl: shareToken === null ? null : cardShareUrlFor(shareToken) };
+    },
+    shareCard(userId) {
+      const shareToken = repo.getCardShareToken(userId) ?? randomUUID();
+      repo.setCardShareToken(userId, shareToken);
+      return { shareToken, shareUrl: cardShareUrlFor(shareToken) };
+    },
+    unshareCard(userId) {
+      repo.setCardShareToken(userId, null);
+    },
+    getSharedCard(token) {
+      const userId = repo.getCardShareOwner(token);
+      if (userId === null) return null;
+      const username = deps.resolveProfiles([userId]).get(userId)?.username;
+      if (!username) return null;
+      return { username, readerCard: deps.readerCardFor(userId), profileVisible: repo.getProfileRow(userId)?.published === 1 };
     },
     getDashboard(viewerId, cursor, limit, requested?: ReadonlySet<string>) {
       const kinds = requested ?? LEGACY_DIGEST_KINDS;

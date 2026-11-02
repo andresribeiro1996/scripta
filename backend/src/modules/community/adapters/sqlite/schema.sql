@@ -88,3 +88,4 @@ CREATE TABLE IF NOT EXISTS saved_content (
 );
 CREATE INDEX IF NOT EXISTS idx_saved_content_time ON saved_content(user_id, saved_at DESC, kind, ref_id);
 CREATE TABLE IF NOT EXISTS top_shelf_recaps (month TEXT PRIMARY KEY, data TEXT NOT NULL, has_cards INTEGER NOT NULL, frozen_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS card_shares (user_id TEXT PRIMARY KEY, token TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL);

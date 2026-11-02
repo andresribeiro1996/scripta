@@ -47,6 +47,10 @@ function fakeService(overrides: Partial<CommunityService> = {}): CommunityServic
     getLibrary: () => {
       throw new ProfileNotFoundError();
     },
+    getCardShare: () => ({ shareToken: null, shareUrl: null }),
+    shareCard: () => ({ shareToken: "token", shareUrl: "https://app.test/shared/cards/token" }),
+    unshareCard: () => {},
+    getSharedCard: () => null,
     getFeedSettings: () => DEFAULT_FEED_SETTINGS,
     updateFeedSettings: () => {},
     archiveOldEvents: async () => ({ moved: 0, purged: 0 }),

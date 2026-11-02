@@ -29,6 +29,9 @@ function createRepoFake() {
     events.filter((e) => follows.has(key(viewerId, e.user_id)) && types.includes(e.type) && (repo.getFeedSettings(e.user_id) ?? DEFAULT_FEED_SETTINGS)[categoryFor(e.type)]);
   const repo: CommunityRepository = {
     deleteUserData() {},
+    getCardShareToken: () => null,
+    setCardShareToken() {},
+    getCardShareOwner: () => null,
     insertFollow(row) {
       const k = key(row.follower_id, row.followee_id);
       if (follows.has(k)) return false;
