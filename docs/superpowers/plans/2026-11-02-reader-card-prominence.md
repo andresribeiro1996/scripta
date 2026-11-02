@@ -599,3 +599,42 @@ The user tested PR 2 on a phone and asked for the layout to match mockup D much 
   - the Activity tab loads more at its end;
   - the Library tab scrolls smoothly;
   - pull-to-refresh works on the Mural tab.
+
+### Task 11: Share badge on the card; tapping the card opens the big viewer
+
+Asked by the user on 2026-11-02 after the phone test: "go with B, also. clicking the card opens the card in a bigger modal screen". Option B means the share button is icon-only and sits as a round badge on the hero card's bottom-right corner. Applies to web and mobile.
+
+**Files:**
+- Create: `mobile/src/features/murals/ReaderCardViewer.tsx`
+- Modify: `mobile/src/features/readerCard/ProfileCardHero.tsx`
+- Modify: `mobile/src/features/community/MyShelfScreen.tsx`
+- Modify: `mobile/src/features/community/ProfileScreen.tsx`
+- Modify: `mobile/src/features/public/SharedCardScreen.tsx`
+- Modify: `frontend/src/components/readerCard/ProfileCardHero.tsx`
+- Modify: `frontend/src/components/OwnShelfView.tsx`
+- Modify: `frontend/src/pages/CommunityProfilePage.tsx`
+- Modify: `frontend/src/pages/SharedCardPage.tsx`
+
+**Interfaces:**
+- Mobile `ReaderCardViewer({ input, onClose, onEdit })` is restored from `origin/main:mobile/src/features/murals/ReaderCardViewer.tsx`. Task 6 deleted it along with the mural block. The web `ReaderCardViewer` still exists and is reused as it is.
+- `ProfileCardHero` (web and mobile) gains `badge?: ReactNode` and `onEdit?: () => void`.
+  - The hero card no longer turns in place. It shows its first page, with the shine, inside one pressable labelled "Open card".
+  - Tapping it opens `ReaderCardViewer` for the same input. The hero owns the open state, and `onEdit` is passed through to the viewer.
+  - The card turns inside the viewer.
+  - `badge` renders over the card's bottom-right corner, overlapping the edge. It is a sibling after the card pressable, so its tap never opens the viewer.
+- Badge, own shelf only: a round icon-only share button with no visible label.
+  - Accent fill. Mobile uses `IconButton framed tone="accent"`; web uses the matching accent token.
+  - Touch target of at least 44.
+  - Accessible name "Share card" (`readerCard.shareCard`).
+  - Disabled until `cardShare.data` loads. It opens the existing share sheet or modal.
+- The visible Share pill goes away on both clients. Mobile keeps Edit card in the ⋯ menu; web keeps the Edit card link. The own shelf passes `onEdit`, which goes to the editor.
+- Every hero opens the viewer: own shelf, others' profiles and the shared card screens. Only the own shelf has a badge.
+
+- [ ] **Step 1: Implement** the Interfaces above. If no existing key fits the "Open card" accessibility label, add one in both locales.
+- [ ] **Step 2: Run the checks and confirm they pass.** Run `node scripts/gate.mjs`. Expected: PASS.
+- [ ] **Step 3: Commit and push.** Run `git add -A mobile frontend docs && git commit -m "Put card sharing on a badge and open the card in the viewer on tap"`, then push.
+- [ ] **Step 4: Device pass (`device-checker`).** Check your own shelf and `fixture_alice`'s profile, in dark theme. It passes if:
+  - the badge sits on the card's corner;
+  - tapping the badge opens the share sheet, not the viewer;
+  - tapping the card opens the viewer, which turns the card and closes;
+  - on your own shelf, Edit in the viewer opens the editor.
