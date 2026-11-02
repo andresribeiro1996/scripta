@@ -54,7 +54,7 @@ export function ProfileCardHero({ input, width, withBackdrop = true, badge, onEd
       {withBackdrop ? <ProfileCardBackdrop input={input} /> : null}
       <View style={styles.band}>
         <View style={{ width: cardWidth, height: cardHeight }}>
-          <Pressable accessibilityRole="button" accessibilityLabel={t("shell.youReaderCard")} onPress={() => setOpen(true)}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t("readerCard.openCard")} onPress={() => setOpen(true)}>
             <ReaderCardImage input={input} width={cardWidth} />
             {shine ? <CardShine kind={shine} width={cardWidth} height={cardHeight} live={false} /> : null}
           </Pressable>
