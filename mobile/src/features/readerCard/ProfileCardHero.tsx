@@ -11,10 +11,11 @@ import { CardShine } from "../murals/CardShine";
 import { PLATE_RATIO, ReaderCardImage } from "../murals/ReaderCardImage";
 import { readerCardXml } from "../murals/readerCardXml";
 import { ReaderCardViewer } from "../murals/ReaderCardViewer";
-import { backdropXml, cardViewBox } from "./backdropXml";
+import { backdropXml } from "./backdropXml";
 
 const BACKDROP_GROW = 0.16;
 const BACKDROP_BLUR = 0.085;
+const BACKDROP_SATURATE = 1.4;
 const OVERLAY_TINT = 0.08;
 const OVERLAY_FROM = 0.2;
 const OVERLAY_TO = 0.98;
@@ -31,13 +32,7 @@ export function ProfileCardBackdrop({ input }: { input: ReaderCardBase }) {
     () => readerCardXml(renderReaderCard({ ...input, print: resolvePrint(input.style.print, mode === "dark") }), { serif: cardFontFamily("playfairDisplay"), sans: cardFontFamily("sans"), mono: CARD_MONO_FAMILY, script: CARD_SCRIPT_FAMILY }),
     [input, mode],
   );
-  const backdrop = useMemo(() => {
-    if (!size) return null;
-    const grow = size.width * BACKDROP_GROW;
-    const [, , viewWidth, viewHeight] = cardViewBox(card);
-    const scale = Math.max((size.width + 2 * grow) / viewWidth, (size.height + 2 * grow) / viewHeight);
-    return backdropXml(card, +((size.width * BACKDROP_BLUR) / scale).toFixed(3));
-  }, [card, size]);
+  const backdrop = useMemo(() => backdropXml(card), [card]);
   const grow = size ? -size.width * BACKDROP_GROW : 0;
   return (
     <View
@@ -47,7 +42,11 @@ export function ProfileCardBackdrop({ input }: { input: ReaderCardBase }) {
       onLayout={(event) => setSize(event.nativeEvent.layout)}
       style={[StyleSheet.absoluteFill, styles.clip]}
     >
-      {backdrop && size ? <SvgXml xml={backdrop} width={size.width - 2 * grow} height={size.height - 2 * grow} style={{ position: "absolute", top: grow, left: grow }} /> : null}
+      {size ? (
+        <View style={{ position: "absolute", top: grow, left: grow, width: size.width - 2 * grow, height: size.height - 2 * grow, filter: [{ blur: size.width * BACKDROP_BLUR }, { saturate: BACKDROP_SATURATE }] }}>
+          <SvgXml xml={backdrop} width="100%" height="100%" />
+        </View>
+      ) : null}
       <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" viewBox="0 0 1 1" preserveAspectRatio="none">
         <Defs>
           <LinearGradient id={fadeId} x1="0" y1="0" x2="0" y2="1">
