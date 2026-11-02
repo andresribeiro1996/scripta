@@ -93,12 +93,12 @@ test("the turner is inline: no dialog, and off the scrim its dots take the page'
   assert.doesNotMatch(dots, /bg-white/);
 });
 
-test("only the owner's viewer offers Edit card, and only when it can go somewhere", () => {
+test("the viewer offers Edit card only when the caller gives it somewhere to go", () => {
   const owner = readerCardInputOf([], [], "andre", "en");
   const noop = () => undefined;
   assert.match(renderToString(createElement(ReaderCardViewer, { input: owner, onClose: noop, onEdit: noop })), />Edit card</);
   assert.doesNotMatch(renderToString(createElement(ReaderCardViewer, { input: owner, onClose: noop })), /Edit card/);
-  assert.doesNotMatch(renderToString(createElement(ReaderCardViewer, { input: visitor("faces"), onClose: noop, onEdit: noop })), /Edit card/);
+  assert.match(renderToString(createElement(ReaderCardViewer, { input: visitor("faces"), onClose: noop, onEdit: noop })), />Edit card</);
 });
 
 test("the script font is served and declared", () => {
