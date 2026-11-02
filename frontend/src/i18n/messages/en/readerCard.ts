@@ -44,5 +44,6 @@ export const readerCard = {
   "readerCard.editCard": "Edit card",
   "readerCard.shareCard": "Share card",
   "readerCard.openInApp": "Open in Atmyshelf",
-  "readerCard.sharedInvalid": "This card link is invalid or no longer active."
+  "readerCard.sharedInvalid": "This card link is invalid or no longer active.",
+  "readerCard.sharedLoadFailed": "Couldn't load this card."
 } satisfies Messages;

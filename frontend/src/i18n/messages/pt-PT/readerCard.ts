@@ -45,5 +45,6 @@ export const readerCard: CatalogOf<typeof en> = {
   "readerCard.editCard": "Editar cartão",
   "readerCard.shareCard": "Partilhar cartão",
   "readerCard.openInApp": "Abrir no Atmyshelf",
-  "readerCard.sharedInvalid": "Esta ligação do cartão é inválida ou já não está ativa."
+  "readerCard.sharedInvalid": "Esta ligação do cartão é inválida ou já não está ativa.",
+  "readerCard.sharedLoadFailed": "Não foi possível carregar este cartão."
 };

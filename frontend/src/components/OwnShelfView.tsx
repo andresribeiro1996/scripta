@@ -179,61 +179,60 @@ export function OwnShelfView({ username }: { username: string }) {
 
   return (
     <Page title={null} back={backTo("profile")}>
-      <ProfileCardHero input={cardInput}>
-        <div className="flex flex-wrap items-center gap-5">
-          {session?.user && <Avatar user={session.user} size={72} />}
-          <h1 className="font-display min-w-0 flex-1 basis-48 break-words text-3xl font-bold lg:text-[2.5rem] lg:leading-[3rem]">@{username}</h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`inline-flex min-h-11 items-center rounded-full border px-3 text-sm font-semibold ${
-                ownData.published ? "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)" : "border-(--color-border) text-(--color-text-dim)"
-              }`}
+      {libraryQuery.data && ownStyle ? <ProfileCardHero input={cardInput} /> : null}
+      <div className="flex flex-wrap items-center gap-5">
+        {session?.user && <Avatar user={session.user} size={72} />}
+        <h1 className="font-display min-w-0 flex-1 basis-48 break-words text-3xl font-bold lg:text-[2.5rem] lg:leading-[3rem]">@{username}</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`inline-flex min-h-11 items-center rounded-full border px-3 text-sm font-semibold ${
+              ownData.published ? "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)" : "border-(--color-border) text-(--color-text-dim)"
+            }`}
+          >
+            {ownData.published ? t("library.published") : t("library.private")}
+          </span>
+          {!ownData.published && (
+            <button
+              onClick={() => setPublishing(true)}
+              disabled={busy}
+              className={BUTTON_PRIMARY}
             >
-              {ownData.published ? t("library.published") : t("library.private")}
-            </span>
-            {!ownData.published && (
-              <button
-                onClick={() => setPublishing(true)}
-                disabled={busy}
-                className={BUTTON_PRIMARY}
-              >
-                {t("library.publish")}
-              </button>
-            )}
-            {publishing && <PublishDialog username={username} onAnswer={publish} onCancel={() => setPublishing(false)} />}
-            <OwnerControls
-              busy={busy}
-              published={ownData.published}
-              currentMuralId={ownData.muralId}
-              feedSettings={ownData.feedSettings}
-              onSwitch={(muralId) => void run(() => setShelfMural(muralId))}
-              onUnpublish={() => void run(() => unpublishProfile())}
-              onSaveSettings={(settings) => void run(() => updateFeedSettings(settings))}
-            />
-          </div>
-        </div>
-        {progress ? <p className="mt-3 text-sm text-(--color-text-dim)">{progress}</p> : null}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button onClick={() => setSharingCard(true)} disabled={!cardShare.data} className={BUTTON_SECONDARY}>
-            {t("readerCard.shareCard")}
-          </button>
-          <Link to="/dashboard/reader-card" className={BUTTON_SECONDARY}>
-            {t("readerCard.editCard")}
-          </Link>
-          {cardShare.isError && <p className="text-sm text-(--color-danger)">{t("library.shelfActionFailed")}</p>}
-        </div>
-        {sharingCard && cardShare.data && (
-          <ShareModal
-            title={t("shell.areaReaderCard")}
-            shareToken={cardShare.data.shareToken}
-            shareUrl={cardShare.data.shareUrl}
-            defaultCaption={t("shell.areaReaderCard")}
-            onShare={shareOwnCard}
-            onUnshare={unshareOwnCard}
-            onClose={() => setSharingCard(false)}
+              {t("library.publish")}
+            </button>
+          )}
+          {publishing && <PublishDialog username={username} onAnswer={publish} onCancel={() => setPublishing(false)} />}
+          <OwnerControls
+            busy={busy}
+            published={ownData.published}
+            currentMuralId={ownData.muralId}
+            feedSettings={ownData.feedSettings}
+            onSwitch={(muralId) => void run(() => setShelfMural(muralId))}
+            onUnpublish={() => void run(() => unpublishProfile())}
+            onSaveSettings={(settings) => void run(() => updateFeedSettings(settings))}
           />
-        )}
-      </ProfileCardHero>
+        </div>
+      </div>
+      {progress ? <p className="mt-3 text-sm text-(--color-text-dim)">{progress}</p> : null}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button onClick={() => setSharingCard(true)} disabled={!cardShare.data} className={BUTTON_SECONDARY}>
+          {t("readerCard.shareCard")}
+        </button>
+        <Link to="/dashboard/reader-card" className={BUTTON_SECONDARY}>
+          {t("readerCard.editCard")}
+        </Link>
+        {cardShare.isError && <p className="text-sm text-(--color-danger)">{t("library.shelfActionFailed")}</p>}
+      </div>
+      {sharingCard && cardShare.data && (
+        <ShareModal
+          title={t("shell.areaReaderCard")}
+          shareToken={cardShare.data.shareToken}
+          shareUrl={cardShare.data.shareUrl}
+          defaultCaption={t("shell.areaReaderCard")}
+          onShare={shareOwnCard}
+          onUnshare={unshareOwnCard}
+          onClose={() => setSharingCard(false)}
+        />
+      )}
       <div className="mt-6">
         {error && <p className="mb-4 text-sm text-(--color-danger)">{error}</p>}
         <SwipeTabs tabs={OWN_SHELF_TABS.map((entry) => ({ value: entry.value, label: t(entry.label) }))} value={tab} onChange={setTab} label={t("library.shelfSections")}>
