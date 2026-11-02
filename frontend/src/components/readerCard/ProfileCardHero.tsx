@@ -13,7 +13,7 @@ export function ProfileCardHero({ input, children }: { input: ReaderCardBase; ch
   const backdrop = useMemo(() => readerCardDataUri({ ...input, print: resolvePrint(input.style.print, dark) }), [input, dark]);
   return (
     <div className="relative isolate -mx-4 overflow-hidden px-4 pt-6 pb-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-      <img src={backdrop} alt="" aria-hidden="true" className={`pointer-events-none absolute inset-0 -z-10 h-full w-full scale-150 object-cover opacity-100 blur-2xl ${FADE}`} />
+      <img src={backdrop} alt="" aria-hidden="true" className={`pointer-events-none absolute inset-0 -z-10 h-full w-full scale-150 object-cover opacity-100 blur-[80px] ${FADE}`} />
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-linear-to-b from-transparent from-55% to-(--color-bg)" />
       <div className="flex justify-center">
         <ReaderCardTurner key={`${input.view}-${input.style.layout}-${hasChosen(input.card.chosen)}`} input={input} cardWidth={CARD_WIDTH} />

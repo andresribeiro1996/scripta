@@ -9,11 +9,11 @@ test("backdropXml keeps one root svg and blurs the card's own content", () => {
   const xml = backdropXml(svg);
   assert.equal(xml.match(/<svg\b/g)!.length, 1);
   assert.equal(xml.match(/<\/svg>/g)!.length, 1);
-  assert.match(xml, /<filter id="backdropBlur"[^>]*><feGaussianBlur stdDeviation="28"\/><\/filter>/);
-  assert.match(xml, /<g filter="url\(#backdropBlur\)">/);
+  assert.match(xml, /<filter id="backdropBlur"[^>]*><feGaussianBlur stdDeviation="80"\/><\/filter>/);
+  assert.match(xml, /<g filter="url\(#backdropBlur\)"><g transform="translate\(\S+ \S+\) scale\(1\.6\) translate\(\S+ \S+\)">/);
   assert.ok(xml.includes(/viewBox="[^"]+"/.exec(svg)![0]));
   assert.match(xml.slice(0, xml.indexOf(">") + 1), /preserveAspectRatio="xMidYMid slice"/);
-  assert.match(xml, /<\/g>\s*<\/svg>\s*$/);
+  assert.match(xml, /<\/g><\/g>\s*<\/svg>\s*$/);
 });
 
 test("backdropXml replaces a preserveAspectRatio the card already has", () => {
