@@ -653,6 +653,7 @@ Asked by the user on 2026-11-02: "the blurry needs to be identical with the one 
 - Modify: `mobile/src/features/readerCard/ProfileCardHero.tsx`
 - Modify: `mobile/src/features/readerCard/profileCardHero.test.ts`
 - Modify: `frontend/src/components/readerCard/ProfileCardHero.tsx`
+- Test: `frontend/scripts/test-profile-card-hero.mts`
 
 **Interfaces:**
 - **Mobile:** `backdropXml(svg: string, stdDeviation: number): string`.

@@ -9,7 +9,6 @@ import { ReaderCardImage } from "./ReaderCardImage";
 import { ReaderCardViewer } from "./ReaderCardViewer";
 
 const CARD_WIDTH = "w-[min(55vw,14rem)]";
-const FADE = "[mask-image:radial-gradient(ellipse_farthest-corner,#000_55%,transparent)]";
 
 export function ProfileCardHero({ input, badge, onEdit, children }: { input: ReaderCardBase; badge?: ReactNode; onEdit?: () => void; children?: ReactNode }) {
   const t = useT();
@@ -20,8 +19,10 @@ export function ProfileCardHero({ input, badge, onEdit, children }: { input: Rea
   return (
     <>
       <div className="relative isolate -mx-4 overflow-hidden px-4 pt-6 pb-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        <img src={backdrop} alt="" aria-hidden="true" className={`pointer-events-none absolute inset-0 -z-10 h-full w-full scale-150 object-cover opacity-100 blur-[80px] ${FADE}`} />
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-linear-to-b from-transparent from-55% to-(--color-bg)" />
+        <div aria-hidden="true" className="@container pointer-events-none absolute inset-0 -z-10">
+          <img src={backdrop} alt="" className="absolute -inset-[16cqw] h-[calc(100%+32cqw)] w-[calc(100%+32cqw)] max-w-none object-cover blur-[8.5cqw] saturate-[1.4]" />
+        </div>
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(to_bottom,rgba(0,0,0,.08)_20%,var(--color-bg)_98%)]" />
         <div className="flex justify-center">
           <div className={`relative ${CARD_WIDTH}`}>
             <button type="button" aria-label={t("readerCard.openCard")} onClick={() => setOpen(true)} className="relative block w-full">

@@ -11,9 +11,13 @@ import { CardShine } from "../murals/CardShine";
 import { PLATE_RATIO, ReaderCardImage } from "../murals/ReaderCardImage";
 import { readerCardXml } from "../murals/readerCardXml";
 import { ReaderCardViewer } from "../murals/ReaderCardViewer";
-import { backdropXml } from "./backdropXml";
+import { backdropXml, cardViewBox } from "./backdropXml";
 
-const BACKDROP_OPACITY = 1;
+const BACKDROP_GROW = 0.16;
+const BACKDROP_BLUR = 0.085;
+const OVERLAY_TINT = 0.08;
+const OVERLAY_FROM = 0.2;
+const OVERLAY_TO = 0.98;
 const CARD_WIDTH_SHARE = 0.55;
 const CARD_WIDTH_MAX = 220;
 
@@ -22,21 +26,36 @@ const heroCardWidth = (width: number) => Math.min(width * CARD_WIDTH_SHARE, CARD
 export function ProfileCardBackdrop({ input }: { input: ReaderCardBase }) {
   const { colors, mode } = useTheme();
   const fadeId = useId().replace(/\W/g, "");
-  const backdrop = useMemo(
-    () => backdropXml(readerCardXml(renderReaderCard({ ...input, print: resolvePrint(input.style.print, mode === "dark") }), { serif: cardFontFamily("playfairDisplay"), sans: cardFontFamily("sans"), mono: CARD_MONO_FAMILY, script: CARD_SCRIPT_FAMILY })),
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+  const card = useMemo(
+    () => readerCardXml(renderReaderCard({ ...input, print: resolvePrint(input.style.print, mode === "dark") }), { serif: cardFontFamily("playfairDisplay"), sans: cardFontFamily("sans"), mono: CARD_MONO_FAMILY, script: CARD_SCRIPT_FAMILY }),
     [input, mode],
   );
+  const backdrop = useMemo(() => {
+    if (!size) return null;
+    const grow = size.width * BACKDROP_GROW;
+    const [, , viewWidth, viewHeight] = cardViewBox(card);
+    const scale = Math.max((size.width + 2 * grow) / viewWidth, (size.height + 2 * grow) / viewHeight);
+    return backdropXml(card, +((size.width * BACKDROP_BLUR) / scale).toFixed(3));
+  }, [card, size]);
+  const grow = size ? -size.width * BACKDROP_GROW : 0;
   return (
-    <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={StyleSheet.absoluteFill}>
-      <SvgXml xml={backdrop} width="100%" height="100%" style={[StyleSheet.absoluteFill, styles.backdrop]} />
+    <View
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      onLayout={(event) => setSize(event.nativeEvent.layout)}
+      style={[StyleSheet.absoluteFill, styles.clip]}
+    >
+      {backdrop ? <SvgXml xml={backdrop} style={{ position: "absolute", top: grow, bottom: grow, left: grow, right: grow }} /> : null}
       <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" viewBox="0 0 1 1" preserveAspectRatio="none">
         <Defs>
           <LinearGradient id={fadeId} x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={colors.background} stopOpacity={0} />
-            <Stop offset="0.55" stopColor={colors.background} stopOpacity={0} />
-            <Stop offset="1" stopColor={colors.background} stopOpacity={1} />
+            <Stop offset={OVERLAY_FROM} stopColor={colors.background} stopOpacity={0} />
+            <Stop offset={OVERLAY_TO} stopColor={colors.background} stopOpacity={1} />
           </LinearGradient>
         </Defs>
+        <Rect width="1" height="1" fill="#000" fillOpacity={OVERLAY_TINT} />
         <Rect width="1" height="1" fill={`url(#${fadeId})`} />
       </Svg>
     </View>
@@ -96,7 +115,7 @@ const styles = StyleSheet.create({
   hero: { gap: spacing.md, overflow: "hidden", paddingTop: spacing.xl, paddingBottom: spacing.md },
   band: { alignItems: "center" },
   badge: { position: "absolute", right: -spacing.md, bottom: -spacing.md },
-  backdrop: { opacity: BACKDROP_OPACITY },
+  clip: { overflow: "hidden" },
   children: { paddingHorizontal: spacing.lg, gap: spacing.md, alignItems: "center" },
   identity: { alignItems: "center", gap: spacing.xs, maxWidth: "100%" },
   nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, maxWidth: "100%" },

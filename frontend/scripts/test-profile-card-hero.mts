@@ -27,7 +27,7 @@ const hero = (style: Partial<NonNullable<PublicReaderCard["style"]>> = {}) =>
 
 test("hero puts a blurred aria-hidden backdrop first and the card before its children", () => {
   const html = hero();
-  const backdrop = html.match(/<img(?=[^>]*aria-hidden="true")(?=[^>]*class="[^"]*\bblur-)[^>]*>/);
+  const backdrop = html.match(/<div aria-hidden="true"[^>]*><img(?=[^>]*class="[^"]*\bblur-)[^>]*>/);
   assert.ok(backdrop);
   assert.match(backdrop[0], /src="data:image\/svg\+xml;utf8,/);
   assert.ok(html.indexOf(backdrop[0]) < html.indexOf("<svg"));
