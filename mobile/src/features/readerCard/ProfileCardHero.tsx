@@ -1,15 +1,16 @@
-import { useId, useMemo, type ReactNode } from "react";
-import { StyleSheet, View } from "react-native";
+import { useId, useMemo, useState, type ReactNode } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop, SvgXml } from "react-native-svg";
-import { hasChosen, renderReaderCard, resolvePrint, type IdentityKey, type ReaderCardBase } from "@scripta/shared";
+import { cardRatio, readerCardShine, renderReaderCard, resolvePrint, type IdentityKey, type ReaderCardBase } from "@scripta/shared";
 import { cardFontFamily, dynamicType, Skeleton, spacing, typography, useTheme } from "../../ui";
 import { Text } from "../../ui/Text";
 import { useT } from "../../i18n";
 import { ReaderGlyph } from "../community/ReaderGlyph";
 import { CARD_MONO_FAMILY, CARD_SCRIPT_FAMILY } from "../../ui/fontAssets";
-import { PLATE_RATIO } from "../murals/ReaderCardImage";
+import { CardShine } from "../murals/CardShine";
+import { PLATE_RATIO, ReaderCardImage } from "../murals/ReaderCardImage";
 import { readerCardXml } from "../murals/readerCardXml";
-import { ReaderCardTurner } from "../murals/ReaderCardTurner";
+import { ReaderCardViewer } from "../murals/ReaderCardViewer";
 import { backdropXml } from "./backdropXml";
 
 const BACKDROP_OPACITY = 1;
@@ -42,14 +43,26 @@ export function ProfileCardBackdrop({ input }: { input: ReaderCardBase }) {
   );
 }
 
-export function ProfileCardHero({ input, width, withBackdrop = true, children }: { input: ReaderCardBase; width: number; withBackdrop?: boolean; children?: ReactNode }) {
+export function ProfileCardHero({ input, width, withBackdrop = true, badge, onEdit, children }: { input: ReaderCardBase; width: number; withBackdrop?: boolean; badge?: ReactNode; onEdit?: () => void; children?: ReactNode }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const cardWidth = heroCardWidth(width);
+  const cardHeight = cardWidth * cardRatio(input.crop);
+  const shine = readerCardShine(input.style.finish);
   return (
     <View style={[styles.hero, { width }]}>
       {withBackdrop ? <ProfileCardBackdrop input={input} /> : null}
       <View style={styles.band}>
-        <ReaderCardTurner key={`${input.view}-${input.style.layout}-${hasChosen(input.card.chosen)}`} input={input} width={heroCardWidth(width)} dots={false} />
+        <View style={{ width: cardWidth, height: cardHeight }}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t("shell.youReaderCard")} onPress={() => setOpen(true)}>
+            <ReaderCardImage input={input} width={cardWidth} />
+            {shine ? <CardShine kind={shine} width={cardWidth} height={cardHeight} live={false} /> : null}
+          </Pressable>
+          {badge ? <View style={styles.badge}>{badge}</View> : null}
+        </View>
       </View>
       {children ? <View style={styles.children}>{children}</View> : null}
+      {open ? <ReaderCardViewer input={input} onClose={() => setOpen(false)} onEdit={onEdit ? () => { setOpen(false); onEdit(); } : undefined} /> : null}
     </View>
   );
 }
@@ -82,6 +95,7 @@ export function ProfileCardSkeleton({ width }: { width: number }) {
 const styles = StyleSheet.create({
   hero: { gap: spacing.md, overflow: "hidden", paddingTop: spacing.xl, paddingBottom: spacing.md },
   band: { alignItems: "center" },
+  badge: { position: "absolute", right: -spacing.md, bottom: -spacing.md },
   backdrop: { opacity: BACKDROP_OPACITY },
   children: { paddingHorizontal: spacing.lg, gap: spacing.md, alignItems: "center" },
   identity: { alignItems: "center", gap: spacing.xs, maxWidth: "100%" },

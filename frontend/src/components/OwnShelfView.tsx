@@ -19,6 +19,7 @@ import { ShareModal } from "./ShareModal";
 import { Sheet } from "./Sheet";
 import { SkeletonCardGrid } from "./Skeleton";
 import { SwipeTabs } from "./SwipeTabs";
+import { ShareIcon } from "./Toolbar";
 import { useCommunityActivity } from "../hooks/useCommunity";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
@@ -43,6 +44,7 @@ const OWN_SHELF_TABS = [
 type OwnShelfTab = (typeof OWN_SHELF_TABS)[number]["value"];
 
 const CARD_SHARE_KEY = ["community", "card-share"] as const;
+const SHARE_BADGE = "flex h-11 w-11 items-center justify-center rounded-full bg-(--color-accent) text-(--color-on-accent) hover:opacity-90 disabled:opacity-50";
 
 export function OwnShelfView({ username }: { username: string }) {
   const locale = useLocale();
@@ -215,9 +217,6 @@ export function OwnShelfView({ username }: { username: string }) {
       </div>
       {libraryQuery.isSuccess && progress ? <p className="mt-3 text-sm text-(--color-text-dim)">{progress}</p> : null}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button onClick={() => setSharingCard(true)} disabled={!cardShare.data} className={BUTTON_SECONDARY}>
-          {t("readerCard.shareCard")}
-        </button>
         <Link to="/dashboard/reader-card" className={BUTTON_SECONDARY}>
           {t("readerCard.editCard")}
         </Link>
@@ -229,7 +228,17 @@ export function OwnShelfView({ username }: { username: string }) {
   return (
     <Page title={null} back={backTo("profile")}>
       {libraryQuery.isSuccess && styleQuery.isSuccess ? (
-        <ProfileCardHero input={cardInput}>{shelfHeader}</ProfileCardHero>
+        <ProfileCardHero
+          input={cardInput}
+          badge={
+            <button type="button" aria-label={t("readerCard.shareCard")} onClick={() => setSharingCard(true)} disabled={!cardShare.data} className={SHARE_BADGE}>
+              <ShareIcon />
+            </button>
+          }
+          onEdit={() => navigate("/dashboard/reader-card")}
+        >
+          {shelfHeader}
+        </ProfileCardHero>
       ) : (
         <>
           {libraryQuery.isSuccess && styleQuery.isError ? (

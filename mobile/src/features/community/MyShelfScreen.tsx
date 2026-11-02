@@ -241,14 +241,21 @@ export function MyShelfScreen() {
   const cardActions = card ? (
     <>
       <ProfileHeroIdentity username={username} glyph={glyph} finished={card.input.card.facts?.finished} />
-      <IconButton framed name="share" tone="accent" label={t("readerCard.shareCard")} accessibilityLabel={t("readerCard.shareCard")} disabled={!cardShare.data} onPress={() => setSharingCard(true)} />
       {card.progress ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{card.progress}</Text> : null}
       {cardShare.isError ? <Text accessibilityRole="alert" {...dynamicType} style={[typography.caption, { color: colors.danger }]}>{t("community.somethingWentWrongRetry")}</Text> : null}
     </>
   ) : null;
 
   const hero = card && styleQuery.isSuccess ? (
-    <ProfileCardHero input={card.input} width={width} withBackdrop={false}>{cardActions}</ProfileCardHero>
+    <ProfileCardHero
+      input={card.input}
+      width={width}
+      withBackdrop={false}
+      badge={<IconButton name="share" tone="accent" accessibilityLabel={t("readerCard.shareCard")} disabled={!cardShare.data} onPress={() => setSharingCard(true)} />}
+      onEdit={() => router.push("/reader-card" as never)}
+    >
+      {cardActions}
+    </ProfileCardHero>
   ) : card && styleQuery.isError ? (
     <View style={styles.cardError}>
       <Text accessibilityRole="alert" {...dynamicType} style={[typography.caption, { color: colors.danger }]}>{t("community.somethingWentWrongRetry")}</Text>
