@@ -389,7 +389,6 @@
     - the backdrop is an `aria-hidden` `<img>` of `readerCardDataUri({ ...input, print: resolvePrint(input.style.print, dark) })`, scaled up with Tailwind `blur-3xl`, under a fade to the page background;
     - the card is `ReaderCardTurner`;
     - `children` sit below.
-  - `frontend/package.json`'s `test` glob already picks up the new script. Its `typecheck` gains `&& tsc -p functions --noEmit` in Task 9, not here.
 
 - [ ] **Step 1: Write the failing shared test.** In `dataUri.test.ts`, test `readerCardDataUri round-trips the rendered svg`: decoding the part after the prefix equals `renderReaderCard(input, "front")`.
 - [ ] **Step 2: Implement it and run the shared tests.** Run `npm test --workspace @scripta/shared`. Expected: PASS.
