@@ -1,4 +1,4 @@
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 import type { DailyChapterDay } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { dynamicType, radii, spacing, typography, useTheme } from "../../ui";
@@ -10,7 +10,7 @@ export const scoreTint = (score: number) => 0.25 + 0.15 * score;
 
 export const POSTER_COLORS = { top: "#3b2414", bottom: "#7a3f0c", text: "#fbefe0", outline: "rgba(251,239,224,0.3)", scores: ["rgba(255,255,255,0.12)", "#f0c99e", "#f0c99e", "#e7a868", "#d98535", "#fff3e2"] } as const;
 
-export function DailyChapterCalendar({ days, onDayPress, tone = "screen", numbers = true }: { days: DailyChapterDay[]; onDayPress?: (date: string) => void; tone?: "screen" | "poster"; numbers?: boolean }) {
+export function DailyChapterCalendar({ days, tone = "screen", numbers = true }: { days: DailyChapterDay[]; tone?: "screen" | "poster"; numbers?: boolean }) {
   const t = useT();
   const { colors } = useTheme();
   const poster = tone === "poster";
@@ -27,9 +27,7 @@ export function DailyChapterCalendar({ days, onDayPress, tone = "screen", number
           {played ? <View style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: poster ? POSTER_COLORS.scores[day.score!] : colors.accent, opacity: poster ? 1 : scoreTint(day.score!) }} /> : null}
           <Text {...dynamicType} style={[typography.caption, { color: poster ? POSTER_COLORS.top : played && day.score! >= 3 ? colors.onAccent : day.published ? colors.text : colors.textDim }]}>{label}</Text>
         </View>;
-        return played && onDayPress
-          ? <Pressable key={day.date} accessibilityRole="button" accessibilityLabel={t("quizzes.outOfFive", { label: day.date, score: day.score! })} onPress={() => onDayPress(day.date)} style={{ width: `${100 / 7}%`, aspectRatio: 1 }}>{cell}</Pressable>
-          : <View key={day.date} accessibilityLabel={played ? t("quizzes.outOfFive", { label: day.date, score: day.score! }) : undefined} style={{ width: `${100 / 7}%`, aspectRatio: 1 }}>{cell}</View>;
+        return <View key={day.date} accessibilityLabel={played ? t("quizzes.outOfFive", { label: day.date, score: day.score! }) : undefined} style={{ width: `${100 / 7}%`, aspectRatio: 1 }}>{cell}</View>;
       })}
     </View>
   </View>;

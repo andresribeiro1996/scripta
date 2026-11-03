@@ -62,7 +62,7 @@ export function YourChaptersScreen() {
   const data = history.data;
   const retry = () => { void identity.refetch(); void history.refetch(); };
   let body;
-  if (identity.isError || history.isError) body = <ScrollView contentContainerStyle={{ padding: spacing.lg }}><ErrorState body={t("quizzes.loadChaptersFailed")} actionLabel={t("shell.retry")} onAction={retry} /></ScrollView>;
+  if (identity.isError || history.isLoadingError) body = <ScrollView contentContainerStyle={{ padding: spacing.lg }}><ErrorState body={t("quizzes.loadChaptersFailed")} actionLabel={t("shell.retry")} onAction={retry} /></ScrollView>;
   else if (!data) body = <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}><Skeleton height={72} /><Skeleton height={120} /><Skeleton height={200} /></ScrollView>;
   else body = <YourChaptersBody data={data} />;
   return <Screen top={false} bottom><Stack.Screen options={{ title: t("quizzes.yourChapters"), headerShown: true }} />{body}</Screen>;

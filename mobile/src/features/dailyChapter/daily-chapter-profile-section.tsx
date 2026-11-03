@@ -34,7 +34,7 @@ function OwnDailyChapterSection() {
   const t = useT();
   const identity = useDeviceIdentity();
   const history = useDailyHistory();
-  if (identity.isError || history.isError) return <ScrollView contentContainerStyle={{ padding: spacing.lg }}><ErrorState body={t("quizzes.loadChaptersFailed")} actionLabel={t("shell.retry")} onAction={() => { void identity.refetch(); void history.refetch(); }} /></ScrollView>;
+  if (identity.isError || history.isLoadingError) return <ScrollView contentContainerStyle={{ padding: spacing.lg }}><ErrorState body={t("quizzes.loadChaptersFailed")} actionLabel={t("shell.retry")} onAction={() => { void identity.refetch(); void history.refetch(); }} /></ScrollView>;
   if (!history.data) return <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}><Skeleton height={72} /><Skeleton height={120} /><Skeleton height={200} /></ScrollView>;
   return <OwnDailyChapterBody history={history.data} />;
 }
