@@ -1,4 +1,5 @@
 export function pinnedOffset(scrollY: number, heroHeight: number): number | null {
+  "worklet";
   return scrollY > heroHeight ? heroHeight : null;
 }
 

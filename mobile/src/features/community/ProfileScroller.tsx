@@ -159,14 +159,14 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
           drag.set(withSpring(0, SPRING_BACK));
           return;
         }
-        if (reducedMotion) {
-          scheduleOnRN(choose, target);
-          return;
+        const pinned = pinnedOffset(scrollY.get(), heroTop.get()) !== null;
+        if (!reducedMotion) {
+          const out = (tabOrder.indexOf(target) > tabOrder.indexOf(current) ? -1 : 1) * width * OUT_DISTANCE;
+          drag.set(withTiming(out, { duration: OUT_DURATION }, (finished) => {
+            if (finished && pinned) scheduleOnRN(choose, target);
+          }));
         }
-        const out = (tabOrder.indexOf(target) > tabOrder.indexOf(current) ? -1 : 1) * width * OUT_DISTANCE;
-        drag.set(withTiming(out, { duration: OUT_DURATION }, (finished) => {
-          if (finished) scheduleOnRN(choose, target);
-        }));
+        if (reducedMotion || !pinned) scheduleOnRN(choose, target);
       });
   }, [scrollY, heroTop, drag, dragTab, downX, tabState, reducedMotion, width]);
 
