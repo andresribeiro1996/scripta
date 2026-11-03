@@ -835,13 +835,16 @@ Accepted, by the user after the spike or as Claude's call:
 - Modify: `mobile/src/features/community/pinnedOffset.ts`
 - Modify: `mobile/src/features/community/MyShelfScreen.tsx`
 - Modify: `mobile/src/features/community/ProfileScreen.tsx`
+- Modify: `mobile/src/features/community/ActivityList.tsx`
+- Modify: `mobile/src/features/readerCard/ProfileCardHero.tsx`
+- Modify: `frontend/src/components/OwnShelfView.tsx`
 - Test: `mobile/src/features/community/profileScroller.test.ts`
 
 **Interfaces:**
 - **Props:** `ProfileScroller<T>({ hero, backdrop, notice, tabs, value, onChange, sectionFor, accessibilityLabel })`.
   - `sectionFor: (tab: T) => ProfileSection` replaces `section`. Both screens already have `sectionFor`.
   - `ProfileSection`, `elementSection`, `transparentHeader` and `usePlainHeader` keep their names and shapes.
-  - The tab count is fixed per screen. Create `tabs.map(() => useAnimatedRef<FlatList<unknown>>())`, `tabs.map(() => useSharedValue(0))` (each page's `scrollY`) and `tabs.map(() => useSharedValue(0))` (each page's content height, from `onContentSizeChange`) once in `ProfileScroller`, held in a ref.
+  - The tab count is fixed per screen. Create `tabs.map(() => useAnimatedRef<FlatList<unknown>>())`, `tabs.map(() => useSharedValue(0))` (each page's `scrollY`) and `tabs.map(() => useSharedValue(0))` (each page's content height, from `onContentSizeChange`) in `ProfileScroller` on every render, in the same order.
 - **Tree:** the outer View holds, in this order:
   1. the root View, with default `pointerEvents` (never `box-none`) and `collapsable={false}`, inside the `GestureDetector`;
   2. `notice`, placed as today: last, `pointerEvents="box-none"`, at `top: headerHeight`, outside the root.
@@ -858,13 +861,13 @@ Accepted, by the user after the spike or as Claude's call:
   - `contentContainerStyle` has `minHeight: heroHeight + viewport` and `paddingBottom: spacing.huge`.
   - It takes the section's `onEndReached` (threshold 0.4), `ListEmptyComponent` and `ListFooterComponent`.
   - `scrollY` comes from its `useAnimatedScrollHandler`, whose `onBeginDrag` cancels `fling`.
-  - **Android:** keep a RefreshControl mounted with `enabled={Boolean(section.onRefresh)}`, as Task 16 does, and add `progressViewOffset={heroHeight + tabBarHeight}`. **iOS:** render it only when `onRefresh` is set.
+  - **Android:** keep a RefreshControl mounted with `enabled={Boolean(section.onRefresh)}`, as Task 16 does, and add `progressViewOffset={heroHeight + tabBarHeight}`. **iOS:** render it only when `onRefresh` is set, with no offset, because iOS honours the prop and the spinner would sit behind the header.
 - **Header:** absolute at `top: 0`, full width. It is not translated itself.
   - `collapse = min(activeY, heroHeight)`, where `activeY` is the active page's `scrollY`, read on the UI thread.
   - On Android, clamp `activeY` at 0 first. On iOS, don't clamp, so the header follows the overscroll and the refresh spinner shows above the rows.
   - Inside the header:
     - the backdrop, `pointerEvents="none"`, absolute at `top: 0`, height `headerHeight + heroHeight`, with `translateY: -collapse`;
-    - a clip View, `pointerEvents="box-none"`, `overflow: "hidden"`, absolute at `top: headerHeight`, height `heroHeight + tabBarHeight`, which never moves;
+    - a clip View, `pointerEvents="box-none"`, `overflow: "hidden"`, absolute at `top: headerHeight`, `bottom: 0`, which never moves;
     - inside the clip, one `pointerEvents="box-none"` View with the hero and the tab bar, with `translateY: -collapse`.
   - Because the clip stays put, the hero is cut off at the nav bar once it is pinned. Where the content has moved up, the clip is empty and passes touches through to the pages.
   - Measure `heroHeight` and `tabBarHeight` with `onLayout`, into both state and shared values.
@@ -893,10 +896,10 @@ Accepted, by the user after the spike or as Claude's call:
   1. cancel `fling` and `x`;
   2. run the same sync;
   3. set `activeIndex`;
-  4. animate `x` to the tab with `withTiming(…, { duration: 220 })`, or jump under reduced motion.
+  4. animate `x` to the tab with `settle(target, 0)`, which runs for 300 ms, or jump under reduced motion.
 
   Then call `onChange`.
-- **`value` changing from outside:** a `useEffect` on `value` acts only when `order.indexOf(value)` differs from `activeIndex` on the UI thread, and then does the same as a tab tap without calling `onChange`. Tap and swipe set `activeIndex` themselves, so their `onChange` echo is a no-op and never replaces the spring.
+- **`value` changing from outside:** a `useEffect` on `value` acts only when `order.indexOf(value)` differs from `activeIndex` on the UI thread, and then does the same as a tab tap without calling `onChange`. Tap and swipe set `activeIndex` themselves and record the value in a `sent` queue, so their `onChange` echo is dropped and never replaces the settle.
 - **Rows under a swipe:** the pan's activation cancels the JS press in progress (RNGH `cancelsJSResponder`, true by default), so a horizontal or diagonal swipe never opens a row. Don't set `cancelsJSResponder(false)`. If a row still opens, the swipe didn't activate; report it rather than adding a workaround.
 - **Pure helpers in `pinnedOffset.ts`, both `"worklet"`:**
   - `syncedOffset(activeY: number, ownY: number, heroHeight: number): number` is `activeY < heroHeight ? activeY : max(ownY, heroHeight)`. It is the offset another page takes so the header doesn't jump when that page comes in.
@@ -912,6 +915,12 @@ Accepted, by the user after the spike or as Claude's call:
 - [ ] **Step 2: Implement** the Interfaces above.
 - [ ] **Step 3: Run the checks and confirm they pass.** Run `node scripts/gate.mjs`. Expected: PASS.
 - [ ] **Step 4: Commit and push.** Run `git commit -m "Make the profile tabs a pager driven by one gesture"`, then push.
+- [ ] **Step 4b: Fix what the device pass and branch reviews found.**
+  - **Profile page height:** `ProfileScreen` drops `bottom` from its main `Screen`. The route sits above the tab bar, so the inset left a dead band where swipes did nothing and rows were cut off.
+  - **Swipe during list momentum:** the horizontal pan's `onEnd` runs `syncOthers()` again before `settle` when it changes tab, so the incoming page matches where the outgoing list has coasted to and the header doesn't step.
+  - **Activity refresh failure:** with rows on screen, `useActivitySection` shows `community.refreshActivityFailed` as a root toast when a refetch fails, as `ActivityScreen` does. Main's list replaced the rows with an error; the shared list keeps them.
+  - **Card share status failure:** a Retry button beside the error text, on `MyShelfScreen` and `OwnShelfView`. The badge stays disabled until the status loads.
+  - **Card tap guard:** `ProfileCardHero` measures both axes, so a fast vertical fling that the pan didn't activate on doesn't open the viewer.
 - [ ] **Step 5: Device pass (`device-checker`).** Use own shelf (tabs Shelf, Activity, Daily) and fixture_alice (tabs Mural, Activity, Library, Daily), each at the top and pinned. Use these swipe shapes:
   - slow: 90 px over about 450 ms;
   - medium: 220 px over about 300 ms;
