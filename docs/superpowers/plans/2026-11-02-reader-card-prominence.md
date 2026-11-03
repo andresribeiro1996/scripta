@@ -786,6 +786,9 @@ Asked by the user on 2026-11-03: "go with 1 first", that is, follow the finger. 
 **Files:**
 - Modify: `mobile/src/features/community/ProfileScroller.tsx`
 - Modify: `mobile/src/features/community/pinnedOffset.ts`
+- Modify: `mobile/src/features/community/MyShelfScreen.tsx`
+- Modify: `mobile/src/features/community/ProfileScreen.tsx`
+- Modify: `mobile/src/features/murals/MuralCanvas.tsx`
 - Test: `mobile/src/features/community/profileScroller.test.ts`
 
 **Interfaces:**

@@ -47,6 +47,20 @@ export function ProfileScreen({ username }: { username: string }) {
   const books = useMemo(() => (muralData ? reconstructBooks(muralData.library.books, muralData.library.currentlyReading, muralData.library.highlights) : []), [muralData]);
   const images = useMemo<GalleryImage[]>(() => (muralData ? Object.entries(muralData.imageUrls).filter((entry): entry is [string, string] => entry[1] !== null).map(([id, url]) => ({ id, url, filename: "", mimeType: "", width: 0, height: 0, byteSize: 0, createdAt: "" })) : []), [muralData]);
   const tierlists = useMemo(() => reconstructTierlists(muralData?.tierlists ?? {}), [muralData]);
+  const mural = useMemo<Mural | null>(() => (muralData
+    ? {
+        id: muralData.mural.id,
+        name: muralData.mural.name,
+        theme: muralData.mural.theme,
+        blocks: ensureBookBlockHeights(muralData.mural.blocks),
+        createdAt: "",
+        updatedAt: "",
+        coverImageUrl: muralData.mural.coverImageUrl ?? undefined,
+        shareToken: null,
+        shareUrl: null,
+        folderId: null,
+      }
+    : null), [muralData]);
   const cardInput = useMemo(() => (view && !view.private && view.readerCard ? readerCardInputOf([], [], view.profile.user.username, locale, view.readerCard) : null), [view, locale]);
   const library = useQuery({
     queryKey: ["community", "profile-library", username],
@@ -108,21 +122,6 @@ export function ProfileScreen({ username }: { username: string }) {
       </Centered>
     );
   }
-
-  const mural: Mural | null = muralData
-    ? {
-        id: muralData.mural.id,
-        name: muralData.mural.name,
-        theme: muralData.mural.theme,
-        blocks: ensureBookBlockHeights(muralData.mural.blocks),
-        createdAt: "",
-        updatedAt: "",
-        coverImageUrl: muralData.mural.coverImageUrl ?? undefined,
-        shareToken: null,
-        shareUrl: null,
-        folderId: null,
-      }
-    : null;
 
   const profileUser = view!.profile.user;
   const following = view!.profile.viewerFollows === true;

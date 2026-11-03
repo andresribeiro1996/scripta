@@ -263,8 +263,8 @@ const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, se
   floatScheme?: ThemeScheme;
   shelfThemeOverride?: ShelfTheme;
   statsOverride?: Record<string, number>;
-  onSelect: () => void;
-  onMove: (dx: number, dy: number) => void;
+  onSelect: (id: string) => void;
+  onMove: (id: string, dx: number, dy: number) => void;
   onAssetReady?: (key: string) => void;
   drag: SharedValue<DragState | null>;
   preview: SharedValue<Record<string, BlockLayout>>;
@@ -279,8 +279,8 @@ const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, se
   const reducedMotion = useReducedMotion();
   const callbacks = useRef({ onSelect, onMove });
   useLayoutEffect(() => { callbacks.current = { onSelect, onMove }; }, [onSelect, onMove]);
-  const select = useCallback(() => callbacks.current.onSelect(), []);
-  const move = useCallback((dx: number, dy: number) => callbacks.current.onMove(dx, dy), []);
+  const select = useCallback(() => callbacks.current.onSelect(block.id), [block.id]);
+  const move = useCallback((dx: number, dy: number) => callbacks.current.onMove(block.id, dx, dy), [block.id]);
   const x = useSharedValue(block.layout.x * columnWidth);
   const y = useSharedValue(block.layout.y * ROW_HEIGHT);
   const scrollOffset = scroll?.offset;
@@ -350,7 +350,7 @@ const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, se
         animated,
       ]}>
         <FinishOverlay id={block.id} style={style} colors={colors} />
-        {editable ? <Pressable accessibilityRole="button" accessibilityLabel={t("murals.blockDragLabel", { block: blockLabel(block.type, locale) })} accessibilityActions={MOVE_ACTIONS.map(({ name, labelKey }) => ({ name, label: t(labelKey) }))} onAccessibilityAction={(event) => { const move = MOVES[event.nativeEvent.actionName]; if (move) onMove(move[0], move[1]); }} onPress={onSelect} style={[styles.blockPress, blockPadding(style)]}>{body}</Pressable> : <View style={[styles.blockPress, blockPadding(style)]}>{body}</View>}
+        {editable ? <Pressable accessibilityRole="button" accessibilityLabel={t("murals.blockDragLabel", { block: blockLabel(block.type, locale) })} accessibilityActions={MOVE_ACTIONS.map(({ name, labelKey }) => ({ name, label: t(labelKey) }))} onAccessibilityAction={(event) => { const step = MOVES[event.nativeEvent.actionName]; if (step) move(step[0], step[1]); }} onPress={select} style={[styles.blockPress, blockPadding(style)]}>{body}</Pressable> : <View style={[styles.blockPress, blockPadding(style)]}>{body}</View>}
         <FadeOverlay style={style} colors={colors} />
         {selected ? <View pointerEvents="none" style={{ position: "absolute", inset: 0, borderWidth: 2, borderRadius: style.cardRadius, borderColor: selectionBorderColor(style, colors) }} /> : null}
       </Animated.View>;
@@ -478,6 +478,11 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, profileI
   }, editable);
   const [day] = useState(localDay);
   const [readyAssets, setReadyAssets] = useState<Set<string>>(() => new Set());
+  const selectBlock = useCallback((id: string) => onSelectBlock?.(id), [onSelectBlock]);
+  const moveBlock = useCallback((id: string, dx: number, dy: number) => {
+    const original = mural.blocks.find((item) => item.id === id)!;
+    onLayoutChange?.(id, { ...original.layout, x: original.layout.x + dx, y: original.layout.y + dy });
+  }, [mural.blocks, onLayoutChange]);
   const onAssetReady = useCallback((key: string) => setReadyAssets((current) => current.has(key) ? current : new Set(current).add(key)), []);
   const resolvedBlocks = useMemo(() => mural.blocks.map((block) => resolveHomeBlock(block, books, groups, day, locale)), [mural.blocks, books, groups, day, locale]);
   const assetKeys = resolvedBlocks.flatMap((block) => {
@@ -511,11 +516,8 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, profileI
         floatScheme={profileInHero ? mode : undefined}
         shelfThemeOverride={shelfThemeOverride}
         statsOverride={statsOverride}
-        onSelect={() => onSelectBlock?.(block.id)}
-        onMove={(dx, dy) => {
-          const original = mural.blocks.find((item) => item.id === block.id)!;
-          onLayoutChange?.(block.id, { ...original.layout, x: original.layout.x + dx, y: original.layout.y + dy });
-        }}
+        onSelect={selectBlock}
+        onMove={moveBlock}
         onAssetReady={onImageReadyChange ? onAssetReady : undefined}
         drag={drag}
         preview={preview}

@@ -7,7 +7,7 @@ import { buildMuralPreset, ensureBookBlockHeights, orderLibraryBooks, ownProfile
 import { useAuth } from "../../core/auth";
 import { API_URL } from "../../core/config";
 import { ActionSheet, Button, Dialog, dynamicType, EmptyState, ErrorState, HeaderActions, IconButton, Screen, Skeleton, spacing, Toast, typography, useTheme, type ActionItem } from "../../ui";
-import { fetchGalleryImages } from "../gallery/api";
+import { fetchGalleryImages, type GalleryImage } from "../gallery/api";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { MuralCanvas } from "../murals";
 import { NO_GROUPS } from "../murals/MuralCanvas";
@@ -17,7 +17,7 @@ import { useMurals } from "../murals/useMurals";
 import { ProfileCardBackdrop, ProfileCardHero, ProfileCardSkeleton, ProfileHeroIdentity } from "../readerCard/ProfileCardHero";
 import { useOwnCardStyle, useReaderCardStyle } from "../readerCard/useReaderCardStyle";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
-import { fetchTierlists } from "../tierlists/api";
+import { fetchTierlists, type Tierlist } from "../tierlists/api";
 import { DailyChapterProfileSection } from "../dailyChapter/daily-chapter-profile-section";
 import { useActivitySection } from "./ActivityList";
 import { FeedSettingsDialog } from "./FeedSettingsDialog";
@@ -39,6 +39,8 @@ let lastTab: MyShelfTab = "shelf";
 
 const CARD_SHARE_KEY = ["community", "card-share"] as const;
 const NO_BOOKS: Array<Record<string, unknown>> = [];
+const NO_IMAGES: GalleryImage[] = [];
+const NO_TIERLISTS: Tierlist[] = [];
 const SHARE_CARD_WIDTH = 300;
 const SHARE_SHEET_CHROME_HEIGHT = 400;
 const SHARE_SHEET_CHROME_WIDTH = 72;
@@ -81,16 +83,16 @@ export function MyShelfScreen() {
 
   const books = library?.data.books ?? NO_BOOKS;
   const groups = library?.data.groups ?? NO_GROUPS;
-  const images = gallery.data ?? [];
-  const tierlists = tierlistsQuery.data ?? [];
-  const profile = user?.username
-    ? { username: user.username, avatarUrl: user.avatarId ? `${API_URL}/auth/avatar/${user.avatarId}/file` : null }
-    : undefined;
+  const images = gallery.data ?? NO_IMAGES;
+  const tierlists = tierlistsQuery.data ?? NO_TIERLISTS;
+  const avatarId = user?.avatarId;
+  const profile = useMemo(() => (username ? { username, avatarUrl: avatarId ? `${API_URL}/auth/avatar/${avatarId}/file` : null } : undefined), [username, avatarId]);
 
   const card = useMemo(() => (libraryQuery.isSuccess ? ownProfileCard(readerCardInputOf(books, groups, username, locale, undefined, ownStyle)) : null), [libraryQuery.isSuccess, books, groups, username, locale, ownStyle]);
   const ordered = useMemo(() => orderLibraryBooks(books, groups), [books, groups]);
   const preview = useMemo(() => buildMuralPreset("shelf", ordered, locale, groups), [ordered, locale, groups]);
-  const previewMural: Mural = { id: "shelf-preview", name: preview.name, theme, blocks: preview.blocks, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
+  const previewMural = useMemo<Mural>(() => ({ id: "shelf-preview", name: preview.name, theme, blocks: preview.blocks, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null }), [preview, theme]);
+  const shelfMural = useMemo(() => (mural.data ? { ...mural.data, blocks: ensureBookBlockHeights(mural.data.blocks) } : null), [mural.data]);
   const pendingShelf = useRef<string | null>(null);
   const working = useRef(false);
 
@@ -209,7 +211,7 @@ export function MyShelfScreen() {
       return (
         <View style={styles.canvasScroll}>
           <MuralCanvas
-            mural={{ ...mural.data!, blocks: ensureBookBlockHeights(mural.data!.blocks) }}
+            mural={shelfMural!}
             books={books}
             groups={groups}
             images={images}
