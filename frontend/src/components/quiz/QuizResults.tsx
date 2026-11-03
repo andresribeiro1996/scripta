@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { answerExpands, leaderboardPosition, missesFirst, playDurationLabel, playerLabel, resultCovers, scoreRows, type PlayResponse, type PublicQuizQuestion, type ScoreRow } from "@scripta/shared";
+import { answerExpands, isLoneViewer, leaderboardPosition, missesFirst, playDurationLabel, playerLabel, resultCovers, scoreRowPrompt, scoreRows, type PlayResponse, type PublicQuizQuestion, type ScoreRow } from "@scripta/shared";
 import { fetchPublicResultsApi } from "../../api/quizzes";
 import { CoverImage } from "../BookCard";
 import { AuthorAvatar } from "../CommunityAuthorAvatar";
@@ -28,17 +28,12 @@ function AnswerValue({ value, picked = false }: { value: NonNullable<ScoreRow["a
   );
 }
 
-function quotedPrompt(row: ScoreRow, question: PublicQuizQuestion) {
-  if (!row.prompt) return null;
-  return question.type === "quote_title" || question.type === "blurb_title" ? `“${row.prompt}”` : row.prompt;
-}
-
 function QuizAnswer({ row, question, expanded, onToggle }: { row: ScoreRow; question: PublicQuizQuestion; expanded: boolean; onToggle: () => void }) {
   const t = useT();
   const title = row.answer?.title ?? (row.answer?.kind === "text" ? row.answer.value : t("quizzes.questionNumber", { number: row.number }));
   const cover = row.answer?.kind === "cover" ? row.answer.value : question.type === "cover_title" ? question.prompt : null;
   const expands = answerExpands(row);
-  const prompt = quotedPrompt(row, question);
+  const prompt = scoreRowPrompt(row, question.type);
   const verdict = row.correct ? t("quizzes.correct") : row.pick?.kind === "text" ? t("quizzes.youPicked", { value: row.pick.value }) : t("quizzes.incorrect");
   const summary = (
     <>
@@ -67,9 +62,9 @@ function QuizAnswer({ row, question, expanded, onToggle }: { row: ScoreRow; ques
       <div id={`quiz-answer-${row.id}`} className={`min-w-0 flex-1 pb-4 lg:block lg:pb-0 ${expanded ? "" : "hidden"}`}>
         {prompt && <p className="mb-3 hidden text-sm break-words text-(--color-text-dim) lg:block">{prompt}</p>}
         <p className={`mb-3 hidden items-center gap-1.5 text-xs font-semibold lg:flex ${row.correct ? "text-(--color-success)" : "text-(--color-danger)"}`}>
-          <span aria-hidden="true">{row.correct ? "✓" : "✗"}</span>{verdict}
+          <span aria-hidden="true">{row.correct ? "✓" : "✗"}</span>{row.correct ? t("quizzes.correct") : t("quizzes.incorrect")}
         </p>
-        <div className={row.pick ? `grid-cols-2 gap-3 lg:gap-4 ${row.pick.kind === "cover" ? "grid" : "hidden lg:grid"}` : ""}>
+        <div className={!row.answer ? "" : `${row.pick ? "grid-cols-2 gap-3 lg:gap-4" : ""} ${row.pick?.kind === "cover" ? "grid" : "hidden lg:grid"}`}>
           {row.answer && <AnswerValue value={row.answer} />}
           {row.pick && <div className="border-l border-(--color-border) pl-3 lg:pl-4"><AnswerValue value={row.pick} picked /></div>}
           {!row.answer && <p className="text-sm text-(--color-text-dim)">{t("quizzes.answerUnavailable")}</p>}
@@ -226,7 +221,7 @@ export function QuizLeaderboard({ code, playId }: { code: string; playId: string
           })}
         </ol>
       )}
-      {leaderboard.data.plays.length === 1 && leaderboard.data.plays[0]!.isYou && <p className="mt-3 text-sm text-(--color-text-dim)">{t("quizzes.justYou")}</p>}
+      {isLoneViewer(leaderboard.data.plays) && <p className="mt-3 text-sm text-(--color-text-dim)">{t("quizzes.justYou")}</p>}
     </section>
   );
 }

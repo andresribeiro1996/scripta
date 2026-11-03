@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { answerExpands, leaderboardPosition, missesFirst, playDurationLabel, playerLabel, quizClueHeading, quizOptionLabel, quizQuestionLabel, resultCovers, scoreRows } from "./labels.js";
+import { answerExpands, isLoneViewer, leaderboardPosition, missesFirst, playDurationLabel, playerLabel, quizClueHeading, quizOptionLabel, quizQuestionLabel, resultCovers, scoreRowPrompt, scoreRows } from "./labels.js";
 import type { PublicQuizQuestion, QuizBook, QuizQuestion } from "./types.js";
 
 const books: QuizBook[] = [{ workId: "w1", title: "Dune", author: "Frank Herbert", coverUrl: "/c/dune.jpg", quote: null, blurb: null }];
@@ -112,4 +112,19 @@ test("durations keep the decimal under a minute and read as a clock from there",
   assert.equal(playDurationLabel(59_960, "en"), "1:00");
   assert.equal(playDurationLabel(143_200, "en"), "2:23");
   assert.equal(playDurationLabel(119_600, "en"), "2:00");
+});
+
+test("a prompt is curly-quoted for quotes and blurbs only", () => {
+  const row = { id: "a", number: 1, correct: true, prompt: "A line" };
+  assert.equal(scoreRowPrompt(row, "quote_title"), "“A line”");
+  assert.equal(scoreRowPrompt(row, "blurb_title"), "“A line”");
+  assert.equal(scoreRowPrompt(row, "characters_title"), "A line");
+  assert.equal(scoreRowPrompt({ id: "b", number: 2, correct: true }, "quote_title"), null);
+});
+
+test("a lone viewer is exactly one play, and it is theirs", () => {
+  assert.equal(isLoneViewer([{ isYou: true }]), true);
+  assert.equal(isLoneViewer([{ isYou: false }]), false);
+  assert.equal(isLoneViewer([{ isYou: true }, { isYou: false }]), false);
+  assert.equal(isLoneViewer([]), false);
 });

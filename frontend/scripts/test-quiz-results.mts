@@ -85,6 +85,20 @@ test("legacy results keep every verdict without inventing answers or picks", () 
   assert.doesNotMatch(html, /Correct answer<\/p>|Your pick<\/p>/);
 });
 
+test("below lg the expanded body is only the cover comparison", () => {
+  const panel = (html: string, id: string) => html.slice(html.indexOf(`id="quiz-answer-${id}"`));
+  const comparison = (html: string, id: string) => panel(html, id).match(/<div class="([^"]*)"><div class="flex min-w-0/)![1]!;
+  const html = render(result);
+  assert.match(comparison(html, "quote"), /(?=.*\bhidden\b)(?=.*\blg:grid\b)/);
+  assert.doesNotMatch(comparison(html, "quote"), /grid-cols-2/);
+  assert.match(comparison(html, "cover"), /(?=.*\bgrid\b)(?=.*\bgrid-cols-2\b)/);
+  assert.doesNotMatch(comparison(html, "cover"), /\bhidden\b/);
+  const { answers: _, ...legacy } = result;
+  const unavailable = panel(render(legacy), "cover").match(/<div class="([^"]*)"><p class="[^"]*">Answer details/);
+  assert.ok(unavailable);
+  assert.doesNotMatch(unavailable[1]!, /\bhidden\b/);
+});
+
 test("leaderboard preserves guest labels, scores, times and its empty state", () => {
   assert.match(render(result), /No plays yet/);
   const html = render(result, [play({ anonymous: true })]);

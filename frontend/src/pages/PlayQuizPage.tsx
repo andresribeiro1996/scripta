@@ -1,10 +1,9 @@
 // /play/:code — the page a challenge link recipient lands on (see
 // App.tsx: OUTSIDE every RequireAuth wrapper, same treatment as
-// /vote/:code). One question at a time, timer running from the first
-// question to the last answer,
-// submit grades server-side and locks the play. The end screen shows the
-// score, the per-question verdicts, the leaderboard, and the same link
-// back — that loop is the challenge.
+// /vote/:code). One question at a time, with the timer running from the
+// first question to the last answer. Submit grades server-side and locks
+// the play. The end screen shows the score, the per-question verdicts,
+// the leaderboard, and the same link back — that loop is the challenge.
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";

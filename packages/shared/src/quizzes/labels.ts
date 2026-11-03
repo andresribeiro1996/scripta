@@ -71,6 +71,17 @@ export function answerExpands(row: ScoreRow): boolean {
   return !row.answer || Boolean(row.workId) || row.pick?.kind === "cover";
 }
 
+const QUOTED_PROMPT_TYPES = new Set<QuizQuestionType>(["quote_title", "blurb_title"]);
+
+export function scoreRowPrompt(row: ScoreRow, type: QuizQuestionType): string | null {
+  if (!row.prompt) return null;
+  return QUOTED_PROMPT_TYPES.has(type) ? `“${row.prompt}”` : row.prompt;
+}
+
+export function isLoneViewer(plays: Array<{ isYou: boolean }>): boolean {
+  return plays.length === 1 && plays[0]!.isYou;
+}
+
 export function leaderboardPosition(plays: Array<{ isYou: boolean }>): { rank: number; total: number } | null {
   const index = plays.findIndex((play) => play.isYou);
   return index === -1 || plays.length < 2 ? null : { rank: index + 1, total: plays.length };

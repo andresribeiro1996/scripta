@@ -176,6 +176,15 @@ test("a token beats a play id on public results", async () => {
   assert.deepEqual(publicPlays(body).map((p) => [p.anonymous, p.isYou]), [[false, true], [true, false], [true, false]]);
 });
 
+test("a signed-in player's play id without a token marks nobody", async () => {
+  const { service, code, answers } = await twoAnonymousPlays();
+  const { body: signedIn } = await call(service, { method: "POST", url: `/quizzes/voting/${code}/play`, body: { answers, durationMs: 500 } }, "u9");
+  const playId = (signedIn as unknown as { playId: string }).playId;
+  const { status, body } = await call(service, { method: "GET", url: `/quizzes/voting/${code}/results?playId=${playId}` });
+  assert.equal(status, 200);
+  assert.deepEqual(publicPlays(body).map((p) => p.isYou), [false, false, false]);
+});
+
 test("public results are not cacheable", async () => {
   const { service, code } = publishedQuiz();
   const { headers } = await call(service, { method: "GET", url: `/quizzes/voting/${code}/results` });

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { answerExpands, createPlayClock, leaderboardPosition, missesFirst, playDurationLabel, playerLabel, resultCovers, scoreRows, type PlayClock, type PublicQuizQuestion, type ScoreRow } from "@scripta/shared";
+import { answerExpands, createPlayClock, isLoneViewer, leaderboardPosition, missesFirst, playDurationLabel, playerLabel, resultCovers, scoreRowPrompt, scoreRows, type PlayClock, type PublicQuizQuestion, type ScoreRow } from "@scripta/shared";
 import { useQuery } from "@tanstack/react-query";
 import { router, Stack, useSegments } from "expo-router";
 import { isPermanentError } from "../../core/apiClient";
@@ -238,7 +238,7 @@ function AnswerRow({ row, question, expanded, onToggle }: { row: ScoreRow; quest
   const title = row.answer?.title ?? (row.answer?.kind === "text" ? row.answer.value : t("quizzes.questionNumber", { number: row.number }));
   const cover = row.answer?.kind === "cover" ? row.answer.value : question.type === "cover_title" ? question.prompt : null;
   const expands = answerExpands(row);
-  const prompt = row.prompt && (question.type === "quote_title" || question.type === "blurb_title") ? `“${row.prompt}”` : row.prompt;
+  const prompt = scoreRowPrompt(row, question.type);
   const picked = row.pick?.kind === "text" ? t("quizzes.youPicked", { value: row.pick.value }) : null;
   const verdict = row.correct ? t("quizzes.correct") : picked ?? t("quizzes.incorrect");
   const outcome = (row.correct ? t("quizzes.correct") : t("quizzes.incorrect")).toLowerCase();
@@ -319,7 +319,7 @@ function Leaderboard({ code, playId }: { code: string; playId: string | null }) 
         </View>
       </View>;
     })}
-    {data.plays.length === 1 && data.plays[0]!.isYou ? <Text {...dynamicType} style={[typography.caption, styles.justYou, { color: colors.textDim }]}>{t("quizzes.justYou")}</Text> : null}
+    {isLoneViewer(data.plays) ? <Text {...dynamicType} style={[typography.caption, styles.justYou, { color: colors.textDim }]}>{t("quizzes.justYou")}</Text> : null}
   </ScrollView>;
 }
 
