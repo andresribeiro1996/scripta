@@ -778,3 +778,34 @@ Asked by the user on 2026-11-02: "the menus should be swipeable". Answering a qu
   - a left or right swipe switches tabs with a slide, both at the top and while the tab bar is pinned;
   - vertical scroll, pull-to-refresh and tab taps behave as before;
   - a swipe on the card does not switch tabs.
+
+### Task 17: Profile tab swipe follows the finger
+
+Asked by the user on 2026-11-03: "go with 1 first", that is, follow the finger. While a horizontal swipe is held, the current tab's rows move with the finger and fade. Released past the threshold, the switch happens and the new tab's rows slide in from that side. Released short of it, the rows spring back. The tab bar never moves. The single scroller, the hero and every guard from Task 16 stay.
+
+**Files:**
+- Modify: `mobile/src/features/community/ProfileScroller.tsx`
+- Modify: `mobile/src/features/community/pinnedOffset.ts`
+- Test: `mobile/src/features/community/profileScroller.test.ts`
+
+**Interfaces:**
+- **Drag:** a `drag` shared value is driven by the pan's `onUpdate` on the UI thread. The current rows' `Animated.View` takes `translateX: drag` and `opacity: 1 - min(|drag| / width, 1) * 0.6`.
+- **No neighbour:** at the first or last tab, the drag is rubber-banded to about a third of the finger's travel.
+- **Release:** `swipeTarget` from Task 16 decides.
+  - **Switch:** `drag` animates out to ±width·0.35 over 120 ms, then `select()` runs. The new rows enter with Task 16's slide, from the opposite side at ±24, so the motion reads as continuous.
+  - **No switch:** `drag` springs back to 0 (`withSpring`, damping about 20).
+- **Reset:** `drag` resets to 0 when the new tab's rows mount, so they never inherit the offset.
+- **Reduced motion:** no drag translate. A release past the threshold switches instantly.
+- **Kept from Task 16:** activation offsets, the hero and cover-row guards, cancelling a row's press, and the pinned-offset flow from Task 16's last fixes.
+- `rubberBand(dx: number, atEdge: boolean): number` in `pinnedOffset.ts`.
+
+- [ ] **Step 1: Test.** `rubberBand(90, false)` is 90, and `rubberBand(90, true)` is 30.
+- [ ] **Step 2: Implement** the Interfaces above.
+- [ ] **Step 3: Run the checks and confirm they pass.** Run `node scripts/gate.mjs`. Expected: PASS.
+- [ ] **Step 4: Commit and push.** Run `git commit -m "Let the profile tab swipe follow the finger"`, then push.
+- [ ] **Step 5: Device pass (`device-checker`).**
+  - The rows follow a held drag and spring back on a short release.
+  - A long release switches tabs with continuous motion.
+  - Edge tabs rubber-band.
+  - Pinned switches don't jump.
+  - The hero card and cover row don't drag the rows.
