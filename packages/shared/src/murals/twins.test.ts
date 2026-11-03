@@ -82,3 +82,31 @@ test("the stored style is never mutated", () => {
   flip(style);
   assert.deepEqual(style, copy);
 });
+
+test("a theme-ref text on a flipped hex background stays readable", () => {
+  const out = flip({ ...DEFAULT_BLOCK_STYLE, backgroundColor: "#fff3b0", textColor: "theme:onAccent" });
+  const { text, background } = effectiveBlockColors(out, dark);
+  assert.ok(contrastRatio(text, background)! >= 4.5);
+});
+
+test("a dark theme flips to its light twin", () => {
+  const light = muralColors("oxblood", "light");
+  const surface = muralBlockStyle({ ...DEFAULT_BLOCK_STYLE, backgroundColor: themes.dark.colors.surface }, "oxblood", "light");
+  assert.ok(contrastRatio(surface.backgroundColor!, themes.light.colors.surface)! < 1.1);
+  const note = muralBlockStyle({ ...DEFAULT_BLOCK_STYLE, backgroundColor: "#ffd166" }, "oxblood", "light");
+  const { text, background } = effectiveBlockColors(note, light);
+  assert.ok(contrastRatio(text, background)! >= 4.5);
+});
+
+test("border and fade hex colours flip", () => {
+  const out = flip({ ...DEFAULT_BLOCK_STYLE, cardBorderColor: "#fff3b0", fadeColor: "#f6efe3" });
+  for (const [field, source] of [["cardBorderColor", "#fff3b0"], ["fadeColor", "#f6efe3"]] as const) {
+    assert.match(out[field]!, /^#[0-9a-f]{6}$/);
+    assert.notEqual(out[field], source);
+  }
+});
+
+test("an undefined colour field passes through", () => {
+  const out = flip({ ...DEFAULT_BLOCK_STYLE, backgroundColor: undefined as unknown as null });
+  assert.equal(out.backgroundColor, undefined);
+});

@@ -133,7 +133,7 @@ export function muralBlockStyle(style: BlockStyle, id: ThemeId, scheme: ThemeSch
   const flipped = { ...style };
   for (const field of BLOCK_COLOR_FIELDS) {
     const value = style[field];
-    if (value === null || !parseHexColor(value)) continue;
+    if (typeof value !== "string" || !parseHexColor(value)) continue;
     const [lightness, chroma, hue] = toOklch(value);
     const mapped = surfaceTo + (lightness - surfaceFrom) * slope;
     flipped[field] = fromOklch([Math.min(1, Math.max(0, mapped)), chroma, hue]);
