@@ -811,3 +811,74 @@ Asked by the user on 2026-11-03: "go with 1 first", that is, follow the finger. 
   - Edge tabs rubber-band.
   - Pinned switches don't jump.
   - The hero card and cover row don't drag the rows.
+
+### Task 18: Profile tabs become a pager driven by one gesture
+
+Asked by the user on 2026-11-03, after comparing Task 17 with a pager spike (`spike/profile-pager`, 769763bd, local only): "the pager feels better, build it properly". They also said "some swipes … end up not swiping and its jarring". A device pass on the spike (`.superpowers/device/pager-swipes/`) found three causes:
+- On the card or name row, nothing moved and nothing switched.
+- On the tab bar, the page stayed still during the drag and then jumped on release.
+- On content, react-native-pager-view sprang back unless the release was past half a page or was a fling, so a slow 90 px swipe never switched.
+
+A diagonal swipe on a tappable Activity row also sometimes opened that row.
+
+So the pages are not a native pager. One RNGH pan, attached over the whole screen (header and pages), moves a row of pages, so a swipe follows the finger wherever it starts. Release uses Task 16's `swipeTarget`, the same thresholds everywhere. Each tab keeps its own scroll position. The card and tab bar float above the pages and never move sideways. Task 17's follow-the-finger rows, slide-in, out-animation and `pinnedOffset` are removed.
+
+Accepted by the user after the spike: during the collapse on Android, the floating header can trail the list by about a frame (Reanimated scroll-driven style; see PR #231). Swipes that start on a horizontal cover row scroll the covers, not the tabs.
+
+**Files:**
+- Modify: `mobile/src/features/community/ProfileScroller.tsx`
+- Modify: `mobile/src/features/community/pinnedOffset.ts`
+- Modify: `mobile/src/features/community/MyShelfScreen.tsx`
+- Modify: `mobile/src/features/community/ProfileScreen.tsx`
+- Test: `mobile/src/features/community/profileScroller.test.ts`
+
+**Interfaces:**
+- **Props:** `ProfileScroller<T>({ hero, backdrop, notice, tabs, value, onChange, sectionFor, accessibilityLabel })`. `sectionFor: (tab: T) => ProfileSection` replaces `section`. Both screens already have `sectionFor`. `ProfileSection`, `elementSection`, `transparentHeader` and `usePlainHeader` keep their names and shapes.
+- **Pages:** under `marginTop: useHeaderHeight()`, an `overflow: "hidden"` box holds a row `Animated.View` of `tabs.length` pages, each `width` wide (`useWindowDimensions`), with `translateX: -x`. `x` is a shared value in pixels, `index * width` at rest.
+  - Each page is its own `Animated.FlatList` over `sectionFor(tab)`, with an empty `ListHeaderComponent` spacer of height `heroHeight + tabBarHeight`.
+  - `contentContainerStyle` has `minHeight: heroHeight + viewport` and `paddingBottom: spacing.huge`.
+  - It takes the section's `onEndReached` (threshold 0.4), `ListEmptyComponent` and `ListFooterComponent`.
+  - Each page has one `scrollY` shared value, set from its `useAnimatedScrollHandler`.
+  - **Android:** keep a RefreshControl mounted with `enabled={Boolean(section.onRefresh)}`, as Task 16 does, and add `progressViewOffset={heroHeight + tabBarHeight}`. **iOS:** render it only when `onRefresh` is set.
+- **Header:** one absolutely positioned `Animated.View` at `top: headerHeight` holds the backdrop (`pointerEvents="none"`, height `headerHeight + heroHeight`, top `-headerHeight`), the hero and the tab bar.
+  - Its `translateY` is `-min(max(activeY, 0), heroHeight)`, where `activeY` is the active page's `scrollY` read on the UI thread.
+  - Measure `heroHeight` and `tabBarHeight` with `onLayout`, into both state and shared values.
+  - The tab bar keeps ProfileScroller's tab look.
+  - The indicator is one bar with a Reanimated style interpolated from `x / width` across the measured tab layouts. It slides with the finger.
+- **Swipe:** `Gesture.Pan()` with `activeOffsetX([-12, 12])` and `failOffsetY([-12, 12])`, inside a `GestureDetector` around a `collapsable={false}` root `View` that contains both the header and the pages. Use no hero guard, because a swipe on the card pages too.
+  - **onTouchesDown:** record the touch-down `absoluteX`.
+  - **onStart:**
+    - `cancelAnimation(x)`.
+    - Sync every other page to `syncedOffset(activeY, itsY, heroHeight)` with `scrollTo(ref, 0, offset, false)`, and set its `scrollY`. This runs synchronously in the worklet.
+    - Remember `startX`.
+  - **onUpdate:** `x = dragX(startX, absoluteX - downX, tabs.length, width)`.
+  - **onEnd:**
+    - `target = swipeTarget(order, current, absoluteX - downX, velocityX) ?? current`.
+    - Set the active index to the target, then animate `x` to `targetIndex * width` with `withSpring({ damping: 20, mass: 1, stiffness: 100 })`.
+    - When the target differs, call `scheduleOnRN(onChange, target)` at release, not after the spring.
+  - **Reduced motion:** no follow, and `x` jumps to the target on release.
+- **Vertical drags on the header:** `Gesture.Race` the swipe with a second `Gesture.Pan()`, `activeOffsetY([-8, 8])` and `failOffsetX([-12, 12])`. It fails in `onTouchesDown` unless the touch is within the header's visible box. It drives the active list with `scrollTo(activeRef, 0, max(startY - translationY, 0), false)`. On release, `withDecay` on `-velocityY` continues it through a `useAnimatedReaction`, clamped to `[0, contentHeight - viewport]` from the list's `onContentSizeChange`. A new touch cancels the decay.
+- **Tab tap, or `value` changing from outside:** run the same sync on the UI thread, then animate `x` to the tab with `withTiming(…, { duration: 220 })`, or jump under reduced motion. Then call `onChange`.
+- **Rows under a swipe:** the pan's activation cancels the JS press in progress, so a horizontal or diagonal swipe never opens a row. Confirm this in the device pass. If a row still fires, add `cancelsTouchesInView` (RNGH default) checks before anything else.
+- **Pure helpers in `pinnedOffset.ts`:**
+  - `syncedOffset(activeY: number, ownY: number, heroHeight: number): number` is `activeY < heroHeight ? activeY : max(ownY, heroHeight)`. Its worklet keeps the header from jumping when the next page comes in.
+  - `dragX(startX: number, dx: number, count: number, width: number): number` is `startX - dx`. Past `0` or `(count - 1) * width`, the excess goes through `rubberBand(…, true)`.
+  - Delete `pinnedOffset`, which has no caller left, and its test.
+  - Keep `swipeTarget` and `rubberBand`.
+- **Removed:** `SectionRow`, `slideIn`, `drag`/`dragTab`/`leaving`, the out-animation and the pinned-offset `select()`. Also remove the spike's `profileSwipeMode.ts` and the long-press toggle, which never landed on this branch.
+
+- [ ] **Step 1: Test.** In `profileScroller.test.ts`:
+  - `syncedOffset(100, 500, 300)` is 100, `syncedOffset(400, 50, 300)` is 300, and `syncedOffset(400, 500, 300)` is 500.
+  - `dragX(0, -100, 3, 320)` is 100, `dragX(320, 100, 3, 320)` is 220, `dragX(0, 90, 3, 320)` is -30, and `dragX(640, -90, 3, 320)` is 670.
+  - Delete the `pinnedOffset` test.
+- [ ] **Step 2: Implement** the Interfaces above.
+- [ ] **Step 3: Run the checks and confirm they pass.** Run `node scripts/gate.mjs`. Expected: PASS.
+- [ ] **Step 4: Commit and push.** Run `git commit -m "Make the profile tabs a pager driven by one gesture"`, then push.
+- [ ] **Step 5: Device pass (`device-checker`).** Rerun the spike's matrix from `.superpowers/device/pager-swipes/`: start on the card, name row, tab bar, content row, cover row and empty space, with slow 90 px, medium 220 px and diagonal swipes, at the top and pinned, on your own shelf and on fixture_alice.
+  - Every swipe except a cover-row swipe follows the finger, and switches when past 64 px or fast.
+  - No row opens under a swipe.
+  - The card still opens on a tap.
+  - A vertical drag on the card scrolls the page.
+  - Each tab keeps its scroll.
+  - Pinned switches don't jump.
+  - The pull-to-refresh spinner shows below the tab bar.
