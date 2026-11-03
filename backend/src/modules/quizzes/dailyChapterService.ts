@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { DAILY_CHAPTER_QUOTE_RIGHTS, DAILY_CHAPTER_THEMES, dailyChapterCoverage, dailyChapterStats, dailyChapterSummary, gradeAnswers, type DailyChapterBoard, type DailyChapterBook, type DailyChapterEditionInput, type DailyChapterMonthFacts, type DailyChapterPerson, type DailyChapterQuestionInput, type DailyChapterResult, type SubmittedAnswer } from "@scripta/shared";
+import { DAILY_CHAPTER_QUOTE_RIGHTS, DAILY_CHAPTER_THEMES, dailyChapterCoverage, dailyChapterStats, dailyChapterSummary, gradeAnswers, type DailyChapterBoard, type DailyChapterBook, type DailyChapterEditionInput, type DailyChapterMonthFacts, type DailyChapterPerson, type DailyChapterReview, type DailyChapterQuestionInput, type DailyChapterResult, type SubmittedAnswer } from "@scripta/shared";
 import { t, type BackendKey } from "../../i18n/index.js";
 import { DailyChapterError, NO_DAILY_PEOPLE, type DailyChapterPeople, type DailyChapterRepository, type StoredDailyChapter } from "./domain/dailyChapter.js";
 import type { QuizzesRepository } from "./domain/ports.js";
@@ -26,7 +26,8 @@ export function createDailyChapterService(repo: DailyChapterRepository, plays: Q
     const editions = repo.editions().filter((edition) => edition.publishedAt && edition.date <= today());
     const byId = new Map(editions.map((edition) => [edition.id, edition]));
     const results = repo.plays(playerId).flatMap((play) => { const edition = byId.get(play.quiz_id); return edition ? [editionResult(edition, play)] : []; });
-    return dailyChapterStats(results, editions, today());
+    const pastEditions = editions.filter((edition) => edition.date < today()).map(({ id, date, title, themeId }) => ({ id, date, title, themeId }));
+    return { ...dailyChapterStats(results, editions, today()), pastEditions };
   };
   return {
     today() {
@@ -37,10 +38,17 @@ export function createDailyChapterService(repo: DailyChapterRepository, plays: Q
       return { board, date, nextAt };
     },
     history,
+    review(id: string): DailyChapterReview {
+      const edition = repo.edition(id);
+      if (!edition?.publishedAt || edition.date > today()) return failKey(404, "quizzes.dailyNoEdition");
+      if (edition.date === today()) return failKey(403, "quizzes.dailyPlayFirst");
+      return { editionId: edition.id, date: edition.date, title: edition.title, themeId: edition.themeId,
+        questions: edition.snapshot!.map((q) => ({ questionId: q.id, prompt: q.prompt, answerIndex: q.answerIndex, options: q.options, explanation: q.explanation, sourceUrl: q.sourceUrl, book: q.book })) };
+    },
     people(editionId: string, viewerId: string): DailyChapterPerson[] {
       const edition = repo.edition(editionId);
       if (!edition?.publishedAt || edition.date > today()) return failKey(404, "quizzes.dailyNoEdition");
-      if (!plays.getPlayByVoter(editionId, viewerId)) return failKey(403, "quizzes.dailyPlayFirst");
+      if (edition.date === today() && !plays.getPlayByVoter(editionId, viewerId)) return failKey(403, "quizzes.dailyPlayFirst");
       const followees = people.followees(viewerId).filter((id) => id !== viewerId);
       const visible = people.published(followees);
       const ids = [viewerId, ...new Set(followees.filter((id) => visible.has(id)))];

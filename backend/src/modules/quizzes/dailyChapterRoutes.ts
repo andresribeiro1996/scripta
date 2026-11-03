@@ -40,6 +40,7 @@ export function buildDailyChapterRoutes(service: DailyChapterService, isAdmin: (
       return reply.header("Cache-Control", "no-store").send(service.play(request.params.id, player(request, body.guestId), body.answers));
     });
     app.get<{ Params: { id: string } }>("/daily-chapter/:id/people", { preHandler: authGuard }, async (request, reply) => reply.header("Cache-Control", "no-store").send({ people: service.people(request.params.id, request.user.id) }));
+    app.get<{ Params: { id: string } }>("/daily-chapter/:id/review", { preHandler: authGuard }, async (request, reply) => reply.header("Cache-Control", "no-store").send(service.review(request.params.id)));
     app.get<{ Params: { userId: string } }>("/daily-chapter/players/:userId", async (request, reply) => {
       const userId = playerIdSchema.parse(request.params.userId);
       return reply.header("Cache-Control", "no-store").send({ summary: service.player(userId, signedIn(request)?.id ?? null) });
