@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
-import { Platform, Pressable, RefreshControl, StyleSheet, View, type FlatList } from "react-native";
+import { Platform, Pressable, RefreshControl, StyleSheet, useWindowDimensions, View, type FlatList } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { scrollTo, useAnimatedRef, useAnimatedScrollHandler, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, { cancelAnimation, scrollTo, useAnimatedRef, useAnimatedScrollHandler, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming, type SharedValue } from "react-native-reanimated";
 import { scheduleOnRN, scheduleOnUI } from "react-native-worklets";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { Text } from "../../ui/Text";
 import { dynamicType, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
 import { useScreenOptions } from "../../ui/navigation";
-import { pinnedOffset, swipeTarget } from "./pinnedOffset";
+import { pinnedOffset, rubberBand, swipeTarget } from "./pinnedOffset";
 
 const SLIDE_DISTANCE = 24;
 const SLIDE_DURATION = 180;
+const OUT_DISTANCE = 0.35;
+const OUT_DURATION = 120;
+const SPRING_BACK = { damping: 20, mass: 1, stiffness: 100 } as const;
 
 function slideIn(from: number) {
   return () => {
@@ -20,6 +23,22 @@ function slideIn(from: number) {
       animations: { opacity: withTiming(1, { duration: SLIDE_DURATION }), transform: [{ translateX: withTiming(0, { duration: SLIDE_DURATION }) }] },
     };
   };
+}
+
+function SectionRow<T extends string>({ tab, drag, dragTab, leaving, width, from, children }: {
+  tab: T;
+  drag: SharedValue<number>;
+  dragTab: SharedValue<T | null>;
+  leaving: SharedValue<T | null>;
+  width: number;
+  from: number;
+  children: ReactNode;
+}) {
+  const style = useAnimatedStyle(() => {
+    const x = dragTab.get() === tab ? drag.get() : 0;
+    return { opacity: leaving.get() === tab ? 0 : 1 - Math.min(Math.abs(x) / width, 1) * 0.6, transform: [{ translateX: x }] };
+  });
+  return <Animated.View entering={from ? slideIn(from) : undefined} style={style}>{children}</Animated.View>;
 }
 
 export type ProfileSection<T = unknown> = {
@@ -63,6 +82,11 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
   const scrollY = useSharedValue(0);
   const leaving = useSharedValue<T | null>(null);
   const heroTop = useSharedValue(0);
+  const drag = useSharedValue(0);
+  const dragTab = useSharedValue<T | null>(null);
+  const order = tabs.map((tab) => tab.value);
+  const tabState = useSharedValue({ order, value });
+  const { width } = useWindowDimensions();
   const slideFrom = useRef(0);
   const reducedMotion = useReducedMotion();
   const [heroHeight, setHeroHeight] = useState(0);
@@ -71,12 +95,15 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
     scrollY.set(event.contentOffset.y);
   });
   const backdropStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -Math.max(scrollY.get(), 0) }] }));
-  const rowStyle = useAnimatedStyle(() => ({ opacity: leaving.get() === value ? 0 : 1 }));
   const rows: readonly unknown[] = [TAB_BAR, ...(section.data.length ? section.data : [EMPTY])];
 
   useEffect(() => {
     slideFrom.current = 0;
   }, [value]);
+
+  useEffect(() => {
+    tabState.set({ order, value });
+  });
 
   function select(next: T) {
     const offset = pinnedOffset(scrollY.get(), heroHeight);
@@ -95,25 +122,49 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
     });
   }
 
-  const latest = useRef({ select, value, order: tabs.map((tab) => tab.value) });
-  latest.current = { select, value, order: tabs.map((tab) => tab.value) };
+  function tap(next: T) {
+    cancelAnimation(drag);
+    dragTab.set(null);
+    select(next);
+  }
+
+  const latest = useRef(select);
+  latest.current = select;
 
   const swipe = useMemo(() => {
-    const finish = (translationX: number, velocityX: number) => {
-      const { select: choose, value: current, order } = latest.current;
-      const target = swipeTarget(order, current, translationX, velocityX);
-      if (target !== null) choose(target);
-    };
+    const choose = (next: T) => latest.current(next);
     return Gesture.Pan()
       .activeOffsetX([-24, 24])
       .failOffsetY([-12, 12])
       .onTouchesDown((event, manager) => {
         if ((event.allTouches[0]?.y ?? 0) + scrollY.get() < heroTop.get()) manager.fail();
       })
+      .onStart(() => {
+        dragTab.set(tabState.get().value);
+      })
+      .onUpdate((event) => {
+        if (reducedMotion) return;
+        const { order: tabOrder, value: current } = tabState.get();
+        const index = tabOrder.indexOf(current);
+        drag.set(rubberBand(event.translationX, event.translationX > 0 ? index <= 0 : index >= tabOrder.length - 1));
+      })
       .onEnd((event, success) => {
-        if (success) scheduleOnRN(finish, event.translationX, event.velocityX);
+        const { order: tabOrder, value: current } = tabState.get();
+        const target = success ? swipeTarget(tabOrder, current, event.translationX, event.velocityX) : null;
+        if (target === null) {
+          drag.set(withSpring(0, SPRING_BACK));
+          return;
+        }
+        if (reducedMotion) {
+          scheduleOnRN(choose, target);
+          return;
+        }
+        const out = (tabOrder.indexOf(target) > tabOrder.indexOf(current) ? -1 : 1) * width * OUT_DISTANCE;
+        drag.set(withTiming(out, { duration: OUT_DURATION }, (finished) => {
+          if (finished) scheduleOnRN(choose, target);
+        }));
       });
-  }, [scrollY, heroTop]);
+  }, [scrollY, heroTop, drag, dragTab, tabState, reducedMotion, width]);
 
   const tabBar = (
     <View accessibilityLabel={accessibilityLabel} accessibilityRole="tablist" style={[styles.tabRow, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
@@ -125,7 +176,7 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
             accessibilityLabel={tab.label}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
-            onPress={() => select(tab.value)}
+            onPress={() => tap(tab.value)}
             style={({ pressed }) => [styles.tab, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}
           >
             <Text {...dynamicType} numberOfLines={1} style={[typography.body, styles.tabLabel, { color: selected ? colors.accent : colors.textDim }]}>
@@ -160,7 +211,7 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
         ListHeaderComponent={<View onLayout={(event) => { heroTop.set(event.nativeEvent.layout.height); setHeroHeight(event.nativeEvent.layout.height); }}>{hero}</View>}
         ListFooterComponent={section.ListFooterComponent}
         keyExtractor={(item, index) => (item === TAB_BAR ? "tab-bar" : item === EMPTY ? `${value}:empty` : `${value}:${section.keyExtractor(item, index - 1)}`)}
-        renderItem={({ item, index }) => (item === TAB_BAR ? tabBar : <Animated.View entering={slideFrom.current ? slideIn(slideFrom.current) : undefined} style={rowStyle}>{item === EMPTY ? section.ListEmptyComponent ?? null : section.renderItem(item, index - 1)}</Animated.View>)}
+        renderItem={({ item, index }) => (item === TAB_BAR ? tabBar : <SectionRow tab={value} drag={drag} dragTab={dragTab} leaving={leaving} width={width} from={slideFrom.current}>{item === EMPTY ? section.ListEmptyComponent ?? null : section.renderItem(item, index - 1)}</SectionRow>)}
       />
       </View>
       </GestureDetector>
