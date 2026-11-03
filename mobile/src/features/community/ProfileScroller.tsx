@@ -1,45 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { Platform, Pressable, RefreshControl, StyleSheet, useWindowDimensions, View, type FlatList } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { cancelAnimation, scrollTo, useAnimatedRef, useAnimatedScrollHandler, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming, type SharedValue } from "react-native-reanimated";
+import Animated, { Extrapolation, cancelAnimation, interpolate, scrollTo, useAnimatedReaction, useAnimatedRef, useAnimatedScrollHandler, useAnimatedStyle, useReducedMotion, useSharedValue, withDecay, withSpring, withTiming, type AnimatedRef, type SharedValue } from "react-native-reanimated";
 import { scheduleOnRN, scheduleOnUI } from "react-native-worklets";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { Text } from "../../ui/Text";
 import { dynamicType, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
 import { useScreenOptions } from "../../ui/navigation";
-import { pinnedOffset, rubberBand, swipeTarget } from "./pinnedOffset";
+import { dragX, swipeTarget, syncedOffset } from "./pinnedOffset";
 
-const SLIDE_DISTANCE = 24;
-const SLIDE_DURATION = 180;
-const OUT_DISTANCE = 0.35;
-const OUT_DURATION = 120;
-const SPRING_BACK = { damping: 20, mass: 1, stiffness: 100 } as const;
-
-function slideIn(from: number) {
-  return () => {
-    "worklet";
-    return {
-      initialValues: { opacity: 0, transform: [{ translateX: from }] },
-      animations: { opacity: withTiming(1, { duration: SLIDE_DURATION }), transform: [{ translateX: withTiming(0, { duration: SLIDE_DURATION }) }] },
-    };
-  };
-}
-
-function SectionRow<T extends string>({ tab, drag, dragTab, leaving, width, from, children }: {
-  tab: T;
-  drag: SharedValue<number>;
-  dragTab: SharedValue<T | null>;
-  leaving: SharedValue<T | null>;
-  width: number;
-  from: number;
-  children: ReactNode;
-}) {
-  const style = useAnimatedStyle(() => {
-    const x = dragTab.get() === tab ? drag.get() : 0;
-    return { opacity: leaving.get() === tab ? 0 : 1 - Math.min(Math.abs(x) / width, 1) * 0.6, transform: [{ translateX: x }] };
-  });
-  return <Animated.View entering={from ? slideIn(from) : undefined} style={style}>{children}</Animated.View>;
-}
+const SPRING = { damping: 20, mass: 1, stiffness: 100 } as const;
+const TAP_DURATION = 220;
 
 export type ProfileSection<T = unknown> = {
   data: readonly T[];
@@ -52,9 +23,6 @@ export type ProfileSection<T = unknown> = {
   onRefresh?(): void;
 };
 
-const TAB_BAR = Symbol("tabBar");
-const EMPTY = Symbol("empty");
-
 export function elementSection(elements: readonly ReactElement[]): ProfileSection<ReactElement> {
   return { data: elements, keyExtractor: (element, index) => String(element.key ?? index), renderItem: (element) => element };
 }
@@ -66,161 +34,289 @@ export function usePlainHeader() {
   return { headerTransparent: false, headerStyle: screenOptions.headerStyle, headerShadowVisible: screenOptions.headerShadowVisible, headerLargeTitleEnabled: screenOptions.headerLargeTitleEnabled };
 }
 
-export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs, value, onChange, section, accessibilityLabel }: {
+function Page({ section, listRef, scrollY, contentHeight, fling, topSpace, minHeight }: {
+  section: ProfileSection;
+  listRef: AnimatedRef<FlatList<unknown>>;
+  scrollY: SharedValue<number>;
+  contentHeight: SharedValue<number>;
+  fling: SharedValue<number>;
+  topSpace: number;
+  minHeight: number;
+}) {
+  const onScroll = useAnimatedScrollHandler({
+    onBeginDrag: () => {
+      cancelAnimation(fling);
+    },
+    onScroll: (event) => {
+      scrollY.set(event.contentOffset.y);
+    },
+  });
+  return (
+    <Animated.FlatList
+      ref={listRef}
+      style={styles.grow}
+      contentContainerStyle={[styles.content, { minHeight }]}
+      data={section.data}
+      onScroll={onScroll}
+      scrollEventThrottle={16}
+      onContentSizeChange={(_, height) => contentHeight.set(height)}
+      refreshControl={section.onRefresh || Platform.OS === "android" ? <RefreshControl enabled={Boolean(section.onRefresh)} refreshing={section.refreshing ?? false} onRefresh={section.onRefresh} progressViewOffset={topSpace} /> : undefined}
+      onEndReached={section.onEndReached}
+      onEndReachedThreshold={0.4}
+      ListHeaderComponent={<View style={{ height: topSpace }} />}
+      ListEmptyComponent={section.ListEmptyComponent}
+      ListFooterComponent={section.ListFooterComponent}
+      keyExtractor={(item, index) => section.keyExtractor(item, index)}
+      renderItem={({ item, index }) => section.renderItem(item, index)}
+    />
+  );
+}
+
+export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs, value, onChange, sectionFor, accessibilityLabel }: {
   hero: ReactNode;
   backdrop: ReactNode;
   notice?: ReactNode;
   tabs: readonly { value: T; label: string }[];
   value: T;
   onChange: (value: T) => void;
-  section: ProfileSection;
+  sectionFor: (tab: T) => ProfileSection;
   accessibilityLabel?: string;
 }) {
   const { colors } = useTheme();
   const headerHeight = useHeaderHeight();
-  const list = useAnimatedRef<FlatList<unknown>>();
-  const scrollY = useSharedValue(0);
-  const leaving = useSharedValue<T | null>(null);
-  const heroTop = useSharedValue(0);
-  const drag = useSharedValue(0);
-  const dragTab = useSharedValue<T | null>(null);
-  const downX = useSharedValue(0);
+  const { width } = useWindowDimensions();
+  const reducedMotion = useReducedMotion();
   const orderKey = tabs.map((tab) => tab.value).join("\n");
   const order = useMemo(() => orderKey.split("\n") as T[], [orderKey]);
-  const tabState = useSharedValue({ order, value });
-  const { width } = useWindowDimensions();
-  const slideFrom = useRef(0);
-  const reducedMotion = useReducedMotion();
+  const count = order.length;
+  const index = Math.max(0, order.indexOf(value));
+  const refs = useRef(tabs.map(() => useAnimatedRef<FlatList<unknown>>())).current;
+  const ys = useRef(tabs.map(() => useSharedValue(0))).current;
+  const heights = useRef(tabs.map(() => useSharedValue(0))).current;
+  const x = useSharedValue(index * width);
+  const activeIndex = useSharedValue(index);
+  const fling = useSharedValue(0);
+  const downX = useSharedValue(0);
+  const startX = useSharedValue(0);
+  const startY = useSharedValue(0);
+  const heroH = useSharedValue(0);
+  const tabH = useSharedValue(0);
+  const viewportH = useSharedValue(0);
   const [heroHeight, setHeroHeight] = useState(0);
+  const [tabBarHeight, setTabBarHeight] = useState(0);
   const [viewport, setViewport] = useState(0);
-  const onScroll = useAnimatedScrollHandler((event) => {
-    scrollY.set(event.contentOffset.y);
+  const [tabLayouts, setTabLayouts] = useState<readonly ({ x: number; width: number } | undefined)[]>([]);
+  const measured = count > 1 && order.every((_, tabIndex) => tabLayouts[tabIndex]);
+
+  const android = Platform.OS === "android";
+
+  const activeScroll = () => {
+    "worklet";
+    const y = ys[activeIndex.get()]!.get();
+    return android ? Math.max(y, 0) : y;
+  };
+
+  const syncOthers = () => {
+    "worklet";
+    const active = activeIndex.get();
+    const activeY = ys[active]!.get();
+    for (let other = 0; other < count; other++) {
+      if (other === active) continue;
+      const target = syncedOffset(activeY, ys[other]!.get(), heroH.get());
+      ys[other]!.set(target);
+      scrollTo(refs[other]!, 0, target, false);
+    }
+  };
+
+  const jump = (target: number) => {
+    "worklet";
+    cancelAnimation(fling);
+    cancelAnimation(x);
+    syncOthers();
+    activeIndex.set(target);
+    x.set(reducedMotion ? target * width : withTiming(target * width, { duration: TAP_DURATION }));
+  };
+
+  const collapseStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -Math.min(activeScroll(), heroH.get()) }] }));
+
+  const indicatorStyle = useAnimatedStyle(() => {
+    if (!measured) return {};
+    const input = order.map((_, tabIndex) => tabIndex);
+    const progress = x.get() / width;
+    return {
+      transform: [
+        { translateX: interpolate(progress, input, order.map((_, tabIndex) => tabLayouts[tabIndex]!.x + tabLayouts[tabIndex]!.width / 2 - 0.5), Extrapolation.CLAMP) },
+        { scaleX: interpolate(progress, input, order.map((_, tabIndex) => tabLayouts[tabIndex]!.width), Extrapolation.CLAMP) },
+      ],
+    };
   });
-  const backdropStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -Math.max(scrollY.get(), 0) }] }));
-  const rows: readonly unknown[] = [TAB_BAR, ...(section.data.length ? section.data : [EMPTY])];
 
-  useEffect(() => {
-    slideFrom.current = 0;
-  }, [value]);
+  const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: -x.get() }] }));
 
-  useEffect(() => {
-    tabState.set({ order, value });
-  }, [order, value, tabState]);
-
-  function select(next: T) {
-    const offset = pinnedOffset(scrollY.get(), heroHeight);
-    const from = offset !== null && next !== value ? value : null;
-    const direction = Math.sign(tabs.findIndex((tab) => tab.value === next) - tabs.findIndex((tab) => tab.value === value));
-    slideFrom.current = reducedMotion ? 0 : direction * SLIDE_DISTANCE;
-    scheduleOnUI(() => {
-      leaving.set(from);
-      requestAnimationFrame(() => {
-        if (offset !== null) {
-          scrollY.set(offset);
-          scrollTo(list, 0, offset, false);
-        }
-        scheduleOnRN(onChange, next);
-      });
-    });
-  }
-
-  function tap(next: T) {
-    cancelAnimation(drag);
-    dragTab.set(null);
-    select(next);
-  }
-
-  const latest = useRef(select);
-  latest.current = select;
-
-  const swipe = useMemo(() => {
-    const choose = (next: T) => latest.current(next);
-    return Gesture.Pan()
-      .activeOffsetX([-12, 12])
-      .failOffsetY([-12, 12])
-      .onTouchesDown((event, manager) => {
-        const touch = event.allTouches[0];
-        if ((touch?.y ?? 0) + scrollY.get() < heroTop.get()) manager.fail();
-        downX.set(touch?.absoluteX ?? 0);
-      })
-      .onStart(() => {
-        cancelAnimation(drag);
-        drag.set(0);
-        dragTab.set(tabState.get().value);
-      })
-      .onUpdate((event) => {
-        if (reducedMotion) return;
-        const { order: tabOrder, value: current } = tabState.get();
-        const index = tabOrder.indexOf(current);
-        const dx = event.absoluteX - downX.get();
-        drag.set(rubberBand(dx, dx > 0 ? index <= 0 : index >= tabOrder.length - 1));
-      })
-      .onEnd((event, success) => {
-        const { order: tabOrder, value: current } = tabState.get();
-        const target = success ? swipeTarget(tabOrder, current, event.absoluteX - downX.get(), event.velocityX) : null;
-        if (target === null) {
-          drag.set(withSpring(0, SPRING_BACK));
-          return;
-        }
-        const pinned = pinnedOffset(scrollY.get(), heroTop.get()) !== null;
-        if (!reducedMotion) {
-          const out = (tabOrder.indexOf(target) > tabOrder.indexOf(current) ? -1 : 1) * width * OUT_DISTANCE;
-          drag.set(withTiming(out, { duration: OUT_DURATION }, (finished) => {
-            if (finished && pinned) scheduleOnRN(choose, target);
-          }));
-        }
-        if (reducedMotion || !pinned) scheduleOnRN(choose, target);
-      });
-  }, [scrollY, heroTop, drag, dragTab, downX, tabState, reducedMotion, width]);
-
-  const tabBar = (
-    <View accessibilityLabel={accessibilityLabel} accessibilityRole="tablist" style={[styles.tabRow, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-      {tabs.map((tab) => {
-        const selected = tab.value === value;
-        return (
-          <Pressable
-            key={tab.value}
-            accessibilityLabel={tab.label}
-            accessibilityRole="tab"
-            accessibilityState={{ selected }}
-            onPress={() => tap(tab.value)}
-            style={({ pressed }) => [styles.tab, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}
-          >
-            <Text {...dynamicType} numberOfLines={1} style={[typography.body, styles.tabLabel, { color: selected ? colors.accent : colors.textDim }]}>
-              {tab.label}
-            </Text>
-            {selected ? <View style={[styles.tabIndicator, { backgroundColor: colors.accent }]} /> : null}
-          </Pressable>
-        );
-      })}
-    </View>
+  useAnimatedReaction(
+    () => fling.get(),
+    (current, previous) => {
+      if (previous === null || current === previous) return;
+      scrollTo(refs[activeIndex.get()]!, 0, Math.max(current, 0), false);
+    },
   );
 
+  useEffect(() => {
+    scheduleOnUI(() => {
+      "worklet";
+      cancelAnimation(x);
+      x.set(activeIndex.get() * width);
+    });
+  }, [width]);
+
+  useEffect(() => {
+    const target = order.indexOf(value);
+    if (target < 0) return;
+    scheduleOnUI(() => {
+      "worklet";
+      if (activeIndex.get() !== target) jump(target);
+    });
+  }, [value, order]);
+
+  const latest = useRef(onChange);
+  latest.current = onChange;
+
+  const gesture = useMemo(() => {
+    const choose = (next: T) => latest.current(next);
+    return Gesture.Race(
+      Gesture.Pan()
+        .activeOffsetX([-12, 12])
+        .failOffsetY([-12, 12])
+        .onTouchesDown((event) => {
+          downX.set(event.allTouches[0]?.absoluteX ?? 0);
+        })
+        .onStart(() => {
+          cancelAnimation(x);
+          cancelAnimation(fling);
+          syncOthers();
+          startX.set(x.get());
+        })
+        .onUpdate((event) => {
+          if (reducedMotion) return;
+          x.set(dragX(startX.get(), event.absoluteX - downX.get(), count, width));
+        })
+        .onEnd((event, success) => {
+          const current = activeIndex.get();
+          const next = success ? swipeTarget(order, order[current]!, event.absoluteX - downX.get(), event.velocityX) : null;
+          const target = next === null ? current : order.indexOf(next);
+          activeIndex.set(target);
+          x.set(reducedMotion ? target * width : withSpring(target * width, SPRING));
+          if (next !== null) scheduleOnRN(choose, next);
+        }),
+      Gesture.Pan()
+        .activeOffsetY([-8, 8])
+        .failOffsetX([-12, 12])
+        .onTouchesDown((event, manager) => {
+          cancelAnimation(fling);
+          const touchY = event.allTouches[0]?.y ?? -1;
+          const bottom = headerHeight + heroH.get() + tabH.get() - Math.min(activeScroll(), heroH.get());
+          if (touchY < headerHeight || touchY >= bottom) manager.fail();
+        })
+        .onStart(() => {
+          startY.set(activeScroll());
+        })
+        .onUpdate((event) => {
+          scrollTo(refs[activeIndex.get()]!, 0, Math.max(startY.get() - event.translationY, 0), false);
+        })
+        .onEnd((event) => {
+          fling.set(activeScroll());
+          fling.set(withDecay({ velocity: -event.velocityY, clamp: [0, Math.max(heights[activeIndex.get()]!.get() - viewportH.get(), 0)] }));
+        }),
+    );
+  }, [headerHeight, width, reducedMotion, order, count]);
+
+  function tap(tabIndex: number, next: T) {
+    scheduleOnUI(jump, tabIndex);
+    onChange(next);
+  }
+
   return (
-    <View style={styles.root}>
-      <Animated.View pointerEvents="none" style={[styles.backdrop, { height: headerHeight + heroHeight }, backdropStyle]}>
-        {backdrop}
-      </Animated.View>
-      <GestureDetector gesture={swipe}>
-      <View collapsable={false} style={[styles.root, { marginTop: headerHeight }]}>
-      <Animated.FlatList
-        ref={list}
-        style={styles.root}
-        contentContainerStyle={[styles.content, { minHeight: heroHeight + viewport }]}
-        data={rows}
-        onLayout={(event) => setViewport(event.nativeEvent.layout.height)}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        stickyHeaderIndices={[1]}
-        refreshControl={section.onRefresh || Platform.OS === "android" ? <RefreshControl enabled={Boolean(section.onRefresh)} refreshing={section.refreshing ?? false} onRefresh={section.onRefresh} /> : undefined}
-        onEndReached={section.onEndReached}
-        onEndReachedThreshold={0.4}
-        ListHeaderComponent={<View onLayout={(event) => { heroTop.set(event.nativeEvent.layout.height); setHeroHeight(event.nativeEvent.layout.height); }}>{hero}</View>}
-        ListFooterComponent={section.ListFooterComponent}
-        keyExtractor={(item, index) => (item === TAB_BAR ? "tab-bar" : item === EMPTY ? `${value}:empty` : `${value}:${section.keyExtractor(item, index - 1)}`)}
-        renderItem={({ item, index }) => (item === TAB_BAR ? tabBar : <SectionRow tab={value} drag={drag} dragTab={dragTab} leaving={leaving} width={width} from={slideFrom.current}>{item === EMPTY ? section.ListEmptyComponent ?? null : section.renderItem(item, index - 1)}</SectionRow>)}
-      />
-      </View>
+    <View style={styles.grow}>
+      <GestureDetector gesture={gesture}>
+        <View collapsable={false} style={styles.grow}>
+          <View pointerEvents="box-none" style={styles.header}>
+            <Animated.View pointerEvents="none" style={[styles.backdrop, { height: headerHeight + heroHeight }, collapseStyle]}>
+              {backdrop}
+            </Animated.View>
+            <View pointerEvents="box-none" style={[styles.clip, { top: headerHeight, height: heroHeight + tabBarHeight }]}>
+              <Animated.View pointerEvents="box-none" style={collapseStyle}>
+                <View
+                  onLayout={(event) => {
+                    heroH.set(event.nativeEvent.layout.height);
+                    setHeroHeight(event.nativeEvent.layout.height);
+                  }}
+                >
+                  {hero}
+                </View>
+                <View
+                  accessibilityLabel={accessibilityLabel}
+                  accessibilityRole="tablist"
+                  onLayout={(event) => {
+                    tabH.set(event.nativeEvent.layout.height);
+                    setTabBarHeight(event.nativeEvent.layout.height);
+                  }}
+                  style={[styles.tabRow, { backgroundColor: colors.background, borderBottomColor: colors.border }]}
+                >
+                  {tabs.map((tab, tabIndex) => {
+                    const selected = tab.value === value;
+                    return (
+                      <Pressable
+                        key={tab.value}
+                        accessibilityLabel={tab.label}
+                        accessibilityRole="tab"
+                        accessibilityState={{ selected }}
+                        onLayout={(event) => {
+                          const { x: left, width: tabWidth } = event.nativeEvent.layout;
+                          setTabLayouts((previous) => previous[tabIndex]?.x === left && previous[tabIndex]?.width === tabWidth ? previous : Object.assign([...previous], { [tabIndex]: { x: left, width: tabWidth } }));
+                        }}
+                        onPress={() => tap(tabIndex, tab.value)}
+                        style={({ pressed }) => [styles.tab, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}
+                      >
+                        <Text {...dynamicType} numberOfLines={1} style={[typography.body, styles.tabLabel, { color: selected ? colors.accent : colors.textDim }]}>
+                          {tab.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                  {measured ? <Animated.View style={[styles.tabIndicator, { backgroundColor: colors.accent }, indicatorStyle]} /> : null}
+                </View>
+              </Animated.View>
+            </View>
+          </View>
+          <View
+            onLayout={(event) => {
+              viewportH.set(event.nativeEvent.layout.height);
+              setViewport(event.nativeEvent.layout.height);
+            }}
+            style={[styles.pages, { marginTop: headerHeight }]}
+          >
+            <Animated.View style={[styles.row, { width: width * count }, rowStyle]}>
+              {tabs.map((tab, tabIndex) => (
+                <View
+                  key={tab.value}
+                  accessibilityElementsHidden={tab.value !== value}
+                  importantForAccessibility={tab.value === value ? "auto" : "no-hide-descendants"}
+                  style={{ width }}
+                >
+                  <Page
+                    section={sectionFor(tab.value)}
+                    listRef={refs[tabIndex]!}
+                    scrollY={ys[tabIndex]!}
+                    contentHeight={heights[tabIndex]!}
+                    fling={fling}
+                    topSpace={heroHeight + tabBarHeight}
+                    minHeight={heroHeight + viewport}
+                  />
+                </View>
+              ))}
+            </Animated.View>
+          </View>
+        </View>
       </GestureDetector>
       {notice ? <View pointerEvents="box-none" style={[styles.notice, { top: headerHeight }]}>{notice}</View> : null}
     </View>
@@ -228,12 +324,16 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  grow: { flex: 1 },
+  header: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 1 },
   backdrop: { position: "absolute", top: 0, left: 0, right: 0 },
+  clip: { position: "absolute", left: 0, right: 0, overflow: "hidden" },
+  pages: { flex: 1, overflow: "hidden" },
+  row: { flex: 1, flexDirection: "row" },
   notice: { position: "absolute", left: 0, right: 0 },
   content: { paddingBottom: spacing.huge },
   tabRow: { flexDirection: "row", borderBottomWidth: 1 },
   tab: { flexGrow: 1, flexShrink: 1, flexBasis: "auto", minHeight: minimumTouchTarget, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm },
   tabLabel: { fontWeight: "700" },
-  tabIndicator: { position: "absolute", left: 0, right: 0, bottom: 0, height: 3 },
+  tabIndicator: { position: "absolute", left: 0, bottom: 0, height: 3, width: 1 },
 });

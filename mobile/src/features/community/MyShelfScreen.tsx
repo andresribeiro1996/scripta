@@ -308,7 +308,7 @@ export function MyShelfScreen() {
         tabs={MY_SHELF_TABS.map((entry) => ({ value: entry.value, label: t(entry.labelKey) }))}
         value={tab}
         onChange={handleTabChange}
-        section={sectionFor(tab)}
+        sectionFor={sectionFor}
       />
       {card ? (
         <ContentShareSheet

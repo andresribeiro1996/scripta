@@ -1,8 +1,3 @@
-export function pinnedOffset(scrollY: number, heroHeight: number): number | null {
-  "worklet";
-  return scrollY > heroHeight ? heroHeight : null;
-}
-
 const SWIPE_DISTANCE = 64;
 const SWIPE_VELOCITY = 600;
 
@@ -17,4 +12,18 @@ export function swipeTarget<T>(tabs: readonly T[], value: T, translationX: numbe
 export function rubberBand(dx: number, atEdge: boolean): number {
   "worklet";
   return atEdge ? dx / 3 : dx;
+}
+
+export function syncedOffset(activeY: number, ownY: number, heroHeight: number): number {
+  "worklet";
+  return activeY < heroHeight ? activeY : Math.max(ownY, heroHeight);
+}
+
+export function dragX(startX: number, dx: number, count: number, width: number): number {
+  "worklet";
+  const x = startX - dx;
+  const last = (count - 1) * width;
+  if (x < 0) return rubberBand(x, true);
+  if (x > last) return last + rubberBand(x - last, true);
+  return x;
 }

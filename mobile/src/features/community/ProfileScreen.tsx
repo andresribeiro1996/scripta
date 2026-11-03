@@ -211,7 +211,7 @@ export function ProfileScreen({ username }: { username: string }) {
         tabs={PROFILE_TABS.map((entry) => ({ value: entry.value, label: t(entry.labelKey) }))}
         value={tab}
         onChange={setTab}
-        section={sectionFor(tab)}
+        sectionFor={sectionFor}
       />
       {librarySection.sheet}
     </Screen>
