@@ -15,6 +15,8 @@ import { CommentsSheet } from "../src/components/home/CommentsSheet";
 import { ConfirmProvider } from "../src/components/ConfirmDialog";
 import { ToastProvider } from "../src/components/Toaster";
 
+Object.defineProperty(globalThis, "matchMedia", { value: () => ({ matches: false }), configurable: true });
+
 const actor = { userId: "u1", username: "alice", avatarUrl: null };
 const createdAt = "2026-10-14T10:00:00.000Z";
 const tournament = { kind: "tournament" as const, id: "g1", name: "Cup of classics", bracketSize: 8, status: "active" as const, bookCount: 8, covers: ["a.png", "b.png"] };

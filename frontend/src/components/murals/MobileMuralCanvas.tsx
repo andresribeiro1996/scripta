@@ -1,5 +1,5 @@
-import { blockEffects, blockTextColors, moveMuralBlock, resolveBlockColor, type Group, type PublicReaderCard } from "@scripta/shared";
-import { themes, type ThemeColors } from "@scripta/shared/themes";
+import { blockEffects, blockTextColors, moveMuralBlock, muralBlockStyle, muralColors, resolveBlockColor, type Group, type PublicReaderCard } from "@scripta/shared";
+import type { ThemeId, ThemeScheme } from "@scripta/shared/themes";
 import GridLayout from "react-grid-layout";
 import { DndContext } from "@dnd-kit/core";
 import { useRef, useState, type CSSProperties } from "react";
@@ -75,7 +75,8 @@ function BlockFrame({
   onActivate,
   buttonRef,
   scale,
-  themeColors,
+  theme,
+  scheme,
   editing
 }: {
   block: MuralBlock;
@@ -94,12 +95,14 @@ function BlockFrame({
   onActivate: () => void;
   buttonRef?: (element: HTMLDivElement | null) => void;
   scale: number;
-  themeColors: ThemeColors;
+  theme: ThemeId;
+  scheme: ThemeScheme;
   editing: boolean;
 }) {
   const locale = useLocale();
   const t = useT();
-  const style = resolveBlockStyle(block.style);
+  const themeColors = muralColors(theme, scheme);
+  const style = muralBlockStyle(resolveBlockStyle(block.style), theme, scheme);
   const effects = blockEffects(style, themeColors);
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const overridden = style.backgroundColor || style.textColor ? blockTextColors(style, themeColors) : null;
@@ -156,6 +159,7 @@ function BlockFrame({
 
 export function MobileMuralCanvas({
   mural,
+  scheme,
   editMode,
   books,
   images,
@@ -185,6 +189,7 @@ export function MobileMuralCanvas({
   revertNonce = 0
 }: {
   mural: Mural;
+  scheme: ThemeScheme;
   editMode: boolean;
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
@@ -279,7 +284,7 @@ export function MobileMuralCanvas({
       <div
         ref={setViewport}
         className="mural-overview-stage relative w-full overflow-hidden"
-        style={{ ...muralThemeStyle(mural.theme), height: logicalHeight * scale, minHeight: editMode ? "52dvh" : undefined }}
+        style={{ ...muralThemeStyle(mural.theme, scheme), height: logicalHeight * scale, minHeight: editMode ? "52dvh" : undefined }}
       >
         {viewportWidth > 0 && (
           <div
@@ -321,7 +326,8 @@ export function MobileMuralCanvas({
                     selected={editMode && block.id === selectedBlockId}
                     draggable={canDrag && (!draft || block.id === draft.block.id)}
                     scale={scale}
-                    themeColors={themes[mural.theme].colors}
+                    theme={mural.theme}
+                    scheme={scheme}
                     editing={editMode}
                     draft={block.id === draft?.block.id}
                     invalid={block.id === draft?.block.id && !draft.valid}
@@ -428,6 +434,7 @@ export function MobileMuralCanvas({
         <MuralBlockDetail
           block={focused}
           theme={mural.theme}
+          scheme={scheme}
           books={books}
           images={images}
           profile={profile}

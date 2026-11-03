@@ -1,6 +1,6 @@
 import { bookTierlists } from "@scripta/shared";
 import { useEffect, useRef, useState } from "react";
-import { THEME_IDS, type ThemeId } from "@scripta/shared/themes";
+import { THEME_IDS, themes, type ThemeId } from "@scripta/shared/themes";
 import { useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import { EmptyState } from "../components/EmptyState";
 import { AddBlockMenu } from "../components/murals/AddBlockMenu";
@@ -559,7 +559,7 @@ export function MuralEditorPage() {
       {(view.blocks.length > 0 || mobileDraft) && (
         <div
           ref={fullscreenRef}
-          style={fullscreen ? muralThemeStyle(view.theme) : undefined}
+          style={fullscreen ? muralThemeStyle(view.theme, themes[view.theme].scheme) : undefined}
           className={fullscreen ? "fixed inset-0 z-50 overflow-y-auto [--app-top:0px] [--offline-h:0px] bg-(--color-bg) px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]" : ""}
         >
           <div ref={stickyRef} style={{ visibility: dragging ? "hidden" : undefined }} className="sticky top-(--app-top) z-40">

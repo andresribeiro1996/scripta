@@ -4,12 +4,22 @@ import { test } from "node:test";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
-import type { Duel } from "@scripta/shared";
+import { muralColors, type Duel } from "@scripta/shared";
+import { themes, type ThemeId } from "@scripta/shared/themes";
 import { DuelCard } from "../src/components/arena/DuelCard";
 import { MuralThumb } from "../src/components/murals/MuralThumb";
 import { QUIZ_TYPE_LABEL_KEYS } from "../src/lib/quizTypeLabels";
 import { t } from "../src/i18n";
 import { PANEL_HEADER } from "../src/components/page/surfaceClasses";
+
+function withScheme<T>(scheme: "light" | "dark", fn: () => T): T {
+  Object.defineProperty(globalThis, "matchMedia", { value: (query: string) => ({ matches: scheme === "dark" && query === "(prefers-color-scheme: dark)" }), configurable: true });
+  try {
+    return fn();
+  } finally {
+    delete (globalThis as { matchMedia?: unknown }).matchMedia;
+  }
+}
 
 const src = (f: string) => readFileSync(new URL(`../src/${f}.tsx`, import.meta.url), "utf8");
 
@@ -53,7 +63,7 @@ test("a mural card shows its title and a preview in the mural's own theme", () =
 });
 
 test("MuralThumb: the cover when there is one, the block layout when there is not, an icon for neither", () => {
-  const render = (props: object) => renderToString(createElement(MuralThumb, { theme: "dark", ...props }));
+  const render = (props: object) => withScheme("light", () => renderToString(createElement(MuralThumb, { theme: "dark", ...props })));
   assert.match(render({ coverUrl: "c.png" }), /<img src="c\.png"/);
   const layouts = [{ x: 0, y: 0, w: 6, h: 2 }, { x: 6, y: 0, w: 6, h: 2 }];
   const blocks = render({ layouts });
@@ -62,6 +72,20 @@ test("MuralThumb: the cover when there is one, the block layout when there is no
   assert.doesNotMatch(blocks, /<img/);
   assert.match(render({}), /<svg/);
   assert.match(blocks, /background:#/i);
+});
+
+test("MuralThumb paints a sepia mural's dark twin for a dark viewer", () => {
+  const html = withScheme("dark", () => renderToString(createElement(MuralThumb, { theme: "sepia", layouts: [{ x: 0, y: 0, w: 6, h: 2 }] })));
+  assert.match(html, new RegExp(`background:${muralColors("sepia", "dark").background}`));
+});
+
+test("MuralThumb falls back to Light for an unknown theme", () => {
+  const html = withScheme("light", () => renderToString(createElement(MuralThumb, { theme: "vaporwave" as ThemeId })));
+  assert.match(html, new RegExp(`background:${themes.light.colors.background}`));
+});
+
+test("the style editors never see a flipped block style", () => {
+  for (const file of ["pages/MuralEditorPage", "components/murals/BlockStylePanel", "components/StyleControls"]) assert.doesNotMatch(src(file), /muralBlockStyle/, file);
 });
 
 test("mural list cards put a preview over the name and one menu style, with no cover-only branches", () => {

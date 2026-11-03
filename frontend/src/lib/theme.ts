@@ -1,5 +1,6 @@
 import { useSyncExternalStore, type CSSProperties } from "react";
 import { flushSync } from "react-dom";
+import { muralColors } from "@scripta/shared";
 import { getLocalePreference, setLocalePreference } from "../i18n";
 import { parseFontPreference, parseThemePreference, resolveTheme, themes, type Appearance, type FontPreference, type FontSlot, type ThemeColors, type ThemeId, type ThemePreference, type ThemeScheme } from "@scripta/shared/themes";
 
@@ -29,8 +30,8 @@ export function themeColorVariables(colors: ThemeColors): Record<string, string>
   return Object.fromEntries(WEB_TOKENS.map(([token, name]) => [name, colors[token]]));
 }
 
-export function muralThemeStyle(id: ThemeId): CSSProperties {
-  const { scheme, colors } = themes[id];
+export function muralThemeStyle(id: ThemeId, scheme: ThemeScheme): CSSProperties {
+  const colors = muralColors(id, scheme);
   return { ...themeColorVariables(colors), colorScheme: scheme, backgroundColor: colors.background, color: colors.text } as CSSProperties;
 }
 
@@ -89,6 +90,10 @@ export function useThemePreference(): ThemePreference {
 
 export function useResolvedTheme(): ThemeId {
   return resolveTheme(useThemePreference(), osScheme());
+}
+
+export function useAppScheme(): ThemeScheme {
+  return themes[useResolvedTheme()].scheme;
 }
 
 const FONT_KEYS: Record<FontSlot, "fontDisplay" | "fontText"> = { display: "fontDisplay", text: "fontText" };

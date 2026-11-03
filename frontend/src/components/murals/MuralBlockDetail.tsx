@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { type Group, type PublicReaderCard, booksByWork, workIdOf } from "@scripta/shared";
 import { Link, useNavigate } from "react-router-dom";
-import type { ThemeId } from "@scripta/shared/themes";
+import type { ThemeId, ThemeScheme } from "@scripta/shared/themes";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import {
@@ -26,8 +26,8 @@ import { NO_GROUPS, useReaderCard } from "../../hooks/useReaderCard";
 import { ReaderCardViewer } from "../readerCard/ReaderCardViewer";
 import { useLocale, useT } from "../../i18n";
 
-function detailSheetStyle(theme: ThemeId) {
-  return { ...muralThemeStyle(theme), backgroundColor: "var(--color-surface)" };
+function detailSheetStyle(theme: ThemeId, scheme: ThemeScheme) {
+  return { ...muralThemeStyle(theme, scheme), backgroundColor: "var(--color-surface)" };
 }
 
 function ReaderCardDetailViewer({ books, groups, readerCardOverride, readerName, onClose }: { books: Array<Record<string, unknown>>; groups: Group[]; readerCardOverride?: PublicReaderCard; readerName: string; onClose: () => void }) {
@@ -39,6 +39,7 @@ function ReaderCardDetailViewer({ books, groups, readerCardOverride, readerName,
 export function MuralBlockDetail({
   block,
   theme,
+  scheme,
   books,
   images,
   profile,
@@ -52,6 +53,7 @@ export function MuralBlockDetail({
 }: {
   block: MuralBlock;
   theme: ThemeId;
+  scheme: ThemeScheme;
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   profile?: ReaderProfile;
@@ -109,7 +111,7 @@ export function MuralBlockDetail({
           : undefined
       }
       onClose={onClose}
-      style={detailSheetStyle(theme)}
+      style={detailSheetStyle(theme, scheme)}
     >
       {actions}
       <div ref={contentRef} className="max-h-[min(70dvh,40rem)] overflow-y-auto overscroll-contain px-3 pt-1 pb-5 text-base">
