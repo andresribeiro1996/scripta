@@ -156,8 +156,6 @@ export const quizzes: CatalogOf<typeof en> = {
   "quizzes.finishChapter": "Terminar capítulo",
   "quizzes.answersAfter": "As respostas e as explicações aparecem depois das cinco perguntas. Não há cronómetro.",
   "quizzes.loadChaptersFailed": "Não foi possível carregar os seus capítulos.",
-  "quizzes.noChapters": "Ainda sem capítulos",
-  "quizzes.noChaptersBody": "Termine o capítulo de hoje e ele aparece aqui.",
   "quizzes.longestStreak": "Maior sequência",
   "quizzes.days": { one: "{count} dia", other: "{count} dias" },
   "quizzes.mostPerfects": "Mais perfeitos seguidos",

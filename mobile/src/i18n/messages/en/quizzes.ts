@@ -155,8 +155,6 @@ export const quizzes = {
   "quizzes.finishChapter": "Finish chapter",
   "quizzes.answersAfter": "Answers and explanations appear after all five questions. There is no timer.",
   "quizzes.loadChaptersFailed": "Couldn't load your chapters.",
-  "quizzes.noChapters": "No chapters yet",
-  "quizzes.noChaptersBody": "Finish today's chapter and it will show up here.",
   "quizzes.longestStreak": "Longest streak",
   "quizzes.days": { one: "{count} day", other: "{count} days" },
   "quizzes.mostPerfects": "Most perfects in a row",
