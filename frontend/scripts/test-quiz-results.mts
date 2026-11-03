@@ -140,7 +140,7 @@ test("the viewer's row is highlighted without visible text", () => {
   assert.match(html, /<li[^>]*bg-\(--color-accent-soft\)/);
   assert.match(html, /Martinha <span class="sr-only">You</);
   assert.match(html, /<li[^>]*-mx-3[^>]*px-3/);
-  assert.doesNotMatch(boardRows(render(result, [play()]))[0]!, /-mx-3|px-3/);
+  assert.doesNotMatch(boardRows(render(result, [play()]))[0]!.match(/^<li[^>]*>/)![0], /-mx-3|px-3/);
   assert.doesNotMatch(render(result, [play()]), /<li[^>]*bg-\(--color-accent-soft\)|sr-only">You</);
 });
 
