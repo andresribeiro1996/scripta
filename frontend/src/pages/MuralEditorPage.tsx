@@ -1,4 +1,4 @@
-import { bookTierlists } from "@scripta/shared";
+import { bookTierlists, oppositeScheme } from "@scripta/shared";
 import { useEffect, useRef, useState } from "react";
 import { THEME_IDS, themes, type ThemeId } from "@scripta/shared/themes";
 import { useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
@@ -143,6 +143,7 @@ export function MuralEditorPage() {
   const [nameDraft, setNameDraft] = useState("");
   const [sharing, setSharing] = useState(false);
   const [pickingTheme, setPickingTheme] = useState(false);
+  const [showTwin, setShowTwin] = useState(false);
   const { ref: fullscreenRef, fullscreen, enterFullscreen, exitFullscreen } = useMuralFullscreen();
   // Bumped only when a save fails; see guard() below for why a
   // remount is what puts a block back where it was.
@@ -469,6 +470,7 @@ export function MuralEditorPage() {
     shareUrl: null,
     folderId: draftFolderId
   };
+  const editorScheme = showTwin ? oppositeScheme(themes[view.theme].scheme) : themes[view.theme].scheme;
 
   return (
     <Page
@@ -516,6 +518,12 @@ export function MuralEditorPage() {
           >
             {t("muralEditor.theme")}
           </button>
+          <button
+            onClick={() => setShowTwin((value) => !value)}
+            className={BUTTON_SECONDARY}
+          >
+            {t(oppositeScheme(editorScheme) === "dark" ? "muralEditor.previewDark" : "muralEditor.previewLight")}
+          </button>
           {/* Nothing to share until the mural exists. Hidden rather
               than disabled on a draft: a greyed button invites a tap
               that can't do anything, and the button reappears the
@@ -559,7 +567,7 @@ export function MuralEditorPage() {
       {(view.blocks.length > 0 || mobileDraft) && (
         <div
           ref={fullscreenRef}
-          style={fullscreen ? muralThemeStyle(view.theme, themes[view.theme].scheme) : undefined}
+          style={fullscreen ? muralThemeStyle(view.theme, editorScheme) : undefined}
           className={fullscreen ? "fixed inset-0 z-50 overflow-y-auto [--app-top:0px] [--offline-h:0px] bg-(--color-bg) px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]" : ""}
         >
           <div ref={stickyRef} style={{ visibility: dragging ? "hidden" : undefined }} className="sticky top-(--app-top) z-40">
@@ -579,6 +587,7 @@ export function MuralEditorPage() {
           <div className="mx-auto max-w-6xl">
             <MuralCanvas
               mural={view}
+              scheme={editorScheme}
               editMode={editMode}
               onDragChange={setDragging}
               groups={library?.data.groups ?? NO_GROUPS}
@@ -627,6 +636,7 @@ export function MuralEditorPage() {
         <BlockStylePanel
           block={stylingBlock}
           preview={(style) => <MuralCanvas
+            scheme={editorScheme}
             mural={{ ...view, blocks: [{ ...stylingBlock, style, layout: { ...stylingBlock.layout, x: 0, y: 0 } }] }}
             editMode={false}
             books={books}

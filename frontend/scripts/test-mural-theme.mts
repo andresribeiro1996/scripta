@@ -27,3 +27,10 @@ test("muralThemeStyle paints the palette of the scheme it is given", () => {
     assert.equal(style.colorScheme, scheme);
   }
 });
+
+test("the mural editor renders every view of the mural in the editor's scheme", () => {
+  const page = readFileSync(new URL("../src/pages/MuralEditorPage.tsx", import.meta.url), "utf8");
+  assert.equal(page.match(/scheme=\{editorScheme\}/g)?.length, 2);
+  assert.match(page, /muralThemeStyle\(view\.theme, editorScheme\)/);
+  assert.match(page, /const editorScheme = showTwin \? oppositeScheme\(themes\[view\.theme\]\.scheme\) : themes\[view\.theme\]\.scheme/);
+});

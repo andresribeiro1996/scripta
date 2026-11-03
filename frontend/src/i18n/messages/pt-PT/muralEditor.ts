@@ -8,6 +8,8 @@ export const muralEditor: CatalogOf<typeof en> = {
   "muralEditor.renameMural": "Mudar o nome deste mural",
   "muralEditor.fullscreen": "Ecrã inteiro",
   "muralEditor.theme": "Tema",
+  "muralEditor.previewDark": "Pré-visualizar escuro",
+  "muralEditor.previewLight": "Pré-visualizar claro",
   "muralEditor.muralTheme": "Tema do mural",
   "muralEditor.doneEditing": "Concluir edição",
   "muralEditor.emptyBodyEditing": "Adicione o seu primeiro bloco com o botão + acima.",
