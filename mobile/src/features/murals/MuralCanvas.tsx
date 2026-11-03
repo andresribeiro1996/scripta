@@ -17,6 +17,8 @@ import {
   computeStat,
   libraryBreakdown,
   localDay,
+  muralBlockStyle,
+  muralColors,
   muralThemeId,
   moveMuralBlock,
   muralDragScrollSpeed,
@@ -35,7 +37,7 @@ import {
   type ShelfTheme,
   type StatMetric,
 } from "@scripta/shared";
-import { themes, type ThemeId } from "@scripta/shared/themes";
+import type { ThemeId } from "@scripta/shared/themes";
 import { CoverImage } from "../library/components/CoverImage";
 import { ReaderCardBlock } from "./ReaderCardBlock";
 import { Image } from "expo-image";
@@ -175,9 +177,9 @@ function CoverRow({ blockId, books, mode, caption, dim, accent, editable, onAsse
 export function BlockContent({ block, books, images, tierlists, profile, groups, shelfThemeOverride, readerCardOverride, statsOverride, editable, onAssetReady }: { block: MuralBlock; books: Array<Record<string, unknown>>; images: GalleryImage[]; tierlists: Tierlist[]; profile?: ReaderProfile; groups?: Group[]; shelfThemeOverride?: ShelfTheme; readerCardOverride?: PublicReaderCard; statsOverride?: Record<string, number>; editable?: boolean; onAssetReady?: (key: string) => void }) {
   const locale = useLocale();
   const t = useT();
-  const { colors: themeColors } = useTheme();
+  const { colors: themeColors, id, mode } = useTheme();
   const [failedSource, setFailedSource] = useState<string | null>(null);
-  const style = resolveBlockStyle(block.style);
+  const style = muralBlockStyle(resolveBlockStyle(block.style), id, mode);
   const blockColors = blockTextColors(style, themeColors);
   const colors = { ...themeColors, text: blockColors.text };
   const text = blockTextStyles(style, colors.text);
@@ -328,7 +330,8 @@ const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, se
     if (next.x !== previous?.x || next.active !== previous?.active) x.set(next.active || reducedMotion ? next.x : withSpring(next.x, MOVE_SPRING));
     if (next.y !== previous?.y || next.active !== previous?.active) y.set(next.active || reducedMotion ? next.y : withSpring(next.y, MOVE_SPRING));
   });
-  const style = resolveBlockStyle(block.style);
+  const { id, mode } = useTheme();
+  const style = muralBlockStyle(resolveBlockStyle(block.style), id, mode);
   const restOpacity = blockEffects(style, colors).opacity;
   const animated = useAnimatedStyle(() => {
     const current = drag.get();
@@ -372,11 +375,12 @@ export function BlockPreview({ theme, block, canvasWidth, maxHeight, books, imag
 }) {
   const locale = useLocale();
   const t = useT();
-  const colors = themes[theme].colors;
+  const { mode } = useTheme();
+  const colors = muralColors(theme, mode);
   const [boxWidth, setBoxWidth] = useState(0);
   const [day] = useState(localDay);
   const resolved = useMemo(() => resolveHomeBlock(block, books, groups, day, locale), [block, books, groups, day, locale]);
-  const style = resolveBlockStyle(resolved.style);
+  const style = muralBlockStyle(resolveBlockStyle(resolved.style), theme, mode);
   const width = block.layout.w * gridColumnWidth(canvasWidth) - GAP;
   const height = block.layout.h * ROW_HEIGHT - ROW_GAP;
   const room = boxWidth - spacing.md * 2;
@@ -424,7 +428,8 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
 }) {
   const locale = useLocale();
   const theme = muralThemeId(mural.theme);
-  const colors = themes[theme].colors;
+  const { mode } = useTheme();
+  const colors = muralColors(theme, mode);
   const [width, setWidth] = useState(0);
   const drag = useSharedValue<DragState | null>(null);
   const preview = useSharedValue<Record<string, BlockLayout>>({});

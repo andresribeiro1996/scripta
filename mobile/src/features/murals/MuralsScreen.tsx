@@ -7,10 +7,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useQuery } from "@tanstack/react-query";
 import { Stack, useRouter } from "expo-router";
-import { buildMuralPreset, muralThemeId, muralPresets, presetAvailability, type Mural, type MuralFolder, type MuralPresetId } from "@scripta/shared";
+import { buildMuralPreset, muralColors, muralThemeId, muralPresets, presetAvailability, type Mural, type MuralFolder, type MuralPresetId } from "@scripta/shared";
 import { ActionSheet, Button, ConfirmDialog, dynamicType, EmptyState, ErrorState, Fab, Icon, IconButton, Input, minimumTouchTarget, ModalBody, Screen, Sheet, Toast } from "../../ui";
 import { radii, spacing, typography, useTheme } from "../../ui/theme";
-import { themes } from "@scripta/shared/themes";
 import { MuralThumbnail } from "./MuralCanvas";
 import { fetchGalleryImages } from "../gallery/api";
 import { fetchTierlists } from "../tierlists/api";
@@ -26,7 +25,7 @@ import { useLocale, useT } from "../../i18n";
 export function MuralsScreen() {
   const locale = useLocale();
   const t = useT();
-  const { colors, id: theme } = useTheme();
+  const { colors, id: theme, mode } = useTheme();
   const router = useRouter();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -215,7 +214,7 @@ export function MuralsScreen() {
             ListEmptyComponent={!murals.isPending ? <EmptyState title={search ? t("arena.nothingMatches") : t("murals.noMuralsHere")} body={search ? t("murals.searchEmptyBody") : t("murals.emptyBody")} actionLabel={search ? t("shell.clearSearch") : t("murals.startFromPreset")} onAction={search ? clearSearch : openPresets} /> : undefined}
             renderItem={({ item }) => {
               const muralTheme = muralThemeId(item.theme);
-              const palette = themes[muralTheme].colors;
+              const palette = muralColors(muralTheme, mode);
               return (
                 <View style={[styles.card, { width: cardWidth, backgroundColor: palette.background, borderColor: palette.border }]}>
                   <Pressable accessibilityLabel={t("murals.openMural", { name: item.name })} accessibilityRole="button" style={({ pressed }) => [styles.open, { opacity: pressed ? 0.75 : 1 }]} onPress={() => router.push(`/murals/${item.id}` as never)}>
