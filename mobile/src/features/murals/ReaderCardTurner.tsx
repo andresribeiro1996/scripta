@@ -13,7 +13,7 @@ const EASE = Easing.bezier(MOTION.ease[0], MOTION.ease[1], MOTION.ease[2], MOTIO
 const TURN_MS = 450;
 const DOT_ON_SCRIM = "#ffffff";
 
-export function ReaderCardTurner({ input, width, onScrim = false, page, liveShine = false, dots = true }: { input: ReaderCardBase; width: number; onScrim?: boolean; page?: { page: ReaderCardPage }; liveShine?: boolean; dots?: boolean }) {
+export function ReaderCardTurner({ input, width, onScrim = false, page, liveShine = false }: { input: ReaderCardBase; width: number; onScrim?: boolean; page?: { page: ReaderCardPage }; liveShine?: boolean }) {
   const t = useT();
   const { colors } = useTheme();
   const reduced = useReducedMotion();
@@ -75,15 +75,13 @@ export function ReaderCardTurner({ input, width, onScrim = false, page, liveShin
           <CardFaces key={rest} rotation={rotation} faces={[<Fragment key="a"><ReaderCardImage input={input} page={pages[turn.faces[0]]!} width={width} />{shineOn(pages[turn.faces[0]]!)}</Fragment>, <Fragment key="b"><ReaderCardImage input={input} page={pages[turn.faces[1]]!} width={width} />{shineOn(pages[turn.faces[1]]!)}</Fragment>]} />
         </Pressable>
       )}
-      {dots ? (
-        <View style={styles.dots}>
-          {pages.map((_, i) => (
-            <Pressable key={i} accessibilityLabel={t("murals.pageNumber", { page: i + 1 })} accessibilityRole="button" accessibilityState={{ selected: i === turn.index }} onPress={() => setTurn((state) => turnTo(state, i, i > state.index ? 1 : -1))} style={styles.dot}>
-              <View style={[styles.dotMark, { backgroundColor: dotColor, opacity: i === turn.index ? 1 : 0.4 }]} />
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
+      <View style={styles.dots}>
+        {pages.map((_, i) => (
+          <Pressable key={i} accessibilityLabel={t("murals.pageNumber", { page: i + 1 })} accessibilityRole="button" accessibilityState={{ selected: i === turn.index }} onPress={() => setTurn((state) => turnTo(state, i, i > state.index ? 1 : -1))} style={styles.dot}>
+            <View style={[styles.dotMark, { backgroundColor: dotColor, opacity: i === turn.index ? 1 : 0.4 }]} />
+          </Pressable>
+        ))}
+      </View>
     </View>
   );
 }

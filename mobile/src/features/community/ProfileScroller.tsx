@@ -85,7 +85,8 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
   const drag = useSharedValue(0);
   const dragTab = useSharedValue<T | null>(null);
   const downX = useSharedValue(0);
-  const order = tabs.map((tab) => tab.value);
+  const orderKey = tabs.map((tab) => tab.value).join("\n");
+  const order = useMemo(() => orderKey.split("\n") as T[], [orderKey]);
   const tabState = useSharedValue({ order, value });
   const { width } = useWindowDimensions();
   const slideFrom = useRef(0);
@@ -104,7 +105,7 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
 
   useEffect(() => {
     tabState.set({ order, value });
-  });
+  }, [order, value, tabState]);
 
   function select(next: T) {
     const offset = pinnedOffset(scrollY.get(), heroHeight);

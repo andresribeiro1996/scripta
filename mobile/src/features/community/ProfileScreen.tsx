@@ -149,6 +149,7 @@ export function ProfileScreen({ username }: { username: string }) {
                 tierlists={tierlists}
                 profile={profileUser}
                 profileInHero
+                initialWidth={width - spacing.lg * 2}
                 shelfThemeOverride={muralData?.library.shelfTheme}
                 statsOverride={muralData?.library.stats}
               />
