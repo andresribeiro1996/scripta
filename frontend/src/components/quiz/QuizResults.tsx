@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { decimalText, playerLabel, resultCovers, scoreRows, type PlayResponse, type PublicQuizQuestion, type ScoreRow } from "@scripta/shared";
+import { Link } from "react-router-dom";
+import { answerExpands, leaderboardPosition, missesFirst, playDurationLabel, playerLabel, resultCovers, scoreRows, type PlayResponse, type PublicQuizQuestion, type ScoreRow } from "@scripta/shared";
 import { fetchPublicResultsApi } from "../../api/quizzes";
 import { CoverImage } from "../BookCard";
+import { AuthorAvatar } from "../CommunityAuthorAvatar";
 import { LibraryIcon } from "../NavIcons";
 import { ChevronRightIcon, ShareIcon } from "../Toolbar";
 import { Page } from "../page/Page";
@@ -26,35 +28,60 @@ function AnswerValue({ value, picked = false }: { value: NonNullable<ScoreRow["a
   );
 }
 
+function quotedPrompt(row: ScoreRow, question: PublicQuizQuestion) {
+  if (!row.prompt) return null;
+  return question.type === "quote_title" || question.type === "blurb_title" ? `“${row.prompt}”` : row.prompt;
+}
+
 function QuizAnswer({ row, question, expanded, onToggle }: { row: ScoreRow; question: PublicQuizQuestion; expanded: boolean; onToggle: () => void }) {
   const t = useT();
   const title = row.answer?.title ?? (row.answer?.kind === "text" ? row.answer.value : t("quizzes.questionNumber", { number: row.number }));
   const cover = row.answer?.kind === "cover" ? row.answer.value : question.type === "cover_title" ? question.prompt : null;
+  const expands = answerExpands(row);
+  const prompt = quotedPrompt(row, question);
+  const verdict = row.correct ? t("quizzes.correct") : row.pick?.kind === "text" ? t("quizzes.youPicked", { value: row.pick.value }) : t("quizzes.incorrect");
+  const summary = (
+    <>
+      <span aria-hidden="true" className="relative flex h-16 w-11 shrink-0 items-center justify-center overflow-hidden rounded bg-(--color-accent-soft) text-(--color-text-dim)">
+        {cover ? <CoverImage book={{ _coverUrl: cover }} fit="contain" /> : <LibraryIcon size={22} />}
+      </span>
+      <span className="min-w-0 flex-1">
+        {row.answer && <span className="sr-only">{t("quizzes.questionNumberLabel", { number: row.number })}</span>}
+        {prompt && <span className={`mb-1 block text-xs break-words text-(--color-text-dim) ${expands && !expanded ? "line-clamp-2" : ""}`}>{prompt}</span>}
+        <span className="block text-sm break-words">{title}</span>
+        <span className={`mt-1 block text-xs break-words ${row.correct ? "text-(--color-success)" : "text-(--color-danger)"}`}><span aria-hidden="true">{row.correct ? "✓" : "✗"} </span>{verdict}</span>
+      </span>
+    </>
+  );
   return (
     <li className="lg:flex lg:gap-4 lg:p-5">
-      <button type="button" aria-expanded={expanded} aria-controls={`quiz-answer-${row.id}`} onClick={onToggle} className="flex min-h-22 w-full items-center gap-3 py-3 text-left lg:hidden">
-        <span aria-hidden="true" className="relative flex h-16 w-11 shrink-0 items-center justify-center overflow-hidden rounded bg-(--color-accent-soft) text-(--color-text-dim)">
-          {cover ? <CoverImage book={{ _coverUrl: cover }} fit="contain" /> : <LibraryIcon size={22} />}
-        </span>
-        <span className="min-w-0 flex-1">
-          {row.answer && <span className="sr-only">{t("quizzes.questionNumberLabel", { number: row.number })}</span>}<span className="block text-sm break-words">{title}</span>
-          <span className={`mt-1 block text-xs ${row.correct ? "text-(--color-success)" : "text-(--color-danger)"}`}><span aria-hidden="true">{row.correct ? "✓" : "✗"} </span>{row.correct ? t("quizzes.correct") : t("quizzes.incorrect")}</span>
-        </span>
-        <span aria-hidden="true" className={`shrink-0 text-(--color-text-dim) ${expanded ? "rotate-90" : ""}`}><ChevronRightIcon size={16} /></span>
-      </button>
+      {expands ? (
+        <button type="button" aria-expanded={expanded} aria-controls={`quiz-answer-${row.id}`} onClick={onToggle} className="flex min-h-22 w-full items-center gap-3 py-3 text-left lg:hidden">
+          {summary}
+          <span aria-hidden="true" className={`shrink-0 text-(--color-text-dim) ${expanded ? "rotate-90" : ""}`}><ChevronRightIcon size={16} /></span>
+        </button>
+      ) : (
+        <div className="flex min-h-22 w-full items-center gap-3 py-3 lg:hidden">{summary}</div>
+      )}
       <span className="hidden pt-0.5 text-sm tabular-nums text-(--color-text-dim) lg:block">{String(row.number).padStart(2, "0")}</span>
       <div id={`quiz-answer-${row.id}`} className={`min-w-0 flex-1 pb-4 lg:block lg:pb-0 ${expanded ? "" : "hidden"}`}>
+        {prompt && <p className="mb-3 hidden text-sm break-words text-(--color-text-dim) lg:block">{prompt}</p>}
         <p className={`mb-3 hidden items-center gap-1.5 text-xs font-semibold lg:flex ${row.correct ? "text-(--color-success)" : "text-(--color-danger)"}`}>
-          <span aria-hidden="true">{row.correct ? "✓" : "✗"}</span>{row.correct ? t("quizzes.correct") : t("quizzes.incorrect")}
+          <span aria-hidden="true">{row.correct ? "✓" : "✗"}</span>{verdict}
         </p>
-        <div className={row.pick ? "grid grid-cols-2 gap-3 lg:gap-4" : ""}>
+        <div className={row.pick ? `grid-cols-2 gap-3 lg:gap-4 ${row.pick.kind === "cover" ? "grid" : "hidden lg:grid"}` : ""}>
           {row.answer && <AnswerValue value={row.answer} />}
           {row.pick && <div className="border-l border-(--color-border) pl-3 lg:pl-4"><AnswerValue value={row.pick} picked /></div>}
           {!row.answer && <p className="text-sm text-(--color-text-dim)">{t("quizzes.answerUnavailable")}</p>}
         </div>
+        {row.workId && <Link to={`/work/${row.workId}`} className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-(--color-accent) hover:underline">{t("quizzes.openBook")}</Link>}
       </div>
     </li>
   );
+}
+
+function usePublicResults(code: string, playId: string | null) {
+  return useQuery({ queryKey: ["quizPublicResults", code, playId], queryFn: () => fetchPublicResultsApi(code, playId) });
 }
 
 export function QuizResults({ code, name, result, questions, back }: {
@@ -69,14 +96,21 @@ export function QuizResults({ code, name, result, questions, back }: {
   const [expanded, setExpanded] = useState<string | null>(null);
   const rows = scoreRows(questions, result.correct, result.answers);
   const covers = resultCovers(questions, rows);
+  const board = usePublicResults(code, result.playId).data;
+  const position = board ? leaderboardPosition(board.plays) : null;
+  const alone = board?.plays.length === 1 && board.plays[0]!.isYou;
 
   return (
     <Page back={back} title={name}>
       <section aria-label={t("quizzes.yourResult")} className={`relative isolate mb-3 grid items-center gap-x-4 gap-y-3 pb-3 lg:mb-8 lg:gap-6 lg:border-b lg:border-(--color-border) lg:pb-10 ${covers.length ? "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-2" : ""}`}>
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10" style={{ background: "radial-gradient(ellipse at 60% 50%, color-mix(in srgb, var(--color-accent) 8%, transparent), transparent 70%)" }} />
-        <p aria-label={t("quizzes.scoreOf", { score: result.score, total: questions.length })} className="my-3 min-w-0 font-sans text-[clamp(3.5rem,18vw,5rem)] leading-none font-extralight tracking-[-0.05em] lg:text-[6.5rem]">
-          {result.score}<span className="text-[0.45em] text-(--color-text-dim)"> / {questions.length}</span>
-        </p>
+        <div className="min-w-0">
+          <p aria-label={t("quizzes.scoreOf", { score: result.score, total: questions.length })} className="my-3 min-w-0 font-sans text-[clamp(3.5rem,18vw,5rem)] leading-none font-extralight tracking-[-0.05em] lg:text-[6.5rem]">
+            {result.score}<span className="text-[0.45em] text-(--color-text-dim)"> / {questions.length}</span>
+          </p>
+          {position && <p className="text-sm font-semibold">{t("quizzes.rankOf", position)}</p>}
+          {alone && <p className="text-sm text-(--color-text-dim)">{t("quizzes.justYou")}</p>}
+        </div>
         {covers.length > 0 && (
           <div aria-hidden="true" className="flex justify-end py-3 lg:justify-center lg:py-6">
             {covers.map(({ url, title }, index) => (
@@ -106,21 +140,21 @@ export function QuizResults({ code, name, result, questions, back }: {
         <section id="quiz-answers-panel" role="tabpanel" aria-labelledby="quiz-answers-tab" className={`min-w-0 lg:row-span-2 lg:block ${tab === "answers" ? "" : "hidden"}`}>
           <h2 id="quiz-answers-heading" className="mb-4 hidden font-display text-2xl lg:block">{t("quizzes.yourAnswers")}</h2>
           <ol className="divide-y divide-(--color-border) lg:rounded-xl lg:border lg:border-(--color-border) lg:bg-(--color-surface)">
-            {rows.map((row, index) => <QuizAnswer key={row.id} row={row} question={questions[index]!} expanded={expanded === row.id} onToggle={() => setExpanded((current) => current === row.id ? null : row.id)} />)}
+            {missesFirst(rows).map((row) => <QuizAnswer key={row.id} row={row} question={questions[row.number - 1]!} expanded={expanded === row.id} onToggle={() => setExpanded((current) => current === row.id ? null : row.id)} />)}
           </ol>
         </section>
         <div id="quiz-board-panel" role="tabpanel" aria-labelledby="quiz-board-tab" className={`min-w-0 lg:col-start-2 lg:row-start-2 lg:block [&_h2]:hidden lg:[&_h2]:block ${tab === "board" ? "" : "hidden"}`}>
-          <QuizLeaderboard code={code} />
+          <QuizLeaderboard code={code} playId={result.playId} />
         </div>
         <div className="min-w-0 lg:col-start-2 lg:row-start-1">
-          <ChallengeLink code={code} />
+          <ChallengeLink code={code} score={result.score} total={questions.length} name={name} />
         </div>
       </div>
     </Page>
   );
 }
 
-function ChallengeLink({ code }: { code: string }) {
+function ChallengeLink({ code, score, total, name }: { code: string; score: number; total: number; name: string }) {
   const t = useT();
   const shareLink = `${window.location.origin}/play/${code}`;
   const [copied, setCopied] = useState(false);
@@ -137,7 +171,7 @@ function ChallengeLink({ code }: { code: string }) {
     setCopyError(null);
     setCopied(false);
     try {
-      await navigator.clipboard.writeText(shareLink);
+      await navigator.clipboard.writeText(t("quizzes.challengeMessage", { score, total, name, url: shareLink }));
       setCopied(true);
     } catch (reason) {
       setCopyError(reason instanceof Error ? reason.message : t("quizzes.copyManually"));
@@ -161,10 +195,10 @@ function ChallengeLink({ code }: { code: string }) {
   );
 }
 
-export function QuizLeaderboard({ code }: { code: string }) {
+export function QuizLeaderboard({ code, playId }: { code: string; playId: string | null }) {
   const t = useT();
   const locale = useLocale();
-  const leaderboard = useQuery({ queryKey: ["quizPublicResults", code], queryFn: () => fetchPublicResultsApi(code, null) });
+  const leaderboard = usePublicResults(code, playId);
   if (leaderboard.isError) return <p className="text-sm text-(--color-text-dim)">{t("quizzes.leaderboardFailed")}</p>;
   if (!leaderboard.data) return <p role="status" className="text-sm text-(--color-text-dim)">{t("quizzes.loadingLeaderboard")}</p>;
   return (
@@ -174,19 +208,24 @@ export function QuizLeaderboard({ code }: { code: string }) {
         <p className="text-sm text-(--color-text-dim)">{t("quizzes.noPlays")}</p>
       ) : (
         <ol className="divide-y divide-(--color-border) border-y border-(--color-border)">
-          {leaderboard.data.plays.map((play, index) => (
-            <li key={index} className="flex items-center gap-3 py-4 text-sm">
-              <span className="w-5 shrink-0 tabular-nums text-(--color-text-dim)">{index + 1}</span>
-              <div className="min-w-0 flex-1">
-                <p className="break-words font-medium">{playerLabel(play, locale).name}</p>
-                {playerLabel(play, locale).guest && <p className="text-xs text-(--color-text-dim)">{t("quizzes.guest")}</p>}
-              </div>
-              <div className="shrink-0 text-right tabular-nums">
-                <p className="font-semibold"><span className="sr-only">{t("quizzes.scoreLabel")}</span>{play.score}/{leaderboard.data.questionCount}</p>
-                <p className="mt-0.5 text-xs text-(--color-text-dim)"><span className="sr-only">{t("quizzes.timeLabel")}</span>{t("quizzes.seconds", { value: decimalText(play.durationMs / 1000, locale, 1) })}</p>
-              </div>
-            </li>
-          ))}
+          {leaderboard.data.plays.map((play, index) => {
+            const label = playerLabel(play, locale);
+            const avatar = <AuthorAvatar author={{ username: label.name, avatarUrl: play.avatarUrl }} size={28} />;
+            return (
+              <li key={index} className={`flex items-center gap-3 px-3 py-4 text-sm ${play.isYou ? "bg-(--color-accent-soft)" : ""}`}>
+                <span className={`w-5 shrink-0 tabular-nums ${index === 0 ? "font-semibold text-(--color-accent)" : "text-(--color-text-dim)"}`}>{index + 1}</span>
+                {play.isYou ? <span className="shrink-0 rounded-full ring-1 ring-(--color-accent)">{avatar}</span> : avatar}
+                <div className="min-w-0 flex-1">
+                  <p className="break-words font-medium">{label.name}{play.isYou && <span className="sr-only">{t("quizzes.you")}</span>}</p>
+                  {label.guest && <p className="text-xs text-(--color-text-dim)">{t("quizzes.guest")}</p>}
+                </div>
+                <div className="shrink-0 text-right tabular-nums">
+                  <p className="font-semibold"><span className="sr-only">{t("quizzes.scoreLabel")}</span>{play.score}/{leaderboard.data.questionCount}</p>
+                  <p className="mt-0.5 text-xs text-(--color-text-dim)"><span className="sr-only">{t("quizzes.timeLabel")}</span>{playDurationLabel(play.durationMs, locale)}</p>
+                </div>
+              </li>
+            );
+          })}
         </ol>
       )}
     </section>

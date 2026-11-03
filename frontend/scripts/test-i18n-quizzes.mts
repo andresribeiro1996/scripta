@@ -56,12 +56,12 @@ const result: PlayResponse = {
   playId: "play",
   score: 1,
   correct: { quote: true, repeat: false },
-  answers: { quote: { answerIndex: 0, choiceIndex: 0 }, repeat: { answerIndex: 0, choiceIndex: 1 } },
+  answers: { quote: { answerIndex: 0, choiceIndex: 0, workId: "w1" }, repeat: { answerIndex: 0, choiceIndex: 1, workId: "w2" } },
 };
 
 const results = () => rendered(
   () => createElement(QuizResults, { code: "challenge", name: "Book quiz", questions, result }),
-  (client) => client.setQueryData(["quizPublicResults", "challenge"], { plays: [{ playerName: null, anonymous: true, score: 2, durationMs: 16800 }], questionCount: 2 }),
+  (client) => client.setQueryData(["quizPublicResults", "challenge", "play"], { plays: [{ playerName: null, anonymous: true, avatarUrl: null, isYou: false, score: 2, durationMs: 16800 }], questionCount: 2 }),
 );
 
 test("quiz results, leaderboard and decimal duration render in Portuguese", () => {

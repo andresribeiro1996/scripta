@@ -103,7 +103,7 @@ export function PlayQuizPage() {
       <Page width="narrow" back={back} title={playBoard.name}>
         <div className="flex flex-col gap-6">
           <p className="text-center text-(--color-text-dim)">{t("quizzes.isClosed")}</p>
-          <QuizLeaderboard code={code ?? ""} />
+          <QuizLeaderboard code={code ?? ""} playId={null} />
         </div>
       </Page>
     );
