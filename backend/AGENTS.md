@@ -11,6 +11,7 @@ Fastify/TypeScript API, modular monolith. Read `README.md` before changing it.
 
 ## Rules
 
+- Read `docs/glossary.md` before naming or changing catalog, work, key or library-group logic.
 - One module per domain under `src/modules/<domain>/`; keep routes, service, and adapters inside it.
 - Put logic shared with the web or mobile client in `@scripta/shared`; do not duplicate it.
 - `npm test` names its test files explicitly — add new `*.test.ts` files to that list or CI will not run them.
