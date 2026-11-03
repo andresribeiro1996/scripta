@@ -156,6 +156,8 @@ export const murals = {
   "murals.pickSpotlight": "Pick a book for this spotlight.",
   "murals.pickerRow": "{label}: {value}",
   "murals.pinnedPassage": "Pinned passage",
+  "murals.previewDark": "Preview dark",
+  "murals.previewLight": "Preview light",
   "murals.presetDiffuse": "Diffuse",
   "murals.presetFaint": "Faint",
   "murals.presetFar": "Far",

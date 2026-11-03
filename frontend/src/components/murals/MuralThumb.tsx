@@ -1,9 +1,12 @@
-import { themes, type ThemeId } from "@scripta/shared/themes";
+import { muralColors } from "@scripta/shared";
+import type { ThemeId } from "@scripta/shared/themes";
 import type { BlockLayout } from "../../lib/murals";
+import { muralThemeId } from "../../lib/murals";
+import { useAppScheme } from "../../lib/theme";
 import { MuralsIcon } from "../NavIcons";
 
 export function MuralThumb({ theme, coverUrl, layouts = [], className = "" }: { theme: ThemeId; coverUrl?: string | null; layouts?: BlockLayout[]; className?: string }) {
-  const colors = themes[theme].colors;
+  const colors = muralColors(muralThemeId(theme), useAppScheme());
   const bottom = Math.max(1, ...layouts.map((layout) => layout.y + layout.h));
   return (
     <div aria-hidden="true" className={`relative overflow-hidden ${className}`} style={{ background: colors.background, color: colors.accent }}>

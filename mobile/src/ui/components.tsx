@@ -13,14 +13,14 @@ import { fontStyleFor } from "./fontStyle";
 import { revealOffset } from "./keyboardScroll";
 import { SYSTEM_FAMILY } from "./systemFont";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useReducedMotion, useTheme } from "./theme";
-import { THEME_DECOR, withOpacity, type ThemeId } from "@scripta/shared/themes";
+import { themeDecor, withOpacity, type ThemeColors, type ThemeId } from "@scripta/shared/themes";
 import { decorLayerStyle, pieceStyle } from "./decorLayout";
 import { useT } from "../i18n";
 
 const AnimatedPagerView = Animated.createAnimatedComponent(PagerView);
 
-const DecorLayer = memo(function DecorLayer({ id, top, bottom, insetTop, insetBottom }: { id: ThemeId; top: boolean; bottom: boolean; insetTop: number; insetBottom: number }) {
-  const decor = THEME_DECOR[id];
+const DecorLayer = memo(function DecorLayer({ id, colors, top, bottom, insetTop, insetBottom }: { id: ThemeId; colors: ThemeColors; top: boolean; bottom: boolean; insetTop: number; insetBottom: number }) {
+  const decor = themeDecor(id, colors);
   if (!decor) return null;
   return (
     <View pointerEvents="none" style={decorLayerStyle(top, bottom, { top: insetTop, bottom: insetBottom })}>
@@ -66,7 +66,7 @@ export function Screen({
         style,
       ]}
     >
-      <DecorLayer id={id} top={top} bottom={bottom} insetTop={insets.top} insetBottom={insets.bottom} />
+      <DecorLayer id={id} colors={colors} top={top} bottom={bottom} insetTop={insets.top} insetBottom={insets.bottom} />
       {children}
     </View>
   );

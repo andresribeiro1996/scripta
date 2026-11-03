@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { booksByWork, workIdOf } from "@scripta/shared";
 import { Link } from "react-router-dom";
-import type { ThemeId } from "@scripta/shared/themes";
+import type { ThemeId, ThemeScheme } from "@scripta/shared/themes";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import {
@@ -24,13 +24,14 @@ import { Sheet } from "../Sheet";
 import { ProfileBlockView } from "./blocks/MiscBlocks";
 import { useLocale, useT } from "../../i18n";
 
-function detailSheetStyle(theme: ThemeId) {
-  return { ...muralThemeStyle(theme), backgroundColor: "var(--color-surface)" };
+function detailSheetStyle(theme: ThemeId, scheme: ThemeScheme) {
+  return { ...muralThemeStyle(theme, scheme), backgroundColor: "var(--color-surface)" };
 }
 
 export function MuralBlockDetail({
   block,
   theme,
+  scheme,
   books,
   images,
   profile,
@@ -42,6 +43,7 @@ export function MuralBlockDetail({
 }: {
   block: MuralBlock;
   theme: ThemeId;
+  scheme: ThemeScheme;
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   profile?: ReaderProfile;
@@ -94,7 +96,7 @@ export function MuralBlockDetail({
           : undefined
       }
       onClose={onClose}
-      style={detailSheetStyle(theme)}
+      style={detailSheetStyle(theme, scheme)}
     >
       {actions}
       <div ref={contentRef} className="max-h-[min(70dvh,40rem)] overflow-y-auto overscroll-contain px-3 pt-1 pb-5 text-base">

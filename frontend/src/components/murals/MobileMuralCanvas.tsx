@@ -1,5 +1,5 @@
-import { blockEffects, blockTextColors, floatingBlockShadow, moveMuralBlock, resolveBlockColor } from "@scripta/shared";
-import { themes, type ThemeColors, type ThemeScheme } from "@scripta/shared/themes";
+import { blockEffects, blockTextColors, floatingBlockShadow, moveMuralBlock, muralBlockStyle, muralColors, resolveBlockColor } from "@scripta/shared";
+import type { ThemeId, ThemeScheme } from "@scripta/shared/themes";
 import GridLayout from "react-grid-layout";
 import { DndContext } from "@dnd-kit/core";
 import { useRef, useState, type CSSProperties } from "react";
@@ -7,7 +7,7 @@ import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import { BLOCK_PAD_SCALE, blockFinishImage, blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
 import { isConfigurable, muralBlockTitle, GRID_COLUMNS, screenPointToGrid, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
-import { muralThemeStyle, useResolvedTheme } from "../../lib/theme";
+import { muralThemeStyle, useAppScheme } from "../../lib/theme";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../page/buttonClasses";
 import { ActionSheet } from "../Sheet";
 import { MobileBlockPreview } from "./MobileBlockPreview";
@@ -73,7 +73,8 @@ function BlockFrame({
   onActivate,
   buttonRef,
   scale,
-  themeColors,
+  theme,
+  scheme,
   floatScheme,
   editing
 }: {
@@ -91,13 +92,15 @@ function BlockFrame({
   onActivate: () => void;
   buttonRef?: (element: HTMLDivElement | null) => void;
   scale: number;
-  themeColors: ThemeColors;
+  theme: ThemeId;
+  scheme: ThemeScheme;
   floatScheme?: ThemeScheme;
   editing: boolean;
 }) {
   const locale = useLocale();
   const t = useT();
-  const style = resolveBlockStyle(block.style);
+  const themeColors = muralColors(theme, scheme);
+  const style = muralBlockStyle(resolveBlockStyle(block.style), theme, scheme);
   const effects = blockEffects(style, themeColors);
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const overridden = style.backgroundColor || style.textColor ? blockTextColors(style, themeColors) : null;
@@ -154,6 +157,7 @@ function BlockFrame({
 
 export function MobileMuralCanvas({
   mural,
+  scheme,
   editMode,
   books,
   images,
@@ -182,6 +186,7 @@ export function MobileMuralCanvas({
   revertNonce = 0
 }: {
   mural: Mural;
+  scheme: ThemeScheme;
   editMode: boolean;
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
@@ -210,7 +215,7 @@ export function MobileMuralCanvas({
   revertNonce?: number;
 }) {
   const t = useT();
-  const appScheme = themes[useResolvedTheme()].scheme;
+  const appScheme = useAppScheme();
   const viewportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
@@ -276,7 +281,7 @@ export function MobileMuralCanvas({
       <div
         ref={setViewport}
         className={`mural-overview-stage relative w-full ${floating ? "" : "overflow-hidden"}`}
-        style={{ ...muralThemeStyle(mural.theme), ...(floating ? { backgroundColor: undefined } : {}), height: logicalHeight * scale, minHeight: editMode ? "52dvh" : undefined }}
+        style={{ ...muralThemeStyle(mural.theme, scheme), ...(floating ? { backgroundColor: undefined } : {}), height: logicalHeight * scale, minHeight: editMode ? "52dvh" : undefined }}
       >
         {viewportWidth > 0 && (
           <div
@@ -318,7 +323,8 @@ export function MobileMuralCanvas({
                     selected={editMode && block.id === selectedBlockId}
                     draggable={canDrag && (!draft || block.id === draft.block.id)}
                     scale={scale}
-                    themeColors={themes[mural.theme].colors}
+                    theme={mural.theme}
+                    scheme={scheme}
                     floatScheme={floating ? appScheme : undefined}
                     editing={editMode}
                     draft={block.id === draft?.block.id}
@@ -424,6 +430,7 @@ export function MobileMuralCanvas({
         <MuralBlockDetail
           block={focused}
           theme={mural.theme}
+          scheme={scheme}
           books={books}
           images={images}
           profile={profile}

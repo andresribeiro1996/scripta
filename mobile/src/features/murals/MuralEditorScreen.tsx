@@ -11,6 +11,8 @@ import {
   isConfigurable,
   muralThemeId,
   moveMuralBlock,
+  muralColors,
+  oppositeScheme,
   resolveBlockStyle,
   toggleMuralBlockExpansion,
   type BlockStyle,
@@ -61,6 +63,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const [name, setName] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeId | null>(null);
   const [themeOpen, setThemeOpen] = useState(false);
+  const [showTwin, setShowTwin] = useState(false);
   const [blocks, setBlocks] = useState<MuralBlock[] | null>(null);
   const [history, setHistory] = useState<MuralBlock[][]>([]);
   const scrollRef = useAnimatedRef<ScrollViewInstance>();
@@ -107,7 +110,8 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const currentBlocks = blocks ?? mural?.blocks ?? [];
   const currentName = name ?? mural?.name ?? t("murals.mural");
   const currentTheme = theme ?? muralThemeId(mural?.theme);
-  const colors = themes[currentTheme].colors;
+  const editorScheme = showTwin ? oppositeScheme(themes[currentTheme].scheme) : themes[currentTheme].scheme;
+  const colors = muralColors(currentTheme, editorScheme);
   const selected = currentBlocks.find((block) => block.id === selectedId) ?? null;
   const books = library?.data.books ?? [];
   const groups = library?.data.groups ?? NO_GROUPS;
@@ -214,8 +218,9 @@ export function MuralEditorScreen({ id }: { id: string }) {
         headerShown: true,
         title: "",
         headerLargeTitleEnabled: false,
-        headerRight: () => dragging || !draftMural ? null : <MuralThemeScope theme={currentTheme}><HeaderActions>
+        headerRight: () => dragging || !draftMural ? null : <MuralThemeScope theme={currentTheme} scheme={editorScheme}><HeaderActions>
           <SaveStateButton busy={busy} unsaved={unsaved} onPress={() => void save()} />
+          <IconButton accessibilityLabel={t(oppositeScheme(editorScheme) === "dark" ? "murals.previewDark" : "murals.previewLight")} name={oppositeScheme(editorScheme) === "dark" ? "moon" : "sun"} onPress={() => setShowTwin((value) => !value)} />
           <IconButton accessibilityLabel={t("murals.muralTheme")} name="theme" onPress={() => setThemeOpen(true)} />
           <IconButton accessibilityLabel={t("murals.shareMural")} name="share" onPress={() => setShareFor(draftMural)} />
         </HeaderActions></MuralThemeScope>,
@@ -248,7 +253,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   ] : [];
 
   return (
-    <MuralScreen theme={currentTheme}>
+    <MuralScreen theme={currentTheme} scheme={editorScheme}>
       {discardDialog}
       {header}
       {error ? <Toast visible message={error} tone="error" /> : null}

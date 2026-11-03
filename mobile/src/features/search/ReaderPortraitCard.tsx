@@ -2,8 +2,7 @@ import { useId, useMemo } from "react";
 import { Image } from "expo-image";
 import { Pressable, StyleSheet, View } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
-import { readerCardInputOf, readerGlyphLabel } from "@scripta/shared";
-import { themes } from "@scripta/shared/themes";
+import { muralColors, muralThemeId, readerCardInputOf, readerGlyphLabel } from "@scripta/shared";
 import { personCaption, type SuggestedReader } from "@scripta/shared/community";
 import { Button, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { Text } from "../../ui/Text";
@@ -17,7 +16,7 @@ import { useLocale, useT } from "../../i18n";
 export function ReaderPortraitCard({ person, width, canvasWidth, busy, onToggleFollow }: { person: SuggestedReader; width: number; canvasWidth: number; busy: boolean; onToggleFollow: () => void }) {
   const locale = useLocale();
   const t = useT();
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
   const fadeId = useId();
   const payload = person.private ? null : person.mural;
   const preview = useMemo(() => {
@@ -28,7 +27,7 @@ export function ReaderPortraitCard({ person, width, canvasWidth, busy, onToggleF
   const identity = glyphLabel ? person.user.readerGlyph : undefined;
   const fallback = useMemo(() => readerCardInputOf([], [], person.user.username, locale, { state: identity ? "settled" : "unwritten", identity: identity ?? null, runnerUp: null, signal: null, coverage: [] }), [identity, person.user.username, locale]);
   const caption = personCaption(person, locale);
-  const palette = preview ? themes[preview.mural.theme].colors : colors;
+  const palette = preview ? muralColors(muralThemeId(preview.mural.theme), mode) : colors;
   return (
     <View style={[styles.card, { width, backgroundColor: colors.surface }]}>
       <Pressable accessibilityRole="button" accessibilityLabel={[t("book.openProfile", { username: person.user.username }), glyphLabel, caption].filter(Boolean).join(", ")} onPress={() => openProfile(person.user.username)} style={({ pressed }) => [styles.open, { opacity: pressed ? 0.75 : 1 }]}>

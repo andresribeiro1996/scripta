@@ -157,6 +157,8 @@ export const murals: CatalogOf<typeof en> = {
   "murals.pickSpotlight": "Escolha um livro para este destaque.",
   "murals.pickerRow": "{label}: {value}",
   "murals.pinnedPassage": "Passagem fixada",
+  "murals.previewDark": "Pré-visualizar escuro",
+  "murals.previewLight": "Pré-visualizar claro",
   "murals.presetDiffuse": "Difusa",
   "murals.presetFaint": "Ténue",
   "murals.presetFar": "Longe",

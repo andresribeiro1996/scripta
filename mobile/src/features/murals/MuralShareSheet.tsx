@@ -4,7 +4,7 @@ import { themes } from "@scripta/shared/themes";
 import { View } from "react-native";
 import { Text } from "../../ui/Text";
 import { Button } from "../../ui";
-import { spacing, typography, useTheme } from "../../ui/theme";
+import { MuralThemeScope, spacing, typography, useTheme } from "../../ui/theme";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import type { GalleryImage } from "../gallery/api";
 import type { Tierlist } from "../tierlists/api";
@@ -42,6 +42,6 @@ export function MuralShareSheet({ mural, books, groups, images, tierlists, profi
     imageReady={contentReady && !contentError && imageReady}
     previewControls={contentError ? <View style={{ gap: spacing.sm }}><Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{contentError}</Text><Button label={t("tierlists.retryPreview")} variant="secondary" onPress={onRetryContent} /></View> : undefined}
   >
-    {mural ? <View style={{ backgroundColor: themes[muralThemeId(mural.theme)].colors.background, padding: spacing.sm }}><MuralCanvas mural={mural} books={books} groups={groups} images={images} tierlists={tierlists} profile={profile} onImageReadyChange={setImageReady} /></View> : null}
+    {mural ? <MuralThemeScope theme={muralThemeId(mural.theme)} scheme={themes[muralThemeId(mural.theme)].scheme}><View style={{ backgroundColor: themes[muralThemeId(mural.theme)].colors.background, padding: spacing.sm }}><MuralCanvas mural={mural} books={books} groups={groups} images={images} tierlists={tierlists} profile={profile} onImageReadyChange={setImageReady} /></View></MuralThemeScope> : null}
   </ContentShareSheet>;
 }

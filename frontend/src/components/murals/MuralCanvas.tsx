@@ -1,6 +1,6 @@
 import { MuralBlockDetail } from "./MuralBlockDetail";
-import { blockEffects, blockTextColors, floatingBlockShadow, localDay, resolveBlockColor, resolveHomeBlock, type Group } from "@scripta/shared";
-import { themes } from "@scripta/shared/themes";
+import { blockEffects, blockTextColors, floatingBlockShadow, localDay, muralBlockStyle, muralColors, resolveBlockColor, resolveHomeBlock, type Group } from "@scripta/shared";
+import type { ThemeScheme } from "@scripta/shared/themes";
 import GridLayout from "react-grid-layout";
 import { DndContext } from "@dnd-kit/core";
 import "react-grid-layout/css/styles.css";
@@ -11,7 +11,7 @@ import type { ResolvedTierlist } from "../../api/tierlists";
 import { BLOCK_PAD_SCALE, blockFinishImage, blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
 import { GRID_COLUMNS, blockLabel, isConfigurable, muralThemeId, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
 import { useMuralBookMetadata } from "../../hooks/useMuralBookMetadata";
-import { muralThemeStyle, useResolvedTheme } from "../../lib/theme";
+import { muralThemeStyle, useAppScheme } from "../../lib/theme";
 import { OptionsMenu } from "../OptionsMenu";
 import { BlockRenderer } from "./BlockRenderer";
 import { MobileMuralCanvas, type MobileMuralDraft } from "./MobileMuralCanvas";
@@ -25,6 +25,7 @@ const NO_GROUPS: Group[] = [];
 
 export function MuralCanvas({
   mural: originalMural,
+  scheme: schemeProp,
   groups = NO_GROUPS,
   onOpenBlock,
   editMode,
@@ -55,6 +56,7 @@ export function MuralCanvas({
   onCancelMobileDraft
 }: {
   mural: Mural;
+  scheme?: ThemeScheme;
   groups?: Group[];
   onOpenBlock?: (block: MuralBlock) => void;
   editMode: boolean;
@@ -86,14 +88,15 @@ export function MuralCanvas({
 }) {
   const locale = useLocale();
   const t = useT();
-  const appScheme = themes[useResolvedTheme()].scheme;
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const drag = useMuralDrag(originalMural.blocks, canvasRef, onLayoutChange, 1, onDragChange);
   const [day] = useState(localDay);
   const mural = { ...originalMural, theme: muralThemeId(originalMural.theme), blocks: originalMural.blocks.map((block) => resolveHomeBlock(block, books, groups, day, locale)) };
   const originalBlock = (block: MuralBlock) => originalMural.blocks.find((item) => item.id === block.id) ?? block;
-  const themeColors = themes[mural.theme].colors;
+  const appScheme = useAppScheme();
+  const scheme = schemeProp ?? appScheme;
+  const themeColors = muralColors(mural.theme, scheme);
   useMuralBookMetadata(mural.blocks, books, tierlistData);
   const [compactMode, setCompactMode] = useState(
     () => typeof window !== "undefined" && (window.innerWidth < 768 || Boolean(window.matchMedia?.("(pointer: coarse)").matches))
@@ -114,6 +117,7 @@ export function MuralCanvas({
     return (
       <MobileMuralCanvas
         mural={mural}
+        scheme={scheme}
         editMode={editMode}
         books={books}
         images={images}
@@ -152,7 +156,7 @@ export function MuralCanvas({
   return (
     <>
     <DndContext {...drag.context}>
-    <div ref={canvasRef} className={`relative ${floating ? "" : "overflow-hidden"}`} onClick={(event) => { if (editMode && !(event.target as Element).closest(".react-grid-item")) onSelectBlock?.(null); }} style={{ ...muralThemeStyle(mural.theme), ...(floating ? { backgroundColor: undefined } : {}), minHeight: editMode ? Math.max(0, ...drag.blocks.map((block) => block.layout.y + block.layout.h), drag.drop ? drag.drop.layout.y + drag.drop.layout.h : 0) * 38 + 160 : undefined }}>
+    <div ref={canvasRef} className={`relative ${floating ? "" : "overflow-hidden"}`} onClick={(event) => { if (editMode && !(event.target as Element).closest(".react-grid-item")) onSelectBlock?.(null); }} style={{ ...muralThemeStyle(mural.theme, scheme), ...(floating ? { backgroundColor: undefined } : {}), minHeight: editMode ? Math.max(0, ...drag.blocks.map((block) => block.layout.y + block.layout.h), drag.drop ? drag.drop.layout.y + drag.drop.layout.h : 0) * 38 + 160 : undefined }}>
     <ResponsiveGridLayout
       key={revertNonce}
       layout={layout}
@@ -166,7 +170,7 @@ export function MuralCanvas({
       onResizeStop={handleGestureEnd}
     >
       {mural.blocks.map((block) => {
-        const style = resolveBlockStyle(block.style);
+        const style = muralBlockStyle(resolveBlockStyle(block.style), mural.theme, scheme);
         const effects = blockEffects(style, themeColors);
         const overridden = style.backgroundColor || style.textColor ? blockTextColors(style, themeColors) : null;
         return (
@@ -228,7 +232,7 @@ export function MuralCanvas({
     </ResponsiveGridLayout>
     </div>
     </DndContext>
-    {focusedId && mural.blocks.some((block) => block.id === focusedId) ? <MuralBlockDetail theme={mural.theme} block={mural.blocks.find((block) => block.id === focusedId)!} books={books} images={images} profile={profile} shelfThemeOverride={shelfThemeOverride} statsOverride={statsOverride} tierlistData={tierlistData} onClose={() => setFocusedId(null)} /> : null}
+    {focusedId && mural.blocks.some((block) => block.id === focusedId) ? <MuralBlockDetail theme={mural.theme} scheme={scheme} block={mural.blocks.find((block) => block.id === focusedId)!} books={books} images={images} profile={profile} shelfThemeOverride={shelfThemeOverride} statsOverride={statsOverride} tierlistData={tierlistData} onClose={() => setFocusedId(null)} /> : null}
     </>
   );
 }

@@ -31,7 +31,7 @@ import { FullscreenIcon, toolbarIconClass } from "../components/Toolbar";
 import { useMuralFullscreen } from "../hooks/useMuralFullscreen";
 import { ensureBookBlockHeights, muralThemeId, type Mural } from "../lib/murals";
 import { buildReconstructedBooks } from "../lib/sharedMural";
-import { muralThemeStyle } from "../lib/theme";
+import { muralThemeStyle, useAppScheme } from "../lib/theme";
 import { useT } from "../i18n";
 
 function InfoScreen({ message }: { message: string }) {
@@ -46,6 +46,7 @@ function InfoScreen({ message }: { message: string }) {
 export function SharedMuralPage() {
   const { token } = useParams<{ token: string }>();
   const t = useT();
+  const scheme = useAppScheme();
   const { ref: fullscreenRef, fullscreen, enterFullscreen, exitFullscreen } = useMuralFullscreen();
 
   const { data, isLoading, isError } = useQuery({
@@ -108,7 +109,7 @@ export function SharedMuralPage() {
       ) : (
         <div
           ref={fullscreenRef}
-          style={fullscreen ? muralThemeStyle(mural.theme) : undefined}
+          style={fullscreen ? muralThemeStyle(mural.theme, scheme) : undefined}
           className={fullscreen ? "fixed inset-0 z-50 overflow-y-auto [--app-top:0px] bg-(--color-bg) px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]" : "mx-auto max-w-6xl"}
         >
           {fullscreen && (

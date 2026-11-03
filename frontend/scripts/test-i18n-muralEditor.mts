@@ -172,7 +172,7 @@ test("the block views render their labels in Portuguese", () => {
 });
 
 test("the block detail sheet translates its fallbacks", () => {
-  const detail = (block: MuralBlock) => () => createElement(MuralBlockDetail, { block, theme: "dark", books, images: [], onClose: () => undefined });
+  const detail = (block: MuralBlock) => () => createElement(MuralBlockDetail, { block, theme: "dark", scheme: "dark", books, images: [], onClose: () => undefined });
   const quote = { id: "q1", type: "quote", bookKey: "", highlightId: "", layout } as unknown as MuralBlock;
   assert.match(inPortuguese(() => rendered(detail(quote))), /Ainda não foram adicionadas citações\./);
   assert.match(rendered(detail(quote)), /No quotes added yet\./);

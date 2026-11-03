@@ -116,10 +116,13 @@ function oxblood(c: ThemeColors): Decor {
   };
 }
 
-export const THEME_DECOR: Partial<Record<ThemeId, Decor>> = {
-  matrix: matrix(themes.matrix.colors),
-  synthwave: synthwave(themes.synthwave.colors),
-  seventies: seventies(themes.seventies.colors),
-  newsprint: newsprint(themes.newsprint.colors),
-  oxblood: oxblood(themes.oxblood.colors),
-};
+const DECOR_BUILDERS: Partial<Record<ThemeId, (colors: ThemeColors) => Decor>> = { matrix, synthwave, seventies, newsprint, oxblood };
+
+export const THEME_DECOR: Partial<Record<ThemeId, Decor>> = Object.fromEntries(
+  Object.entries(DECOR_BUILDERS).map(([id, build]) => [id, build(themes[id as ThemeId].colors)]),
+);
+
+export function themeDecor(id: ThemeId, colors: ThemeColors): Decor | undefined {
+  if (colors === themes[id].colors) return THEME_DECOR[id];
+  return DECOR_BUILDERS[id]?.(colors);
+}
