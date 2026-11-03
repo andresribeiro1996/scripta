@@ -138,7 +138,9 @@ test("a legacy result keeps its verdicts without links or picks", () => {
 test("the viewer's row is highlighted without visible text", () => {
   const html = render(result, [play({ isYou: true })]);
   assert.match(html, /<li[^>]*bg-\(--color-accent-soft\)/);
-  assert.match(html, /sr-only">You</);
+  assert.match(html, /Martinha <span class="sr-only">You</);
+  assert.match(html, /<li[^>]*-mx-3[^>]*px-3/);
+  assert.doesNotMatch(boardRows(render(result, [play()]))[0]!, /-mx-3|px-3/);
   assert.doesNotMatch(render(result, [play()]), /<li[^>]*bg-\(--color-accent-soft\)|sr-only">You</);
 });
 
@@ -160,13 +162,17 @@ test("rows carry avatars", () => {
   assert.match(without!, />R<\/span>/);
 });
 
-test("the hero shows the rank, and a lone player gets the prompt instead", () => {
+test("the hero shows the rank, and the board gives a lone player the prompt", () => {
   const html = render(result, [play(), play({ isYou: true, playerName: "Me" })]);
   assert.match(html, /#2 of 2 players/);
   assert.doesNotMatch(html, /Just you so far/);
   const alone = render(result, [play({ isYou: true })]);
   assert.doesNotMatch(alone, /of 1 players/);
   assert.match(alone, /Just you so far\. Send the link to a friend\./);
+  const results = alone.slice(0, alone.indexOf("</section>"));
+  assert.doesNotMatch(results, /Just you so far/);
+  const board = alone.slice(alone.indexOf('aria-labelledby="quiz-leaderboard-heading"'));
+  assert.ok(board.indexOf("Just you so far") > board.indexOf("</li>"));
 });
 
 test("long times read as a clock", () => {

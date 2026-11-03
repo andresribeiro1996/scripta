@@ -98,7 +98,6 @@ export function QuizResults({ code, name, result, questions, back }: {
   const covers = resultCovers(questions, rows);
   const board = usePublicResults(code, result.playId).data;
   const position = board ? leaderboardPosition(board.plays) : null;
-  const alone = board?.plays.length === 1 && board.plays[0]!.isYou;
 
   return (
     <Page back={back} title={name}>
@@ -109,7 +108,6 @@ export function QuizResults({ code, name, result, questions, back }: {
             {result.score}<span className="text-[0.45em] text-(--color-text-dim)"> / {questions.length}</span>
           </p>
           {position && <p className="text-sm font-semibold">{t("quizzes.rankOf", position)}</p>}
-          {alone && <p className="text-sm text-(--color-text-dim)">{t("quizzes.justYou")}</p>}
         </div>
         {covers.length > 0 && (
           <div aria-hidden="true" className="flex justify-end py-3 lg:justify-center lg:py-6">
@@ -212,11 +210,11 @@ export function QuizLeaderboard({ code, playId }: { code: string; playId: string
             const label = playerLabel(play, locale);
             const avatar = <AuthorAvatar author={{ username: label.name, avatarUrl: play.avatarUrl }} size={28} />;
             return (
-              <li key={index} className={`flex items-center gap-3 px-3 py-4 text-sm ${play.isYou ? "bg-(--color-accent-soft)" : ""}`}>
+              <li key={index} className={`flex items-center gap-3 py-4 text-sm ${play.isYou ? "-mx-3 rounded-lg bg-(--color-accent-soft) px-3" : ""}`}>
                 <span className={`w-5 shrink-0 tabular-nums ${index === 0 ? "font-semibold text-(--color-accent)" : "text-(--color-text-dim)"}`}>{index + 1}</span>
                 {play.isYou ? <span className="shrink-0 rounded-full ring-1 ring-(--color-accent)">{avatar}</span> : avatar}
                 <div className="min-w-0 flex-1">
-                  <p className="break-words font-medium">{label.name}{play.isYou && <span className="sr-only">{t("quizzes.you")}</span>}</p>
+                  <p className="break-words font-medium">{label.name}{play.isYou && <>{" "}<span className="sr-only">{t("quizzes.you")}</span></>}</p>
                   {label.guest && <p className="text-xs text-(--color-text-dim)">{t("quizzes.guest")}</p>}
                 </div>
                 <div className="shrink-0 text-right tabular-nums">
@@ -228,6 +226,7 @@ export function QuizLeaderboard({ code, playId }: { code: string; playId: string
           })}
         </ol>
       )}
+      {leaderboard.data.plays.length === 1 && leaderboard.data.plays[0]!.isYou && <p className="mt-3 text-sm text-(--color-text-dim)">{t("quizzes.justYou")}</p>}
     </section>
   );
 }
