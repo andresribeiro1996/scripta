@@ -32,7 +32,7 @@ export function DailyChapterDayScreen({ id }: { id: string }) {
   const people = useQuery({ queryKey: ["daily-chapter", "people", id], queryFn: () => dailyChapterApi.people(id), enabled: Boolean(shown) });
   const title = shown ? `${shown.date} · ${shown.title}` : t("quizzes.dailyChapter");
   let body;
-  if (identity.isError || history.isError || review.isError) body = <EmptyState title={t("quizzes.dayLoadFailed")} actionLabel={t("shell.retry")} onAction={() => { void identity.refetch(); void history.refetch(); if (review.isError) void review.refetch(); }} />;
+  if (identity.isError || history.isError || (!result && review.isError)) body = <EmptyState title={t("quizzes.dayLoadFailed")} actionLabel={t("shell.retry")} onAction={() => { void identity.refetch(); void history.refetch(); if (!result && review.isError) void review.refetch(); }} />;
   else if (!history.data || (!result && review.isPending)) body = <View style={{ gap: spacing.md }}><Skeleton height={48} /><Skeleton height={120} /><Skeleton height={120} /></View>;
   else if (!shown) body = <EmptyState title={t("quizzes.didntPlay")} />;
   else {
