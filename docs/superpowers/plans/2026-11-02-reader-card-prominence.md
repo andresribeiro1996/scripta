@@ -656,10 +656,8 @@ Asked by the user on 2026-11-02: "the blurry needs to be identical with the one 
 - Test: `frontend/scripts/test-profile-card-hero.mts`
 
 **Interfaces:**
-- **Mobile:** `backdropXml(svg: string, stdDeviation: number): string`.
-  - The filter is `feGaussianBlur` then `feColorMatrix type="saturate" values="1.4"`, with a filter region large enough that the edges don't clip.
+- **Mobile:** `backdropXml(svg: string): string` only sets `preserveAspectRatio="xMidYMid slice"`. Amended by 0e6e2052: react-native-svg's Android `FeGaussianBlur` clamps the radius at 25 px, so the blur is the view's `filter: [{ blur: 0.085 W }, { saturate: 1.4 }]` on the grown box, not an SVG filter.
   - `ProfileCardBackdrop` measures its box with `onLayout`. It renders the SVG absolutely, with negative insets of 0.16 W.
-  - It converts 0.085 W to card units by dividing by the slice scale, `max(boxW / vbW, boxH / vbH)`, using the card's `viewBox`.
   - The gradient becomes the mock's overlay.
 - **Web:**
   - The backdrop `img` uses negative insets of 16% of the hero width on every side, with `object-cover` and `filter: blur(8.5cqw) saturate(1.4)`. The hero is the size container. Drop `scale-150` and the radial mask.
@@ -795,11 +793,12 @@ Asked by the user on 2026-11-03: "go with 1 first", that is, follow the finger. 
 - **Drag:** a `drag` shared value is driven by the pan's `onUpdate` on the UI thread. The current rows' `Animated.View` takes `translateX: drag` and `opacity: 1 - min(|drag| / width, 1) * 0.6`.
 - **No neighbour:** at the first or last tab, the drag is rubber-banded to about a third of the finger's travel.
 - **Release:** `swipeTarget` from Task 16 decides.
-  - **Switch:** `drag` animates out to ±width·0.35 over 120 ms, then `select()` runs. The new rows enter with Task 16's slide, from the opposite side at ±24, so the motion reads as continuous.
+  - **Switch:** `drag` animates out to ±width·0.35 over 120 ms. When the tab bar is pinned, `select()` runs after the out-animation; otherwise it runs at release, overlapping the out-animation (amended by 91ae8d61: the serial chain added about 120 ms to every switch). The new rows enter with Task 16's slide, from the opposite side at ±24, so the motion reads as continuous.
   - **No switch:** `drag` springs back to 0 (`withSpring`, damping about 20).
-- **Reset:** `drag` resets to 0 when the new tab's rows mount, so they never inherit the offset.
+- **Reset:** rows read `drag` only while `dragTab` is their tab, so new rows never inherit the offset; the pan's `onStart` also zeroes `drag` before claiming `dragTab`.
 - **Reduced motion:** no drag translate. A release past the threshold switches instantly.
-- **Kept from Task 16:** activation offsets, the hero and cover-row guards, cancelling a row's press, and the pinned-offset flow from Task 16's last fixes.
+- **Activation:** `activeOffsetX([-12, 12])` and `failOffsetY([-12, 12])`, with the drag measured from the touch-down `absoluteX` so no travel is lost to activation (amended by 654f5532). Horizontal children such as the cover row keep their native scroll, which claims the touch first.
+- **Kept from Task 16:** the hero guard and the pinned-offset flow from Task 16's last fixes.
 - `rubberBand(dx: number, atEdge: boolean): number` in `pinnedOffset.ts`.
 
 - [ ] **Step 1: Test.** `rubberBand(90, false)` is 90, and `rubberBand(90, true)` is 30.

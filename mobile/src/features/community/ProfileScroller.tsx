@@ -143,6 +143,8 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
         downX.set(touch?.absoluteX ?? 0);
       })
       .onStart(() => {
+        cancelAnimation(drag);
+        drag.set(0);
         dragTab.set(tabState.get().value);
       })
       .onUpdate((event) => {
