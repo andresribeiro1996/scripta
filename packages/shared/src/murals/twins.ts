@@ -1,5 +1,6 @@
+import type { BlockStyle } from "../library/libraryStyle.js";
 import { THEME_CONTRAST_PAIRS, themes, type ThemeColors, type ThemeId, type ThemeScheme } from "../themes/palettes.js";
-import { contrastRatio, parseHexColor, toHex } from "./blockTextColors.js";
+import { contrastRatio, effectiveBlockColors, parseHexColor, toHex } from "./blockTextColors.js";
 
 type Oklch = readonly [number, number, number];
 
@@ -24,6 +25,9 @@ const NUDGE_PASSES = 3;
 const NUDGE_STEPS = 60;
 const NUDGE_STEP = 0.01;
 const NUDGE_TARGET = 4.6;
+const BLOCK_TEXT_TARGET = 4.5;
+const BLOCK_TEXT_STEPS = 100;
+const BLOCK_COLOR_FIELDS = ["backgroundColor", "textColor", "gradientColor", "cardBorderColor", "fadeColor"] as const;
 
 const toLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
 const toSrgb = (c: number) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
@@ -117,4 +121,33 @@ export function muralColors(id: ThemeId, scheme: ThemeScheme): ThemeColors {
     twins.set(id, twin);
   }
   return twin;
+}
+
+export function muralBlockStyle(style: BlockStyle, id: ThemeId, scheme: ThemeScheme): BlockStyle {
+  if (themes[id].scheme === scheme) return style;
+  const from = themes[oppositeScheme(scheme)].colors;
+  const to = themes[scheme].colors;
+  const [surfaceFrom, surfaceTo] = [toOklch(from.surface)[0], toOklch(to.surface)[0]];
+  const [textFrom, textTo] = [toOklch(from.text)[0], toOklch(to.text)[0]];
+  const slope = (textTo - surfaceTo) / (textFrom - surfaceFrom);
+  const flipped = { ...style };
+  for (const field of BLOCK_COLOR_FIELDS) {
+    const value = style[field];
+    if (value === null || !parseHexColor(value)) continue;
+    const [lightness, chroma, hue] = toOklch(value);
+    const mapped = surfaceTo + (lightness - surfaceFrom) * slope;
+    flipped[field] = fromOklch([Math.min(1, Math.max(0, mapped)), chroma, hue]);
+  }
+  const palette = muralColors(id, scheme);
+  const { text, background } = effectiveBlockColors(flipped, palette);
+  if (!parseHexColor(text) || !parseHexColor(background)) return flipped;
+  const towardWhite = contrastRatio(background, "#ffffff")! > contrastRatio(background, "#000000")!;
+  let [lightness, chroma, hue] = toOklch(text);
+  let nudged = text;
+  for (let i = 0; i < BLOCK_TEXT_STEPS && contrastRatio(nudged, background)! < BLOCK_TEXT_TARGET; i++) {
+    lightness += towardWhite ? NUDGE_STEP : -NUDGE_STEP;
+    nudged = fromOklch([lightness, chroma, hue]);
+    flipped.textColor = nudged;
+  }
+  return flipped;
 }
