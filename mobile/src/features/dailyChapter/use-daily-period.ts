@@ -19,7 +19,8 @@ export function useDailyPeriod(history: DailyChapterHistory) {
   const [month, setMonth] = useState(history.today.slice(0, 7));
   const view: DailyChapterView = stored.data === "month" ? "month" : "week";
   const setView = (next: DailyChapterView) => {
-    void AsyncStorage.setItem(VIEW_KEY, next).then(() => client.setQueryData(VIEW_QUERY, next));
+    client.setQueryData(VIEW_QUERY, next);
+    AsyncStorage.setItem(VIEW_KEY, next).catch((err: unknown) => { console.warn("Couldn't save the calendar view on this device.", err); });
   };
   const dates = view === "week" ? dailyChapterWeekDates(history.today, weeksBack) : dailyChapterMonthDates(month);
   const days = dailyChapterDays(history, dates);
