@@ -246,6 +246,7 @@ export function MyShelfScreen() {
       <ProfileHeroIdentity username={username} avatarUrl={profile?.avatarUrl ?? null} glyph={glyph} finished={card.input.card.facts?.finished} />
       {card.progress ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{card.progress}</Text> : null}
       {cardShare.isError ? <Text accessibilityRole="alert" {...dynamicType} style={[typography.caption, { color: colors.danger }]}>{t("community.somethingWentWrongRetry")}</Text> : null}
+      {cardShare.isError ? <Button label={t("shell.retry")} variant="secondary" onPress={() => void cardShare.refetch()} /> : null}
     </>
   ) : null;
 

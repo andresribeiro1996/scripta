@@ -220,7 +220,14 @@ export function OwnShelfView({ username }: { username: string }) {
         <Link to="/dashboard/reader-card" className={BUTTON_SECONDARY}>
           {t("readerCard.editCard")}
         </Link>
-        {cardShare.isError && <p className="text-sm text-(--color-danger)">{t("library.shelfActionFailed")}</p>}
+        {cardShare.isError && (
+          <>
+            <p className="text-sm text-(--color-danger)">{t("library.shelfActionFailed")}</p>
+            <button onClick={() => void cardShare.refetch()} className={BUTTON_SECONDARY}>
+              {t("library.retry")}
+            </button>
+          </>
+        )}
       </div>
     </>
   );

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -9,6 +10,7 @@ import { renderableActivity } from "./communityHome";
 import { CoverFan, SLOT_HEIGHT, SLOT_WIDTH } from "./CoverFan";
 import type { ProfileSection } from "./ProfileScroller";
 import { useLocale, useT } from "../../i18n";
+import { useToast } from "../../ui/ToastHost";
 
 export function useActivitySection(username: string): ProfileSection<{ item: ActivityItem; day: string | null }> {
   const locale = useLocale();
@@ -19,6 +21,10 @@ export function useActivitySection(username: string): ProfileSection<{ item: Act
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
+  const toast = useToast();
+  useEffect(() => {
+    if (activity.isRefetchError && !activity.isRefetching) toast.show(t("community.refreshActivityFailed"), "error");
+  }, [activity.isRefetchError, activity.isRefetching]);
   const items = renderableActivity(activity.data?.pages.flatMap((page) => page.items) ?? [], locale);
   const rows = items.map((item, index) => {
     const day = activityDay(item.createdAt, locale);

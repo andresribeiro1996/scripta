@@ -58,7 +58,7 @@ function Page({ section, listRef, scrollY, contentHeight, fling, topSpace, minHe
       onScroll={onScroll}
       scrollEventThrottle={16}
       onContentSizeChange={(_, height) => contentHeight.set(height)}
-      refreshControl={section.onRefresh || Platform.OS === "android" ? <RefreshControl enabled={Boolean(section.onRefresh)} refreshing={section.refreshing ?? false} onRefresh={section.onRefresh} progressViewOffset={topSpace} /> : undefined}
+      refreshControl={section.onRefresh || Platform.OS === "android" ? <RefreshControl enabled={Boolean(section.onRefresh)} refreshing={section.refreshing ?? false} onRefresh={section.onRefresh} progressViewOffset={Platform.OS === "android" ? topSpace : undefined} /> : undefined}
       onEndReached={section.onEndReached}
       onEndReachedThreshold={0.4}
       ListHeaderComponent={<View style={{ height: topSpace }} />}
@@ -221,6 +221,7 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
           const current = activeIndex.get();
           const next = success ? swipeTarget(order, order[current]!, event.absoluteX - downX.get(), event.velocityX) : null;
           const target = next === null ? current : order.indexOf(next);
+          if (next !== null) syncOthers();
           settle(target, event.velocityX);
           if (next !== null) scheduleOnRN(choose, next);
         }),

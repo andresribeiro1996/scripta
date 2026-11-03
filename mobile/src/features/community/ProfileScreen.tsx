@@ -201,7 +201,7 @@ export function ProfileScreen({ username }: { username: string }) {
   }
 
   return (
-    <Screen bottom top={false}>
+    <Screen top={false}>
       <Stack.Screen options={{ headerShown: true, ...transparentHeader }} />
       <ProfileScroller
         notice={error ? <Toast visible message={error} tone="error" /> : null}

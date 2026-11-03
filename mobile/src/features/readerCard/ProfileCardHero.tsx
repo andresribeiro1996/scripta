@@ -68,7 +68,7 @@ export function ProfileCardBackdrop({ input }: { input: ReaderCardBase }) {
 export function ProfileCardHero({ input, width, withBackdrop = true, badge, onEdit, children }: { input: ReaderCardBase; width: number; withBackdrop?: boolean; badge?: ReactNode; onEdit?: () => void; children?: ReactNode }) {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const pressX = useRef<number | null>(null);
+  const press = useRef<{ x: number; y: number } | null>(null);
   const cardWidth = heroCardWidth(width);
   const cardHeight = cardWidth * cardRatio(input.crop);
   const shine = readerCardShine(input.style.finish);
@@ -77,7 +77,7 @@ export function ProfileCardHero({ input, width, withBackdrop = true, badge, onEd
       {withBackdrop ? <ProfileCardBackdrop input={input} /> : null}
       <View style={styles.band}>
         <View style={{ width: cardWidth, height: cardHeight }}>
-          <Pressable accessibilityRole="button" accessibilityLabel={t("readerCard.openCard")} onPressIn={(event) => { pressX.current = event.nativeEvent.pageX; }} onPress={(event) => { if (pressX.current === null || Math.abs(event.nativeEvent.pageX - pressX.current) < TAP_SLOP) setOpen(true); pressX.current = null; }}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t("readerCard.openCard")} onPressIn={(event) => { press.current = { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY }; }} onPress={(event) => { if (press.current === null || (Math.abs(event.nativeEvent.pageX - press.current.x) < TAP_SLOP && Math.abs(event.nativeEvent.pageY - press.current.y) < TAP_SLOP)) setOpen(true); press.current = null; }}>
             <ReaderCardImage input={input} width={cardWidth} />
             {shine ? <CardShine kind={shine} width={cardWidth} height={cardHeight} live={false} /> : null}
           </Pressable>
