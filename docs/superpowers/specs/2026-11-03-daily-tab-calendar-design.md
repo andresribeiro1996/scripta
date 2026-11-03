@@ -51,7 +51,7 @@ Top to bottom:
 5. **"Best at" line**, kept where there is a best theme.
 6. **Past chapters**: every played or missed chapter in the visible period, newest first. Today appears only once played. Each row has two lines: the title, then "Mon, Nov 2 · Memoirs" (weekday, date, theme). On the right, played rows show score squares and "4/5", and missed rows show "Missed". All rows open the day page. A period with no chapters shows a short line saying so.
 
-**Play button.** "Play today's chapter" is fixed to the bottom of the screen and doesn't scroll with the page. It shows whenever there is a chapter today that the person hasn't played, whether or not they've played before, and is hidden otherwise. It sits above the tab bar, and the scrolling content gets enough bottom padding that the last row can be read clear of it. As it is part of the shared component, it also appears on "Your chapters".
+**Play button.** "Play today's chapter" is fixed to the bottom of the screen and doesn't scroll with the page. It shows whenever there is a chapter today that the person hasn't played, whether or not they've played before, and is hidden otherwise. It sits above the tab bar, below the scrolling content, so it never covers a row. As it is part of the shared component, it also appears on "Your chapters".
 
 **Missed** means any published chapter dated before today that the person didn't play, including those before their first play. This differs from the existing calendar logic, which only marks days from the first play on. The wider meaning applies only to the owner's view.
 
