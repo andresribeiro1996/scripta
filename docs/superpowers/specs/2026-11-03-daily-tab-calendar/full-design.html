@@ -38,7 +38,8 @@
   .score { font-weight: 700; }
   .missed { color: var(--dim); font-size: 12px; }
   .chev { color: var(--dim); }
-  .btn { background: var(--ac); color: #fff; text-align: center; border-radius: 10px; padding: 10px; font-weight: 700; margin-bottom: 12px; }
+  .btn { background: var(--ac); color: #fff; text-align: center; border-radius: 10px; padding: 10px; font-weight: 700; }
+  .btn.fixed { margin: 10px -14px -14px; border-radius: 0 0 21px 21px; box-shadow: 0 -6px 12px rgba(0,0,0,.08); padding: 14px; }
   .q { background: var(--sf); border: 1px solid var(--bd); border-radius: 12px; padding: 10px; margin-bottom: 8px; }
   .q p { margin: 0 0 6px; }
   .ok { color: var(--ok); font-weight: 700; }
@@ -48,7 +49,7 @@
 </style>
 
 <h2>You → Daily, all together</h2>
-<p class="subtitle">Week / Month switch, richer rows, and the list follows the calendar.</p>
+<p class="subtitle">Week / Month switch, richer rows, the list follows the calendar. The play button is fixed to the bottom of the screen, and stats only show once you've played.</p>
 
 <div class="phones">
 
@@ -78,6 +79,7 @@
       <div class="row"><div class="main"><div class="t">From page to screen</div><div class="sub">Sun, Nov 1 · Page to screen</div></div><span class="sq"><s></s><s></s><s></s><s></s><s class="x"></s></span><span class="score">4/5</span><span class="chev">›</span></div>
       <div class="row"><div class="main"><div class="t">Among the shelves</div><div class="sub">Sat, Oct 31 · Bookshops &amp; libraries</div></div><span class="sq"><s></s><s></s><s></s><s></s><s></s></span><span class="score">5/5</span><span class="chev">›</span></div>
       <div class="row"><div class="main"><div class="t">Between worlds</div><div class="sub">Fri, Oct 30 · Impossible places</div></div><span class="missed">Missed</span><span class="chev">›</span></div>
+      <div class="btn fixed">Play today's chapter</div>
     </div>
   </div>
 
@@ -104,6 +106,7 @@
       <h4>Past chapters</h4>
       <div class="row"><div class="main"><div class="t">Among the shelves</div><div class="sub">Sat, Oct 31 · Bookshops &amp; libraries</div></div><span class="sq"><s></s><s></s><s></s><s></s><s></s></span><span class="score">5/5</span><span class="chev">›</span></div>
       <div class="row"><div class="main"><div class="t">Between worlds</div><div class="sub">Fri, Oct 30 · Impossible places</div></div><span class="missed">Missed</span><span class="chev">›</span></div>
+      <div class="btn fixed">Play today's chapter</div>
     </div>
     <p class="cap">‹ stops at October because that's the first month with a chapter.</p>
   </div>
@@ -113,7 +116,6 @@
     <div class="phone">
       <div class="bar">You</div>
       <div class="tabs"><span>Shelf</span><span>Activity</span><b>Daily</b></div>
-      <div class="btn">Play today's chapter</div>
       <div class="seg"><b>Week</b><span>Month</span></div>
       <div class="nav"><i class="off">‹</i><span>Oct 28 – Nov 3</span><i class="off">›</i></div>
       <div class="week">
@@ -128,6 +130,7 @@
       <h4>Past chapters</h4>
       <div class="row"><div class="main"><div class="t">Remarkable lives</div><div class="sub">Mon, Nov 2 · Memoirs</div></div><span class="missed">Missed</span><span class="chev">›</span></div>
       <div class="row"><div class="main"><div class="t">From page to screen</div><div class="sub">Sun, Nov 1 · Page to screen</div></div><span class="missed">Missed</span><span class="chev">›</span></div>
+      <div class="btn fixed">Play today's chapter</div>
     </div>
   </div>
 

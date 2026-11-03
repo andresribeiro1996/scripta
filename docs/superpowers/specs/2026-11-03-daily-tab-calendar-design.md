@@ -36,7 +36,7 @@ On You → Daily, for the signed-in owner:
 
 Top to bottom:
 
-1. **Stat tiles** (streak, average, perfect), all-time as they are now, not tied to the period. If the person has never played, a "Play today's chapter" button replaces them, shown only when there is a chapter today.
+1. **Stat tiles** (streak, average, perfect), all-time as they are now, not tied to the period. They only render once the person has played at least one chapter.
 2. **Week / Month switch.** It opens on Week. The pick is remembered on the device.
 3. **Period header** with ‹ › arrows.
    - Week is the 7 days ending today. Arrows move 7 days at a time. Later windows keep that alignment, so the window is always "7 days ending today minus 7n".
@@ -50,6 +50,8 @@ Top to bottom:
    - Week cells also show a small caption under the number: "5/5", "Missed" or "Play". Month cells show only the number.
 5. **"Best at" line**, kept where there is a best theme.
 6. **Past chapters**: every played or missed chapter in the visible period, newest first. Today appears only once played. Each row has two lines: the title, then "Mon, Nov 2 · Memoirs" (weekday, date, theme). On the right, played rows show score squares and "4/5", and missed rows show "Missed". All rows open the day page. A period with no chapters shows a short line saying so.
+
+**Play button.** "Play today's chapter" is fixed to the bottom of the screen and doesn't scroll with the page. It shows whenever there is a chapter today that the person hasn't played, whether or not they've played before, and is hidden otherwise. It sits above the tab bar, and the scrolling content gets enough bottom padding that the last row can be read clear of it. As it is part of the shared component, it also appears on "Your chapters".
 
 **Missed** means any published chapter dated before today that the person didn't play, including those before their first play. This differs from the existing calendar logic, which only marks days from the first play on. The wider meaning applies only to the owner's view.
 
