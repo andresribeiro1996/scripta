@@ -194,8 +194,10 @@ export function buildPublicQuizRoutes(service: QuizzesService) {
     app.get("/quizzes/voting/:code/results", async (request, reply) => {
       const params = codeParamSchema.safeParse(request.params);
       if (!params.success) return reply.code(404).send({ error: t(localeOf(request), "quizzes.noQuizAtLink") });
-      const results = service.getPublicResults(params.data.code);
+      const { playId } = request.query as { playId?: unknown };
+      const results = service.getPublicResults(params.data.code, playerFor(request, typeof playId === "string" ? playId : null));
       if (!results) return reply.code(404).send({ error: t(localeOf(request), "quizzes.noQuizAtLink") });
+      reply.header("Cache-Control", "no-store");
       return reply.send(results);
     });
   };

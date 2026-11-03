@@ -56,7 +56,7 @@ function publishedQuiz() {
   const outcome = service.publishQuiz("u1", draft.id);
   assert.ok(outcome.ok);
   const code = outcome.ok ? outcome.quiz.voteCode! : "";
-  const answerKey = (service.getQuiz("u1", draft.id)!.data as { questions: Array<{ id: string; answerIndex: number }> }).questions;
+  const answerKey = (service.getQuiz("u1", draft.id)!.data as { questions: Array<{ id: string; answerIndex: number; workId: string | null }> }).questions;
   return { service, code, answerKey };
 }
 
@@ -66,7 +66,7 @@ async function call(service: Service, options: InjectOptions, signedInAs?: strin
   await app.register(buildPublicQuizRoutes(service));
   const res = await app.inject(signedInAs ? { ...options, headers: { ...options.headers, authorization: `Bearer ${signedInAs}` } } : options);
   await app.close();
-  return { status: res.statusCode, body: res.json() as Record<string, never> };
+  return { status: res.statusCode, headers: res.headers, body: res.json() as Record<string, never> };
 }
 
 test("the public board never carries the answer key", async () => {
@@ -134,6 +134,52 @@ test("the public leaderboard lists plays best-first and hides ids", async () => 
     assert.equal("playId" in play, false);
     assert.equal("voter_user_id" in play, false);
   }
+});
+
+type PublicPlay = Record<string, unknown> & { isYou: boolean };
+
+async function twoAnonymousPlays() {
+  const { service, code, answerKey } = publishedQuiz();
+  const answers = answerKey.map((q) => ({ questionId: q.id, choiceIndex: q.answerIndex }));
+  const first = await call(service, { method: "POST", url: `/quizzes/voting/${code}/play`, body: { answers, durationMs: 1000, playerName: "First" } });
+  const second = await call(service, { method: "POST", url: `/quizzes/voting/${code}/play`, body: { answers, durationMs: 2000, playerName: "Second" } });
+  return { service, code, answers, firstId: (first.body as unknown as { playId: string }).playId, secondId: (second.body as unknown as { playId: string }).playId };
+}
+
+const publicPlays = (body: unknown) => (body as { plays: PublicPlay[] }).plays;
+
+test("public results mark the anonymous player who sends their play id", async () => {
+  const { service, code, firstId } = await twoAnonymousPlays();
+  const { status, body } = await call(service, { method: "GET", url: `/quizzes/voting/${code}/results?playId=${firstId}` });
+  assert.equal(status, 200);
+  const plays = publicPlays(body);
+  assert.deepEqual(plays.map((p) => [p.playerName, p.isYou]), [["First", true], ["Second", false]]);
+  for (const play of plays) {
+    assert.equal("playId" in play, false);
+    assert.equal("voter_user_id" in play, false);
+  }
+});
+
+test("public results mark nobody for an unknown or repeated play id", async () => {
+  const { service, code, firstId, secondId } = await twoAnonymousPlays();
+  for (const query of ["playId=nope", `playId=${firstId}&playId=${secondId}`]) {
+    const { status, body } = await call(service, { method: "GET", url: `/quizzes/voting/${code}/results?${query}` });
+    assert.equal(status, 200);
+    assert.deepEqual(publicPlays(body).map((p) => p.isYou), [false, false]);
+  }
+});
+
+test("a token beats a play id on public results", async () => {
+  const { service, code, answers, secondId } = await twoAnonymousPlays();
+  await call(service, { method: "POST", url: `/quizzes/voting/${code}/play`, body: { answers, durationMs: 500 } }, "u9");
+  const { body } = await call(service, { method: "GET", url: `/quizzes/voting/${code}/results?playId=${secondId}` }, "u9");
+  assert.deepEqual(publicPlays(body).map((p) => [p.anonymous, p.isYou]), [[false, true], [true, false], [true, false]]);
+});
+
+test("public results are not cacheable", async () => {
+  const { service, code } = publishedQuiz();
+  const { headers } = await call(service, { method: "GET", url: `/quizzes/voting/${code}/results` });
+  assert.equal(headers["cache-control"], "no-store");
 });
 
 test("an unknown code is a 404 everywhere", async () => {
@@ -480,7 +526,7 @@ test("the play response carries the correct answers, the board and a missing pla
   const answers = answerKey.map((q) => ({ questionId: q.id, choiceIndex: 0 }));
   const played = await call(service, { method: "POST", url: `/quizzes/voting/${code}/play`, body: { answers, durationMs: 1 } }, "u9");
   assert.equal(played.status, 200);
-  assert.deepEqual((played.body as unknown as { answers: unknown }).answers, Object.fromEntries(answerKey.map((q) => [q.id, { choiceIndex: 0, answerIndex: q.answerIndex }])));
+  assert.deepEqual((played.body as unknown as { answers: unknown }).answers, Object.fromEntries(answerKey.map((q) => [q.id, { choiceIndex: 0, answerIndex: q.answerIndex, workId: q.workId }])));
   const missing = await call(service, { method: "GET", url: `/quizzes/voting/${code}/play` }, "u8");
   assert.equal(missing.status, 404);
   assert.equal("answers" in missing.body, false);

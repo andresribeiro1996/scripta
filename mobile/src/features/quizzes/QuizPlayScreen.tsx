@@ -253,7 +253,7 @@ function Leaderboard({ code }: { code: string }) {
   const t = useT();
   const locale = useLocale();
   const { colors } = useTheme();
-  const leaderboard = useQuery({ queryKey: ["quizzes", "results", code], queryFn: () => fetchPublicResults(code), retry: false });
+  const leaderboard = useQuery({ queryKey: ["quizzes", "results", code], queryFn: () => fetchPublicResults(code, null), retry: false });
   if (leaderboard.isPending) return <View style={styles.section}><Skeleton height={180} /></View>;
   if (leaderboard.isError) return <ErrorState body={t("quizzes.leaderboardFailed")} actionLabel={t("shell.retry")} onAction={() => void leaderboard.refetch()} />;
   if (leaderboard.data.plays.length === 0) return <View style={styles.section}><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("quizzes.noPlays")}</Text></View>;

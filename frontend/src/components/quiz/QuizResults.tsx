@@ -164,7 +164,7 @@ function ChallengeLink({ code }: { code: string }) {
 export function QuizLeaderboard({ code }: { code: string }) {
   const t = useT();
   const locale = useLocale();
-  const leaderboard = useQuery({ queryKey: ["quizPublicResults", code], queryFn: () => fetchPublicResultsApi(code) });
+  const leaderboard = useQuery({ queryKey: ["quizPublicResults", code], queryFn: () => fetchPublicResultsApi(code, null) });
   if (leaderboard.isError) return <p className="text-sm text-(--color-text-dim)">{t("quizzes.leaderboardFailed")}</p>;
   if (!leaderboard.data) return <p role="status" className="text-sm text-(--color-text-dim)">{t("quizzes.loadingLeaderboard")}</p>;
   return (

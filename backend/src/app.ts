@@ -224,7 +224,7 @@ export function buildApp() {
     emitPublished: (quizId: string, ownerUserId: string) => recordActivity(ownerUserId, "quiz_published", "quiz", quizId),
     emitPlayed: (playerUserId: string, quizId: string, quizName: string) =>
       recordActivity(playerUserId, "voted_on", "quiz", quizId, { game: "quiz", id: quizId, name: quizName }),
-    resolveUsernames: (userIds: string[]) => new Map([...resolvePublicReaderProfiles(userIds)].map(([id, profile]) => [id, profile.username])),
+    resolveProfiles: resolvePublicReaderProfiles,
     dailyPeople: {
       followees: (userId: string) => getCommunityPublicApi().followees(userId),
       published: (userIds: string[]) => new Set([...getCommunityPublicApi().readerVisibility(null, userIds)].filter(([, listing]) => listing.published).map(([id]) => id)),
