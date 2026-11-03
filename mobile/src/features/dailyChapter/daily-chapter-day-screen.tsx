@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Text } from "../../ui/Text";
 import { EmptyState, Screen, Skeleton, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { AuthorAvatar } from "../community/AuthorAvatar";
+import { ApiError } from "../../core/api";
 import { dailyChapterApi } from "./api";
 import { DailyChapterSquares } from "./daily-chapter-squares";
 import { useDailyHistory, useDeviceIdentity } from "./use-daily-history";
@@ -15,12 +16,25 @@ export function DailyChapterDayScreen({ id }: { id: string }) {
   const identity = useDeviceIdentity();
   const history = useDailyHistory();
   const result = history.data?.results.find((item) => item.editionId === id);
-  const people = useQuery({ queryKey: ["daily-chapter", "people", id], queryFn: () => dailyChapterApi.people(id), enabled: Boolean(result) });
-  const title = result ? `${result.date} · ${result.title}` : t("quizzes.dailyChapter");
+  const review = useQuery({
+    queryKey: ["daily-chapter", "review", id],
+    queryFn: async () => {
+      try {
+        return await dailyChapterApi.review(id);
+      } catch (reason) {
+        if (reason instanceof ApiError && (reason.status === 403 || reason.status === 404)) return null;
+        throw reason;
+      }
+    },
+    enabled: Boolean(history.data && !result),
+  });
+  const shown = result ?? review.data;
+  const people = useQuery({ queryKey: ["daily-chapter", "people", id], queryFn: () => dailyChapterApi.people(id), enabled: Boolean(shown) });
+  const title = shown ? `${shown.date} · ${shown.title}` : t("quizzes.dailyChapter");
   let body;
-  if (identity.isError || history.isError) body = <EmptyState title={t("quizzes.dayLoadFailed")} actionLabel={t("shell.retry")} onAction={() => { void identity.refetch(); void history.refetch(); }} />;
-  else if (!history.data) body = <View style={{ gap: spacing.md }}><Skeleton height={48} /><Skeleton height={120} /><Skeleton height={120} /></View>;
-  else if (!result) body = <EmptyState title={t("quizzes.didntPlay")} />;
+  if (identity.isError || history.isError || review.isError) body = <EmptyState title={t("quizzes.dayLoadFailed")} actionLabel={t("shell.retry")} onAction={() => { void identity.refetch(); void history.refetch(); if (review.isError) void review.refetch(); }} />;
+  else if (!history.data || (!result && review.isPending)) body = <View style={{ gap: spacing.md }}><Skeleton height={48} /><Skeleton height={120} /><Skeleton height={120} /></View>;
+  else if (!shown) body = <EmptyState title={t("quizzes.didntPlay")} />;
   else {
     const others = people.data?.people.filter((person) => !person.you) ?? [];
     let followed;
@@ -34,11 +48,11 @@ export function DailyChapterDayScreen({ id }: { id: string }) {
       <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.textDim, fontWeight: "700" }]}>{person.score}/5</Text>
     </View>);
     body = <>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+      {result ? <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
         <Text {...dynamicType} style={[typography.heading, { color: colors.text, fontWeight: "700" }]}>{result.score}/5</Text>
         <DailyChapterSquares marks={result.answers.map((answer) => answer.choiceIndex === answer.answerIndex)} size={14} />
-      </View>
-      <View style={{ gap: spacing.sm }}>
+      </View> : <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("quizzes.didntPlay")}</Text>}
+      {result ? <View style={{ gap: spacing.sm }}>
         <Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text }]}>{t("quizzes.yourAnswers")}</Text>
         {result.answers.map((answer) => {
           const right = answer.choiceIndex === answer.answerIndex;
@@ -52,7 +66,14 @@ export function DailyChapterDayScreen({ id }: { id: string }) {
               </>}
           </View>;
         })}
-      </View>
+      </View> : <View style={{ gap: spacing.sm }}>
+        <Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text }]}>{t("quizzes.questionsAndAnswers")}</Text>
+        {review.data?.questions.map((question) => <View key={question.questionId} style={{ gap: spacing.xs, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, backgroundColor: colors.surface }}>
+          <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>{question.prompt}</Text>
+          <Text {...dynamicType} style={[typography.body, { color: colors.success, fontWeight: "700" }]}>✓ {question.options[question.answerIndex]}</Text>
+          <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{question.explanation}</Text>
+        </View>)}
+      </View>}
       <View>
         <Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text, marginBottom: spacing.sm }]}>{t("quizzes.peopleYouFollow")}</Text>
         {followed}

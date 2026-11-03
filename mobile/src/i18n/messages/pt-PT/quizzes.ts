@@ -103,6 +103,7 @@ export const quizzes: CatalogOf<typeof en> = {
   "quizzes.outOfFive": "{label}, {score} de 5",
   "quizzes.dayLoadFailed": "Não foi possível carregar este capítulo",
   "quizzes.didntPlay": "Não jogou este capítulo.",
+  "quizzes.questionsAndAnswers": "Perguntas e respostas",
   "quizzes.retryPeopleLabel": "Tentar novamente carregar as pessoas que segue",
   "quizzes.peopleLoadFailed": "Não foi possível carregar as pessoas que segue. Tentar novamente",
   "quizzes.nobodyPlayed": "Ninguém que segue jogou este capítulo.",

@@ -102,6 +102,7 @@ export const quizzes = {
   "quizzes.outOfFive": "{label}, {score} out of 5",
   "quizzes.dayLoadFailed": "Couldn't load this chapter",
   "quizzes.didntPlay": "You didn't play this chapter.",
+  "quizzes.questionsAndAnswers": "Questions and answers",
   "quizzes.retryPeopleLabel": "Retry loading people you follow",
   "quizzes.peopleLoadFailed": "Couldn't load people you follow. Retry",
   "quizzes.nobodyPlayed": "Nobody you follow has played this chapter.",
