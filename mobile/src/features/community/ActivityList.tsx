@@ -45,7 +45,11 @@ export function useActivitySection(username: string): ProfileSection<{ item: Act
         )}
       </View>
     ),
-    ListFooterComponent: activity.isFetchingNextPage ? <View style={styles.body}><Skeleton height={80} /></View> : undefined,
+    ListFooterComponent: activity.isFetchingNextPage ? (
+      <View style={styles.body}><Skeleton height={80} /></View>
+    ) : activity.isFetchNextPageError ? (
+      <View style={styles.body}><ErrorState body={t("community.activityLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void activity.fetchNextPage()} /></View>
+    ) : undefined,
   };
 }
 
