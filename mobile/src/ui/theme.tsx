@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, Animated, Appearance, Easing, StyleSheet, useColorScheme } from "react-native";
+import { muralColors } from "@scripta/shared";
 import {
   MOTION,
   parseFontPreference,
@@ -161,9 +162,10 @@ export function useTheme(): Theme {
   };
 }
 
-export function MuralThemeScope({ theme, children }: { theme: ThemeId; children: ReactNode }) {
+export function MuralThemeScope({ theme, scheme, children }: { theme: ThemeId; scheme?: ThemeScheme; children: ReactNode }) {
   const parent = useTheme();
-  const value = useMemo<Theme>(() => ({ ...parent, id: theme, mode: themes[theme].scheme, colors: themes[theme].colors, fonts: parent.bundledFonts ? resolveFonts(theme, parent.displayFont, parent.textFont) : SYSTEM_FONTS }), [parent, theme]);
+  const mode = scheme ?? parent.mode;
+  const value = useMemo<Theme>(() => ({ ...parent, id: theme, mode, colors: muralColors(theme, mode), fonts: parent.bundledFonts ? resolveFonts(theme, parent.displayFont, parent.textFont) : SYSTEM_FONTS }), [parent, theme, mode]);
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 

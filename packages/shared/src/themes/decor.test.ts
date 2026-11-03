@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DECOR_EXTRA_COLORS, DECOR_MAX_OPACITY, THEME_DECOR, withOpacity } from "./decor.js";
+import { muralColors } from "../murals/twins.js";
+import { DECOR_EXTRA_COLORS, DECOR_MAX_OPACITY, THEME_DECOR, themeDecor, withOpacity } from "./decor.js";
 import { THEME_IDS, themes } from "./palettes.js";
 
 const DECOR_THEMES = ["matrix", "newsprint", "oxblood", "seventies", "synthwave"];
@@ -80,4 +81,10 @@ test("matrix glyphs fade from 0.21 down to 0.02", () => {
   const opacities = [...svg.matchAll(/opacity="([\d.]+)"/g)].map(([, value]) => Number(value));
   assert.equal(Math.max(...opacities), 0.21);
   assert.equal(Math.min(...opacities), 0.02);
+});
+
+test("themeDecor rebuilds a theme's decor from any palette", () => {
+  for (const id of THEME_IDS) assert.strictEqual(themeDecor(id, themes[id].colors), THEME_DECOR[id]);
+  assert.notDeepEqual(themeDecor("matrix", muralColors("matrix", "light")), THEME_DECOR.matrix);
+  assert.equal(themeDecor("sepia", muralColors("sepia", "dark")), undefined);
 });

@@ -7,6 +7,8 @@ export const muralEditor = {
   "muralEditor.renameMural": "Rename this mural",
   "muralEditor.fullscreen": "Fullscreen",
   "muralEditor.theme": "Theme",
+  "muralEditor.previewDark": "Preview dark",
+  "muralEditor.previewLight": "Preview light",
   "muralEditor.muralTheme": "Mural theme",
   "muralEditor.doneEditing": "Done editing",
   "muralEditor.emptyBodyEditing": "Add your first block with the + button above.",

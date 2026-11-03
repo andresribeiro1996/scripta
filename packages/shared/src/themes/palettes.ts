@@ -326,6 +326,26 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
   },
 };
 
+export const THEME_CONTRAST_PAIRS: ReadonlyArray<readonly [keyof ThemeColors, keyof ThemeColors]> = [
+  ["text", "background"],
+  ["text", "surface"],
+  ["textDim", "surface"],
+  ["textDim", "background"],
+  ["accent", "surface"],
+  ["onAccent", "accent"],
+  ["onDanger", "danger"],
+  ["danger", "surface"],
+  ["success", "surface"],
+  ["info", "surface"],
+  ["reference", "surface"],
+  ["accent", "accentSoft"],
+  ["danger", "dangerSoft"],
+  ["success", "successSoft"],
+  ["info", "infoSoft"],
+  ["reference", "referenceSoft"],
+  ["text", "accentFill"],
+];
+
 export function themeLabel(id: ThemeId, locale: Locale): string {
   return sharedT(locale)(`shared.palettes.${id}`);
 }

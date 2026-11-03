@@ -2,14 +2,14 @@ import { useCallback, type ReactNode } from "react";
 import { Stack, useFocusEffect } from "expo-router";
 import { useIsFocused } from "expo-router/react-navigation";
 import { StatusBar } from "expo-status-bar";
-import type { ThemeId } from "@scripta/shared/themes";
+import type { ThemeId, ThemeScheme } from "@scripta/shared/themes";
 import { Screen } from "../../ui";
 import { useScreenOptions } from "../../ui/navigation";
 import { useSetTabTheme } from "../../ui/tabTheme";
 import { MuralThemeScope, useTheme } from "../../ui/theme";
 
-export function MuralScreen({ theme, bottom, children }: { theme: ThemeId; bottom?: boolean; children: ReactNode }) {
-  return <MuralThemeScope theme={theme}><ThemedScreen bottom={bottom}>{children}</ThemedScreen></MuralThemeScope>;
+export function MuralScreen({ theme, scheme, bottom, children }: { theme: ThemeId; scheme?: ThemeScheme; bottom?: boolean; children: ReactNode }) {
+  return <MuralThemeScope theme={theme} scheme={scheme}><ThemedScreen bottom={bottom}>{children}</ThemedScreen></MuralThemeScope>;
 }
 
 function ThemedScreen({ bottom, children }: { bottom?: boolean; children: ReactNode }) {

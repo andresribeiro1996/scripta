@@ -61,6 +61,8 @@ const GLYPHS = {
   follow: { ios: "person.badge.plus", android: "person_add" },
   style: { ios: "paintbrush", android: "brush" },
   theme: { ios: "circle.lefthalf.filled", android: "contrast" },
+  sun: { ios: "sun.max", android: "light_mode" },
+  moon: { ios: "moon", android: "dark_mode" },
   resize: { ios: "arrow.up.left.and.arrow.down.right", android: "open_in_full" },
   expandHorizontal: { ios: "arrow.left.and.right", android: "swap_horiz" },
   expandVertical: { ios: "arrow.up.and.down", android: "swap_vert" },

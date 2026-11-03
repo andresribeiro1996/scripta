@@ -73,7 +73,7 @@ export function ReaderCardPreview() {
               <img src={cardSources.paper} width="250" height="350" alt={t("landing.cardAlt", { name: plateName(plate.key, locale) })} className="block h-full w-full dark:hidden" />
               <img src={cardSources.reversed} width="250" height="350" alt={t("landing.cardAlt", { name: plateName(plate.key, locale) })} className="hidden h-full w-full dark:block" />
             </span>
-            <div aria-hidden={!flipped} style={{ ...muralThemeStyle(look.theme), backgroundImage: blockFinishImage(resolveBlockStyle({ backgroundColor: "theme:background", backgroundFinish: look.finish }), palette) }} className={`absolute inset-0 overflow-hidden rounded-xl border border-(--color-border) text-left [backface-visibility:hidden] [transform:rotateY(180deg)] ${nocturne ? "p-4" : "p-2.5"}`}>
+            <div aria-hidden={!flipped} style={{ ...muralThemeStyle(look.theme, scheme), backgroundImage: blockFinishImage(resolveBlockStyle({ backgroundColor: "theme:background", backgroundFinish: look.finish }), palette) }} className={`absolute inset-0 overflow-hidden rounded-xl border border-(--color-border) text-left [backface-visibility:hidden] [transform:rotateY(180deg)] ${nocturne ? "p-4" : "p-2.5"}`}>
               <div style={{ gridTemplateAreas: look.areas, gridTemplateRows: look.rows }} className={`grid h-full grid-cols-4 text-[9px] leading-[1.35] ${nocturne ? "gap-2.5" : "gap-1.5"}`}>
                 <span style={{ ...surface({ backgroundColor: "theme:accentSoft", gradientColor: "theme:surface", gradientStrength: 85, cardBorderWidth: 0 }), gridArea: "profile" }} className="p-1.5">
                   <span className="flex items-center gap-2">

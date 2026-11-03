@@ -2,7 +2,7 @@ import { StyleSheet, View, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { contrastRatio, type DigestItem } from "@scripta/shared";
+import { contrastRatio, muralColors, muralThemeId, type DigestItem } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { Icon, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
@@ -10,7 +10,6 @@ import { CoverFan, SLOT_HEIGHT, fanWidth } from "../community/CoverFan";
 import { fetchProfile } from "../community/api";
 import { MuralThumbnail } from "../murals/MuralCanvas";
 import { muralPreviewOf } from "../public/adapters";
-import { themes } from "@scripta/shared/themes";
 import { feedRowModel } from "@scripta/shared/community";
 import { useLocale, useT } from "../../i18n";
 
@@ -43,7 +42,8 @@ export function FeedPreview({ item }: { item: DigestItem }) {
 }
 
 function MuralPreview({ item }: { item: Extract<DigestItem, { kind: "mural" }> }) {
-  const palette = themes[item.mural.theme].colors;
+  const { mode } = useTheme();
+  const palette = muralColors(muralThemeId(item.mural.theme), mode);
   const { width } = useWindowDimensions();
   const profile = useQuery({ queryKey: ["community", "profile", item.actor.username], queryFn: () => fetchProfile(item.actor.username), enabled: !item.mural.coverImageUrl, retry: false });
   const payload = profile.data?.mural?.mural.id === item.mural.id ? profile.data.mural : null;
