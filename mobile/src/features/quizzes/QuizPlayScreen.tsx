@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { answerExpands, leaderboardPosition, missesFirst, playDurationLabel, playerLabel, resultCovers, scoreRows, type PublicQuizQuestion, type ScoreRow } from "@scripta/shared";
+import { answerExpands, createPlayClock, leaderboardPosition, missesFirst, playDurationLabel, playerLabel, resultCovers, scoreRows, type PlayClock, type PublicQuizQuestion, type ScoreRow } from "@scripta/shared";
 import { useQuery } from "@tanstack/react-query";
 import { router, Stack, useSegments } from "expo-router";
 import { isPermanentError } from "../../core/apiClient";
@@ -36,7 +36,7 @@ export function QuizPlayScreen({ code }: { code: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"answers" | "board">("answers");
-  const startRef = useRef(Date.now());
+  const clock = useRef(createPlayClock()).current;
   const board = useQuery({ queryKey: ["quizzes", "board", code], queryFn: () => fetchPlayBoard(code), enabled: Boolean(code), retry: false });
 
   useEffect(() => { void AsyncStorage.getItem(playStorageKey(code)).then(setStoredId).catch(() => setStoredId(null)); }, [code]);
@@ -76,11 +76,13 @@ export function QuizPlayScreen({ code }: { code: string }) {
     alreadyPlayed: Boolean(result),
   });
 
+  useEffect(() => { if (stage === "playing") clock.start(Date.now()); }, [stage, clock]);
+
   async function submit(questions: PublicQuizQuestion[]) {
     setBusy(true);
     setError(null);
     try {
-      const body = { answers: buildSubmission(questions, answers), durationMs: Date.now() - startRef.current };
+      const body = { answers: buildSubmission(questions, answers), durationMs: clock.durationMs(Date.now()) };
       const response = await submitPlay(code, playerName.trim() ? { ...body, playerName: playerName.trim() } : body);
       setSubmitted(response);
       try { await AsyncStorage.setItem(playStorageKey(code), response.playId); }
@@ -112,12 +114,13 @@ export function QuizPlayScreen({ code }: { code: string }) {
       const onLast = index === questions.length - 1;
       return <FormScroll contentContainerStyle={styles.page} scrollToEnd={onLast && complete}>
         <View style={[styles.track, { backgroundColor: colors.border }]}><View style={[styles.fill, { backgroundColor: colors.accent, width: `${Math.round((answered / questions.length) * 100)}%` }]} /></View>
-        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.questionOf", { number: index + 1, total: questions.length })}</Text>
+        <ElapsedCaption clock={clock} complete={complete} label={t("quizzes.questionOf", { number: index + 1, total: questions.length })} />
         <Prompt question={question} />
         {question.type === "title_cover" ? (
           <View style={styles.grid}>
             {question.options.map((option, optionIndex) => (
               <Pressable key={option} accessibilityRole="button" accessibilityLabel={t("quizzes.option", { number: optionIndex + 1 })} disabled={busy} onPress={() => {
+                clock.answered(Date.now());
                 setAnswers((value) => ({ ...value, [question.id]: optionIndex }));
                 setIndex((value) => nextIndex(questions, value));
               }} style={[styles.tile, { borderColor: answers[question.id] === optionIndex ? colors.accent : colors.border, backgroundColor: colors.border }]}>
@@ -129,6 +132,7 @@ export function QuizPlayScreen({ code }: { code: string }) {
           <View style={styles.options}>
             {question.options.map((option, optionIndex) => (
               <Pressable key={option} accessibilityRole="button" accessibilityLabel={option} disabled={busy} onPress={() => {
+                clock.answered(Date.now());
                 setAnswers((value) => ({ ...value, [question.id]: optionIndex }));
                 setIndex((value) => nextIndex(questions, value));
               }} style={[styles.option, { borderColor: answers[question.id] === optionIndex ? colors.accent : colors.border, backgroundColor: answers[question.id] === optionIndex ? colors.accentSoft : colors.surface }]}>
@@ -138,12 +142,22 @@ export function QuizPlayScreen({ code }: { code: string }) {
           </View>
         )}
         {onLast && complete ? <View style={styles.complete}>
-          <Input label={t("quizzes.leaderboardName")} value={playerName} onChangeText={setPlayerName} placeholder={t("quizzes.guest")} maxLength={40} />
+          {user?.username ? null : <Input label={t("quizzes.leaderboardName")} value={playerName} onChangeText={setPlayerName} placeholder={t("quizzes.guest")} maxLength={40} />}
           <Button label={t("quizzes.seeScore")} loading={busy} onPress={() => void submit(questions)} />
         </View> : null}
       </FormScroll>;
     })() : null}
   </Screen>;
+}
+
+function ElapsedCaption({ clock, complete, label }: { clock: PlayClock; complete: boolean; label: string }) {
+  const { colors } = useTheme();
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick((value) => value + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{label} · {Math.floor(clock.elapsed(Date.now(), complete) / 1000)}s</Text>;
 }
 
 function Prompt({ question }: { question: PublicQuizQuestion }) {
