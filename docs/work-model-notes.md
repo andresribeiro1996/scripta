@@ -4,9 +4,9 @@ A catalog `books` row is an edition (an ISBN) or a title-plus-author identity, a
 
 ## Already in place
 
-- **`books.ol_work_key`** holds Open Library's work id (`OL82563W`). It is filled by the seed, by the publisher importer (from `/isbn/{isbn}.json`), and by Open Library details and search answers. It is fill-only, and nothing reads it yet.
-- **Works.** Every edition has a `books.work_id`; a `works` row holds the Open Library work key when known, else our own id with the first edition's title and author. When an edition gets a key a work already holds, it moves there and its emptied work gets `merged_into`. Nothing reads `work_id` yet.
-- **Edition languages.** `books.language` (`en`, `pt-PT`, `pt-BR`, …) is filled by the seed and the publisher importer, fill-only; NULL when unmapped. Nothing reads it yet.
+- **`books.ol_work_key`** holds Open Library's work id (`OL82563W`). It is filled by the seed, by the publisher importer (from `/isbn/{isbn}.json`), and by Open Library details and search answers. It is fill-only, and it decides which work an edition joins.
+- **Works.** Every edition has a `books.work_id`; a `works` row holds the Open Library work key when known, else our own id with the first edition's title and author. When an edition gets a key a work already holds, it moves there and its emptied work gets `merged_into`.
+- **Edition languages.** `books.language` (`en`, `pt-PT`, `pt-BR`, …) is filled by the seed, the publisher importer and the BNP import; NULL when unmapped. The translation matcher reads it.
 - **The backfill** assigns works to existing editions on boot and every 10 minutes, 250 at a time.
 - **Covers stay per edition.** The Portuguese Relógio d'Água cover isn't the English Penguin one. A work would pick a display cover, for example the one in the reader's language.
 
@@ -18,7 +18,7 @@ A catalog `books` row is an edition (an ISBN) or a title-plus-author identity, a
 - **Who benefits:**
   - Social "who read this book" should match by work, across editions and languages.
   - Library duplicate review can use the work as a "maybe the same book" hint. It must never auto-merge, since owning two editions is legitimate.
-  - The arena, tier lists and murals keep their per-library `bookKey` for now. Games move to `work_id` in phase E (the owner's plan, 2026-10-02).
+  - The arena, tier lists and quizzes store `work_id` since phase E. Murals still hold `bookKey` in their blocks, linked to works through `mural_works`.
 
 ## Quotes for a work
 

@@ -10,5 +10,6 @@
 
 ## Rules
 
+- Read `docs/glossary.md` before naming or changing catalog, work, key or library-group logic.
 - Only put code here when more than one consumer needs it. No platform-specific imports — no React, no React Native, no Node-only APIs.
 - Adding an entry point means adding it to the `exports` map in `package.json`.
