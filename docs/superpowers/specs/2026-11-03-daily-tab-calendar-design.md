@@ -101,7 +101,7 @@ New strings go in both `en` and `pt-PT`. The wording in the mockup is a starting
 
 ## Release
 
-The backend must be live before the app update, since the new app needs the new history field. This is a JS-only change, so it goes over the air and needs no store build. Deploying stays with the user, per the usual runbook.
+One deploy starts the backend and the app update with no ordering between them. If the new app meets the old backend for a few minutes, it draws no missed days until the backend is live, and it must not crash. This is a JS-only change, so it goes over the air and needs no store build. Deploying stays with the user, per the usual runbook.
 
 The launch editions end on 2026-11-12. If no new ones are scheduled, later days show as plain "no chapter" days. That is correct behaviour and separate from this work.
 

@@ -44,7 +44,6 @@
 
 ```ts
 export interface DailyChapterPastEdition { id: string; date: string; title: string; themeId: string }
-export type DailyChapterStats = Omit<DailyChapterHistory, "pastEditions">;
 export type DailyChapterDayStatus = "played" | "missed" | "today" | "none";
 export interface DailyChapterCalendarDay { date: string; status: DailyChapterDayStatus; score: number | null; editionId: string | null }
 export interface DailyChapterRow { date: string; editionId: string; title: string; themeId: string; score: number | null; marks: boolean[] | null }
@@ -56,18 +55,21 @@ dailyChapterWeekDates(today: string, weeksBack: number): string[]
 dailyChapterMonthDates(month: string): string[]
 dailyChapterHasEarlierWeek(history: DailyChapterHistory, weeksBack: number): boolean
 dailyChapterHasEarlierMonth(history: DailyChapterHistory, month: string): boolean
+dailyChapterHasLaterMonth(history: DailyChapterHistory, month: string): boolean
+dailyChapterShiftMonth(month: string, by: number): string
+dailyChapterPosterMonth(today: string, weeksBack: number): string
 dailyChapterCanPlayToday(history: DailyChapterHistory): boolean
 dailyChapterDayLabel(date: string, locale: Locale): string
 dailyChapterRangeLabel(first: string, last: string, locale: Locale): string
 ```
 
-- `DailyChapterHistory` gains `pastEditions: DailyChapterPastEdition[]`.
-- `dailyChapterStats` now returns `DailyChapterStats`. `dailyChapterSummary` and `dailyChapterMonth` accept stats without `pastEditions`.
+- `DailyChapterHistory` gains an optional `pastEditions?: DailyChapterPastEdition[]`. It's optional because one push to `production` starts Railway and the OTA with no ordering between them, so a new bundle can meet an old backend. `dailyChapterStats` doesn't set it.
+- These functions sit next to `dailyChapterMonth`, which they extend, even though only mobile calls them today. That's deliberate, to keep the logic with its tests.
 - `createDailyChapterApi` gains `review: (id: string) => Promise<DailyChapterReview>`.
 
 - [ ] **Step 1: Write the failing tests in `dailyChapter.test.ts`**
 
-Build fixtures with `const withPast = (stats: DailyChapterStats, ids: string[]) => ({ ...stats, pastEditions: ids.map((id) => ({ id, date: "2030-01-" + id.slice(1), title: "Title " + id, themeId: "retold-myths" })) })` over releases `e01, e03, e05, e07` with today `2030-01-07`.
+Set `process.env.TZ = "America/Sao_Paulo"` at the top of the file, after the imports, with no restore, so every date function here runs west of UTC. Build fixtures with `const withPast = (stats: DailyChapterHistory, ids: string[]) => ({ ...stats, pastEditions: ids.map((id) => ({ id, date: "2030-01-" + id.slice(1), title: "Title " + id, themeId: "retold-myths" })) })` over releases `e01, e03, e05, e07` with today `2030-01-07`.
 
 ```ts
 test("calendar days separate played, missed, today and days with no chapter", () => {
@@ -120,13 +122,32 @@ test("the earlier arrows stop at the window holding the first chapter", () => {
   assert.equal(dailyChapterHasEarlierMonth(history, "2030-01"), false);
 });
 
-test("day labels name the UTC day on a device west of UTC", () => {
-  const zone = process.env.TZ;
-  process.env.TZ = "America/Sao_Paulo";
-  try {
-    assert.equal(dailyChapterDayLabel("2026-11-02", "en"), "Mon, Nov 2");
-    assert.equal(dailyChapterRangeLabel("2026-10-28", "2026-11-03", "en"), "Oct 28 – Nov 3");
-  } finally { process.env.TZ = zone; }
+test("labels name the UTC day on a device west of UTC", () => {
+  assert.match(dailyChapterDayLabel("2026-11-02", "en"), /\b2\b/);
+  assert.doesNotMatch(dailyChapterDayLabel("2026-11-02", "en"), /\b1\b/);
+  assert.match(dailyChapterRangeLabel("2026-10-28", "2026-11-03", "en"), /28.* – .*3/);
+});
+
+test("a new app on an older backend draws no missed days and doesn't throw", () => {
+  const history = dailyChapterStats([result("e03", "2030-01-03", 4)], releases, "2030-01-07");
+  assert.deepEqual(dailyChapterDays(history, ["2030-01-01", "2030-01-03"]).map((day) => day.status), ["none", "played"]);
+  assert.deepEqual(dailyChapterRows(history, dailyChapterDays(history, ["2030-01-01"])), []);
+});
+
+test("arrows don't throw with no chapters at all", () => {
+  const history = dailyChapterStats([], [], "2030-01-07");
+  assert.equal(dailyChapterHasEarlierWeek(history, 0), false);
+  assert.equal(dailyChapterHasEarlierMonth(history, "2030-01"), false);
+  assert.equal(dailyChapterCanPlayToday(history), false);
+});
+
+test("months shift across a year, the later arrow stops now, and the poster takes the week's last day", () => {
+  assert.equal(dailyChapterShiftMonth("2030-01", -1), "2029-12");
+  const history = dailyChapterStats([], [], "2030-01-20");
+  assert.equal(dailyChapterHasLaterMonth(history, "2029-12"), true);
+  assert.equal(dailyChapterHasLaterMonth(history, "2030-01"), false);
+  assert.equal(dailyChapterPosterMonth("2030-02-03", 0), "2030-02");
+  assert.equal(dailyChapterPosterMonth("2030-02-03", 1), "2030-01");
 });
 ```
 
@@ -139,14 +160,15 @@ Assert `review` requests with `auth: "required"`, following that file's recorder
 - [ ] **Step 3: Run the tests to verify they fail**
 
 Run: `npm run build --workspace @scripta/shared` then `npm test --workspace @scripta/shared`
-Expected: the build fails on the missing exports.
+Expected: the build passes, since tests are excluded from it, and the new tests fail at import.
 
 - [ ] **Step 4: Implement in `dailyChapter.ts` and `dailyChapterApi.ts`**
 
-- `dailyChapterDays`: played if `results` has the date. `today` if the date is `history.today` and `editionDates` includes it. `missed` if `pastEditions` has the date. Otherwise `none`.
-- `dailyChapterHasEarlierWeek`: the window's first date is after `editionDates.at(-1)`. False when `editionDates` is empty. The month version compares against `editionDates.at(-1)!.slice(0, 7)`.
+- `dailyChapterDays`: played if `results` has the date. `today` if the date is `history.today` and `editionDates` includes it. `missed` if `history.pastEditions ?? []` has the date. Otherwise `none`.
+- `dailyChapterHasEarlierWeek`: the window's first date is after `editionDates.at(-1)`. The month version compares against that date's month. Both are false when `editionDates` is empty.
+- `dailyChapterShiftMonth` moves the private `shiftMonth` from `your-chapters-screen.tsx` here.
 - `dailyChapterCanPlayToday`: `editionDates` includes `today`, and `results` has no row for `today`.
-- Labels: `new Date(date + "T00:00:00Z").toLocaleDateString(intlLocale(locale), { ..., timeZone: "UTC" })`, with `weekday: "short", month: "short", day: "numeric"` for the day. The range joins two `month: "short", day: "numeric"` dates with ` – `.
+- Labels: `new Date(date + "T00:00:00Z").toLocaleDateString(intlLocale(locale), { ..., timeZone: "UTC" })`, with `weekday: "short", month: "short", day: "numeric"` for the day. The range joins two `month: "short", day: "numeric"` dates with ` – `. `intlLocale` is undefined for `en`, so format follows the device, as `community/helpers.ts:293` does. The tests therefore pin the day, not the exact format.
 - `dailyChapterMonth` reuses `dailyChapterMonthDates`, with unchanged output.
 
 - [ ] **Step 5: Run the tests to verify they pass**
@@ -166,19 +188,20 @@ git commit -m "Add Daily Chapter week and month calendar logic"
 **Files:**
 - Modify: `backend/src/modules/quizzes/dailyChapterService.ts`
 - Modify: `backend/src/modules/quizzes/dailyChapterRoutes.ts`
+- Modify: `backend/README.md`
 - Test: `backend/src/modules/quizzes/dailyChapter.test.ts`
 
 **Interfaces:**
-- Consumes: `DailyChapterHistory`, `DailyChapterStats`, `DailyChapterReview` from Task 1.
+- Consumes: `DailyChapterHistory`, `DailyChapterReview` from Task 1.
 - Produces: `POST /daily-chapter/history` includes `pastEditions`. `GET /daily-chapter/:id/review` returns `DailyChapterReview`. `service.review(id: string): DailyChapterReview`.
 
 - [ ] **Step 1: Write the failing tests**
 
-Seed with the file's `seed` and `service.publish`, move the clock with `on`.
+Seed with the file's `seed` and `service.publish`, move the clock with `on`. Edition `date` is UNIQUE and past dates are refused, so build `unpub-01` by setting the clock to 2029-12-31, saving it with that date, and never publishing it. Its 404 must come from the missing `publishedAt`, not from a future date.
 
 ```ts
 test("history lists closed published chapters only", () => {
-  // published on-01 and today-02, saved-but-unpublished unpub-01, future-03; clock at 2030-01-02
+  // published on-01 and today-02, unpublished unpub-01 (2029-12-31), published future-03; clock at 2030-01-02
   assert.deepEqual(service.history("reader").pastEditions.map((edition) => edition.id), ["on-01"]);
   assert.deepEqual(Object.keys(service.history("reader").pastEditions[0]!).sort(), ["date", "id", "themeId", "title"]);
 });
@@ -190,7 +213,7 @@ test("review answers only for a closed published chapter", async () => {
   assert.equal(open.headers["cache-control"], "no-store");
   assert.equal(open.body.questions.length, 5);
   assert.equal(open.body.questions[0].answerIndex, 0);
-  assert.ok(!("choiceIndex" in open.body.questions[0]));
+  assert.deepEqual(Object.keys(open.body.questions[0]).sort(), ["answerIndex", "book", "explanation", "options", "prompt", "questionId", "sourceUrl"]);
   assert.equal((await call(service, { method: "GET", url: "/daily-chapter/today-02/review" }, "reader")).status, 403);
   assert.equal((await call(service, { method: "GET", url: "/daily-chapter/future-03/review" }, "reader")).status, 404);
   assert.equal((await call(service, { method: "GET", url: "/daily-chapter/unpub-01/review" }, "reader")).status, 404);
@@ -208,8 +231,10 @@ test("reading a missed chapter changes nothing in the player's history", () => {
 });
 
 test("people need a play only while the chapter is open", () => {
-  // withPeople: a viewer with no play gets 403 on the edition's own day,
-  // and the published followees after the clock moves past that day
+  // withPeople returns a movable clock, and gains a viewer who follows the same people as reader and has no play
+  assert.throws(() => service.people("edition-1", "watcher"), (error: InstanceType<typeof DailyChapterError>) => error.status === 403);
+  on("2030-01-02T00:00:00.000Z");
+  assert.deepEqual(service.people("edition-1", "watcher").map((person) => [person.userId, person.you]), [["pub", false]]);
 });
 ```
 
@@ -223,12 +248,12 @@ Expected: the new tests FAIL.
 - [ ] **Step 3: Implement in the service**
 
 - `history` returns `{ ...dailyChapterStats(results, editions, today()), pastEditions }`, with `pastEditions` from `editions` where `date < today()`, mapped to exactly `id, date, title, themeId`.
-- `review(id)`: `repo.edition(id)`. Unpublished, unknown or `date > today()` gets `failKey(404, "quizzes.dailyNoEdition")`. `date === today()` gets `failKey(403, "quizzes.dailyPlayFirst")`. Otherwise map `edition.snapshot!` to the question fields of `editionResult` without `choiceIndex`.
+- `review(id)`: `repo.edition(id)`. Unpublished, unknown or `date > today()` gets `failKey(404, "quizzes.dailyNoEdition")`. `date === today()` gets `failKey(403, "quizzes.dailyPlayFirst")`. Otherwise map `edition.snapshot!` to exactly the fields the test lists. Don't spread the question: the snapshot also holds `rights`, `sourceEdition`, `approvedAt` and `approvedBy`, which is the admin's user id.
 - `people`: the `dailyPlayFirst` check applies only when `edition.date === today()`.
 
 - [ ] **Step 4: Add the route in `dailyChapterRoutes.ts`**
 
-`GET /daily-chapter/:id/review` with `preHandler: authGuard`, sending `no-store`, next to the `people` route. Check it doesn't collide with the admin routes.
+`GET /daily-chapter/:id/review` with `preHandler: authGuard`, sending `no-store`, next to the `people` route. Add it to the routes described around `backend/README.md:850`, which says answer keys remain private, and note that closed chapters are the exception.
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
@@ -238,7 +263,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add backend/src/modules/quizzes/dailyChapterService.ts backend/src/modules/quizzes/dailyChapterRoutes.ts backend/src/modules/quizzes/dailyChapter.test.ts
+git add backend/src/modules/quizzes/dailyChapterService.ts backend/src/modules/quizzes/dailyChapterRoutes.ts backend/src/modules/quizzes/dailyChapter.test.ts backend/README.md
 git commit -m "Let signed-in readers review closed Daily Chapters"
 ```
 
@@ -250,6 +275,7 @@ git commit -m "Let signed-in readers review closed Daily Chapters"
 - Create: `mobile/src/features/dailyChapter/daily-chapter-play-footer.tsx`
 - Modify: `mobile/src/features/dailyChapter/daily-chapter-calendar.tsx`
 - Modify: `mobile/src/features/dailyChapter/daily-chapter-profile-section.tsx`
+- Modify: `mobile/src/features/dailyChapter/use-daily-history.ts`
 - Modify: `mobile/src/features/works/workPath.ts`
 - Modify: `mobile/src/i18n/messages/en/quizzes.ts`
 - Modify: `mobile/src/i18n/messages/pt-PT/quizzes.ts`
@@ -310,11 +336,12 @@ Remove `quizzes.noDailyTitle` and `quizzes.noDailyOwnBody` from both locales onc
 
 - [ ] **Step 4: Implement `useDailyPeriod`**
 
-- State: `view`, `weeksBack` (starts 0), `month` (starts `history.today.slice(0, 7)`). Each view keeps its own position.
-- `view` is read from and written to AsyncStorage under `daily-chapter:view`. Anything other than `"month"` counts as `"week"`.
+- State: `weeksBack` (starts 0) and `month` (starts `history.today.slice(0, 7)`). Each view keeps its own position.
+- `view` comes from a query with key `["daily-chapter", "view"]` that reads AsyncStorage key `daily-chapter:view`. `setView` writes the key and calls `setQueryData`, so a mounted You tab and "Your chapters" stay in step. Anything other than `"month"` counts as `"week"`.
 - `title`: `dailyChapterRangeLabel` for week, the `quizzes.monthYear` text for month.
-- `hasLater`: `weeksBack > 0` for week, `month < history.today.slice(0, 7)` for month.
-- `posterMonth`: `month` in month view, otherwise the visible week's last date `.slice(0, 7)`.
+- `hasLater`: `weeksBack > 0` for week, `dailyChapterHasLaterMonth` for month.
+- `posterMonth`: `month` in month view, otherwise `dailyChapterPosterMonth(history.today, weeksBack)`.
+- In `useDailyHistory`, an `AppState` listener invalidates `["daily-chapter", "history"]` when the app becomes active. Tabs stay mounted and there is no `focusManager`, so without this a phone resumed the next morning keeps yesterday as today and hides the play button.
 
 - [ ] **Step 5: Implement `DailyChapterPeriodSection`**
 
@@ -323,6 +350,7 @@ Order: `Segmented` (accessibility label `quizzes.calendarView`), a header row wi
 - Calendar cells follow the spec and mockup. Export `WEEKDAYS` from `daily-chapter-calendar.tsx` and reuse the tint from there (`opacity: 0.25 + 0.15 * score`), without changing that component's output.
 - Month is a Monday-first grid. Week is 7 cells in date order, each with its weekday above and a caption below: `{score}/5`, `quizzes.dayMissed` or `quizzes.dayPlay`. Captions are `numberOfLines={1}`.
 - Tapping: `played` and `missed` go to `dailyDayPath(editionId, segments)`. `today` goes to `/daily`. `none` is a plain non-pressable `View`.
+- Cell accessibility labels: `quizzes.outOfFive` when played, `quizzes.dayMissedLabel` when missed, `quizzes.dayPlayLabel` for today, with `dailyChapterDayLabel` as the date.
 - Rows have two lines: title, then `{dailyChapterDayLabel} · {dailyThemeName}`. On the right, `DailyChapterSquares` and `{score}/5` when played, `quizzes.dayMissed` when missed, then the chevron. Accessibility labels use `quizzes.pastChapterLabel` or `quizzes.pastChapterMissedLabel`, with the day label as `date`.
 - No rows shows `quizzes.noChaptersInPeriod`.
 
@@ -342,7 +370,7 @@ Expected: PASS.
 - [ ] **Step 9: Commit**
 
 ```bash
-git add mobile/src/features/dailyChapter/use-daily-period.ts mobile/src/features/dailyChapter/daily-chapter-period-section.tsx mobile/src/features/dailyChapter/daily-chapter-play-footer.tsx mobile/src/features/dailyChapter/daily-chapter-calendar.tsx mobile/src/features/dailyChapter/daily-chapter-profile-section.tsx mobile/src/features/works/workPath.ts mobile/src/features/works/workPath.test.ts mobile/src/i18n/messages/en/quizzes.ts mobile/src/i18n/messages/pt-PT/quizzes.ts
+git add mobile/src/features/dailyChapter/use-daily-period.ts mobile/src/features/dailyChapter/use-daily-history.ts mobile/src/features/dailyChapter/daily-chapter-period-section.tsx mobile/src/features/dailyChapter/daily-chapter-play-footer.tsx mobile/src/features/dailyChapter/daily-chapter-calendar.tsx mobile/src/features/dailyChapter/daily-chapter-profile-section.tsx mobile/src/features/works/workPath.ts mobile/src/features/works/workPath.test.ts mobile/src/i18n/messages/en/quizzes.ts mobile/src/i18n/messages/pt-PT/quizzes.ts
 git commit -m "Show a week or month calendar on the You tab's Daily section"
 ```
 
@@ -358,7 +386,7 @@ git commit -m "Show a week or month calendar on the You tab's Daily section"
 
 - [ ] **Step 1: Replace the month state, arrows, calendar and flat list**
 
-Order: tiles and bests when `results.length > 0`, the period section, theme bars, the share button. The footer goes below the `ScrollView`. The empty state goes, since the calendar always shows. The poster and share text use `period.posterMonth` in place of `month`. Sharing stays hidden with no results. `useDailyPeriod` needs loaded history, so the part that holds it is a child component rendered once `data` exists.
+The private `shiftMonth` goes too, now that `dailyChapterShiftMonth` exists. Order: tiles and bests when `results.length > 0`, the period section, theme bars, the share button. The footer goes below the `ScrollView`. The empty state goes, since the calendar always shows. The poster and share text use `period.posterMonth` in place of `month`. Sharing stays hidden with no results. `useDailyPeriod` needs loaded history, so the part that holds it is a child component rendered once `data` exists.
 
 - [ ] **Step 2: Remove strings nothing uses now**
 
@@ -403,13 +431,14 @@ const review = useQuery({
 });
 ```
 
-Only a 403 or 404 means "can't review". Any other failure goes to the existing `quizzes.dayLoadFailed` state with retry.
+Only a 403 or 404 means "can't review". Any other failure goes to the existing `quizzes.dayLoadFailed` state, and its retry also calls `review.refetch()`.
 
 - [ ] **Step 3: Render the missed page**
 
 - The title uses `result ?? review.data`.
 - `review.data` set: `quizzes.didntPlay` as a line, `quizzes.questionsAndAnswers` as a header, then a card per question reusing the played card's styling: prompt, `✓ {options[answerIndex]}` in `colors.success`, and the explanation.
 - `review.data === null`: the existing `quizzes.didntPlay` empty state.
+- `review` pending with no `result`: the existing skeletons, so a missed page doesn't flash "You didn't play this chapter".
 - `people` becomes `enabled: Boolean(result || review.data)`, and the "People you follow" block renders for both.
 
 - [ ] **Step 4: Run the checks**
@@ -427,9 +456,14 @@ git commit -m "Show questions and answers for a missed Daily Chapter"
 ### Task 6: Device pass and the whole gate
 
 **Files:**
+- Modify: `mobile/src/features/dailyChapter/daily-chapter-period-section.tsx`
+- Modify: `mobile/src/features/dailyChapter/daily-chapter-play-footer.tsx`
+- Modify: `mobile/src/features/dailyChapter/daily-chapter-profile-section.tsx`
+- Modify: `mobile/src/features/dailyChapter/daily-chapter-day-screen.tsx`
+- Modify: `mobile/src/features/dailyChapter/your-chapters-screen.tsx`
 - Test: `scripts/dev-daily-chapter.mjs`
 
-The fixture script is listed only as the source of test data. Don't edit it unless the pass finds it can't produce a state below.
+The mobile files are only what Step 3's fixes may touch. The fixture script is the source of test data. Don't edit it unless the pass finds it can't produce a state below.
 
 - [ ] **Step 1: Run the full checks**
 
@@ -438,7 +472,7 @@ Expected: PASS.
 
 - [ ] **Step 2: Dispatch `device-checker`**
 
-Give it the worktree path, a screenshot directory, and these checks on the seeded dev account (it has mixed scores, two missed days and gap days):
+Give it the worktree path, a screenshot directory, and these checks on the seeded dev account (it has mixed scores, several missed days and gap days, though the current Week window may hold no missed day, in which case use ‹ or Month):
 
 - You → Daily, Week: tiles, 7 cells with captions, list limited to the window, fixed play button above the tab bar with the last row readable above it.
 - Month: numbers, arrows, gap days plain, ‹ stops at the first chapter's month. Leave and return: the view is remembered.
@@ -453,3 +487,7 @@ Never-played can't be reached through the UI on the seeded account. Check it wit
 - [ ] **Step 3: Fix what it finds, within this plan's scope**
 
 Commit each fix with a plain sentence and re-check that screen only.
+
+- [ ] **Step 4: Run the `security-review` skill**
+
+The branch changes who can see what, through the review route and the relaxed `people` guard. The main session runs this before merge, as `CLAUDE.md` requires.
