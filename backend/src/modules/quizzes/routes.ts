@@ -6,7 +6,7 @@
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { QUIZ_QUESTION_TYPES, type PlayResponse } from "@scripta/shared";
+import { MAX_PLAY_DURATION_MS, QUIZ_QUESTION_TYPES, type PlayResponse } from "@scripta/shared";
 import { localeOf, t, validationMessage } from "../../i18n/index.js";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
 import { duplicateWorkMessage } from "../library/index.js";
@@ -50,7 +50,7 @@ const playStateSchema = z.object({ open: z.boolean() });
 
 const playSchema = z.object({
   answers: z.array(z.object({ questionId: z.string().min(1), choiceIndex: z.number().int().min(0).max(3) })).min(1).max(20),
-  durationMs: z.number().int().min(0).max(3_600_000),
+  durationMs: z.number().int().min(0).max(MAX_PLAY_DURATION_MS),
   playerName: z.string().trim().max(40).optional()
 });
 
