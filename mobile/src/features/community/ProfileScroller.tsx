@@ -141,7 +141,10 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
     settle(target, 0);
   };
 
-  const collapseStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -Math.min(activeScroll(), heroH.get()) }] }));
+  const collapseStyle = useAnimatedStyle(() => {
+    const y = ys[activeIndex.get()]!.get();
+    return { transform: [{ translateY: -Math.min(android ? Math.max(y, 0) : y, heroH.get()) }] };
+  });
 
   const indicatorStyle = useAnimatedStyle(() => {
     if (!measured) return {};
