@@ -27,3 +27,7 @@ export function seriesSearchHref(name: string, nonce: number, method: SeriesSear
 export function workCharactersPath(id: string, segments: readonly string[]): string {
   return `${workPath(id, segments)}/characters`;
 }
+
+export function dailyDayPath(id: string, segments: readonly string[]): string {
+  return `${segments[1] === "(home)" ? "" : "/(public)"}/daily-chapters/${id}`;
+}

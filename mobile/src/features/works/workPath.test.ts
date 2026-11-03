@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { bookToolPath, seriesSearchHref, seriesSearchMethod, stackPrefix, workPath, workStatsPath } from "./workPath.js";
+import { bookToolPath, dailyDayPath, seriesSearchHref, seriesSearchMethod, stackPrefix, workPath, workStatsPath } from "./workPath.js";
 
 test("a work opened from inside the tabs stays in them; from a root-level screen it opens above it", () => {
   assert.equal(workPath("w1", ["(app)", "(arena)", "tierlist", "[id]"]), "/work/w1");
@@ -40,4 +40,10 @@ test("a series tap reaches the Search tab's own screen by the call that works fr
   assert.equal(seriesSearchMethod(["(public)", "work", "[id]"]), null);
   assert.deepEqual(seriesSearchHref("Dune Chronicles", 5, "dismissTo"), { pathname: "/search", params: { q: "Dune Chronicles", t: "5" } });
   assert.deepEqual(seriesSearchHref("Dune Chronicles", 5, "navigate"), { pathname: "/search", params: { q: "Dune Chronicles", t: "5", pop: "true" } });
+});
+
+test("a Daily Chapter day stays in Home's stack and otherwise opens over the tabs", () => {
+  assert.equal(dailyDayPath("e1", ["(app)", "(home)", "daily-chapters"]), "/daily-chapters/e1");
+  assert.equal(dailyDayPath("e1", ["(app)", "(you)", "you"]), "/(public)/daily-chapters/e1");
+  assert.equal(dailyDayPath("e1", ["(public)", "daily-chapters"]), "/(public)/daily-chapters/e1");
 });
