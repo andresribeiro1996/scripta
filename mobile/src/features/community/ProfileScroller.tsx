@@ -84,6 +84,7 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
   const heroTop = useSharedValue(0);
   const drag = useSharedValue(0);
   const dragTab = useSharedValue<T | null>(null);
+  const downX = useSharedValue(0);
   const order = tabs.map((tab) => tab.value);
   const tabState = useSharedValue({ order, value });
   const { width } = useWindowDimensions();
@@ -134,10 +135,12 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
   const swipe = useMemo(() => {
     const choose = (next: T) => latest.current(next);
     return Gesture.Pan()
-      .activeOffsetX([-24, 24])
+      .activeOffsetX([-12, 12])
       .failOffsetY([-12, 12])
       .onTouchesDown((event, manager) => {
-        if ((event.allTouches[0]?.y ?? 0) + scrollY.get() < heroTop.get()) manager.fail();
+        const touch = event.allTouches[0];
+        if ((touch?.y ?? 0) + scrollY.get() < heroTop.get()) manager.fail();
+        downX.set(touch?.absoluteX ?? 0);
       })
       .onStart(() => {
         dragTab.set(tabState.get().value);
@@ -146,11 +149,12 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
         if (reducedMotion) return;
         const { order: tabOrder, value: current } = tabState.get();
         const index = tabOrder.indexOf(current);
-        drag.set(rubberBand(event.translationX, event.translationX > 0 ? index <= 0 : index >= tabOrder.length - 1));
+        const dx = event.absoluteX - downX.get();
+        drag.set(rubberBand(dx, dx > 0 ? index <= 0 : index >= tabOrder.length - 1));
       })
       .onEnd((event, success) => {
         const { order: tabOrder, value: current } = tabState.get();
-        const target = success ? swipeTarget(tabOrder, current, event.translationX, event.velocityX) : null;
+        const target = success ? swipeTarget(tabOrder, current, event.absoluteX - downX.get(), event.velocityX) : null;
         if (target === null) {
           drag.set(withSpring(0, SPRING_BACK));
           return;
@@ -164,7 +168,7 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
           if (finished) scheduleOnRN(choose, target);
         }));
       });
-  }, [scrollY, heroTop, drag, dragTab, tabState, reducedMotion, width]);
+  }, [scrollY, heroTop, drag, dragTab, downX, tabState, reducedMotion, width]);
 
   const tabBar = (
     <View accessibilityLabel={accessibilityLabel} accessibilityRole="tablist" style={[styles.tabRow, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
