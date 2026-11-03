@@ -1,19 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { playerLabel, resultCovers, scoreRows, type PublicQuizQuestion, type ScoreRow } from "@scripta/shared";
-import { decimalText } from "@scripta/shared/i18n";
+import { answerExpands, leaderboardPosition, missesFirst, playDurationLabel, playerLabel, resultCovers, scoreRows, type PublicQuizQuestion, type ScoreRow } from "@scripta/shared";
 import { useQuery } from "@tanstack/react-query";
-import { router, Stack } from "expo-router";
+import { router, Stack, useSegments } from "expo-router";
 import { isPermanentError } from "../../core/apiClient";
 import { Image } from "expo-image";
-import { Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, Share, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { useAuth } from "../../core/auth";
 import { ApiError } from "../../core/api";
 import { API_URL } from "../../core/config";
 import { Button, ErrorState, FormScroll, Icon, Input, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme, useUnsavedChangesGuard } from "../../ui";
+import { AuthorAvatar } from "../community/AuthorAvatar";
 import { publicContentUrl } from "../sharing/links";
 import { coverUrlForApi } from "../library/lib/coverUrl";
+import { workPath } from "../works/workPath";
 import { fetchPlay, fetchPlayBoard, fetchPublicResults, submitPlay, type PlayBoard, type PlayResponse } from "./api";
 import { buildSubmission, isComplete, nextIndex, playStage, playStorageKey } from "./quizPlay";
 import { useLocale, useT } from "../../i18n";
@@ -100,7 +101,7 @@ export function QuizPlayScreen({ code }: { code: string }) {
     : recoverError ? <ErrorState title={t("quizzes.recoverFailedTitle")} body={recoverError} actionLabel={t("shell.retry")} onAction={() => { setRecoverError(null); loadOwnPlay(); }} />
     : stage === "leaderboard" ? <View style={styles.closed}>
       <Text {...dynamicType} style={[typography.body, styles.center, { color: colors.textDim }]}>{t("quizzes.quizClosed")}</Text>
-      <Leaderboard code={code} />
+      <Leaderboard code={code} playId={null} />
     </View>
     : stage === "played" && board.data ? <EndScreen code={code} board={board.data} result={result!} tab={tab} setTab={setTab} onError={setError} />
     : board.data ? (() => {
@@ -176,11 +177,14 @@ function EndScreen({ code, board, result, tab, setTab, onError }: {
   const [expanded, setExpanded] = useState<string | null>(null);
   const rows = scoreRows(board.questions, result.correct, result.answers);
   const covers = resultCovers(board.questions, rows);
+  const results = usePublicResults(code, result.playId);
+  const position = results.data ? leaderboardPosition(results.data.plays) : null;
 
   async function challenge() {
     onError(null);
     try {
-      await Share.share({ message: await publicContentUrl(`/play/${code}`) });
+      const url = await publicContentUrl(`/play/${code}`);
+      await Share.share({ message: t("quizzes.challengeMessage", { score: result.score, total: board.questionCount, name: board.name, url }) });
     } catch (reason) {
       onError(reason instanceof Error ? reason.message : t("quizzes.publicLinkFailed"));
     }
@@ -192,6 +196,7 @@ function EndScreen({ code, board, result, tab, setTab, onError }: {
         <Text {...dynamicType} display={false} maxFontSizeMultiplier={1.2} accessibilityLabel={t("quizzes.scoreLabel", { score: result.score, total: board.questionCount })} style={[styles.score, { color: colors.text }]}>
           {result.score}<Text style={[styles.scoreOutOf, { color: colors.textDim }]}> / {board.questionCount}</Text>
         </Text>
+        {position ? <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.text }]}>{t("quizzes.rankOf", position)}</Text> : null}
       </View>
       {covers.length > 0 ? <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.fan}>
         {covers.map(({ url }, i) => (
@@ -202,10 +207,10 @@ function EndScreen({ code, board, result, tab, setTab, onError }: {
       </View> : null}
     </View>
     <SwipeableTabs accessibilityLabel={t("quizzes.quizResults")} options={[{ value: "answers", label: t("quizzes.yourAnswers") }, { value: "board", label: t("quizzes.leaderboard") }]} value={tab} onChange={setTab} renderPage={(page) => page === "board" ? (
-      <Leaderboard code={code} />
+      <Leaderboard code={code} playId={result.playId} />
     ) : (
       <ScrollView contentContainerStyle={styles.answers}>
-        {rows.map((row, i) => <AnswerRow key={row.id} row={row} question={board.questions[i]!} expanded={expanded === row.id} onToggle={() => setExpanded((current) => current === row.id ? null : row.id)} />)}
+        {missesFirst(rows).map((row) => <AnswerRow key={row.id} row={row} question={board.questions[row.number - 1]!} expanded={expanded === row.id} onToggle={() => setExpanded((current) => current === row.id ? null : row.id)} />)}
       </ScrollView>
     )} />
     <Button label={t("quizzes.challengeFriend")} onPress={() => void challenge()} />
@@ -215,23 +220,40 @@ function EndScreen({ code, board, result, tab, setTab, onError }: {
 function AnswerRow({ row, question, expanded, onToggle }: { row: ScoreRow; question: PublicQuizQuestion; expanded: boolean; onToggle: () => void }) {
   const t = useT();
   const { colors } = useTheme();
+  const segments = useSegments();
   const title = row.answer?.title ?? (row.answer?.kind === "text" ? row.answer.value : t("quizzes.questionNumber", { number: row.number }));
   const cover = row.answer?.kind === "cover" ? row.answer.value : question.type === "cover_title" ? question.prompt : null;
-  const verdict = row.correct ? t("quizzes.correct") : t("quizzes.incorrect");
+  const expands = answerExpands(row);
+  const prompt = row.prompt && (question.type === "quote_title" || question.type === "blurb_title") ? `“${row.prompt}”` : row.prompt;
+  const picked = row.pick?.kind === "text" ? t("quizzes.youPicked", { value: row.pick.value }) : null;
+  const verdict = row.correct ? t("quizzes.correct") : picked ?? t("quizzes.incorrect");
+  const outcome = (row.correct ? t("quizzes.correct") : t("quizzes.incorrect")).toLowerCase();
+  const label = [prompt, row.answer ? t("quizzes.answerLabelNumbered", { number: row.number, title, verdict: outcome }) : t("quizzes.answerLabel", { title, verdict: outcome }), picked].filter(Boolean).join(". ");
+  const head = <>
+    <View style={[styles.thumb, { backgroundColor: cover ? colors.border : colors.accentSoft }]}>
+      {cover ? <Image source={{ uri: uriFor(cover) }} contentFit="contain" style={StyleSheet.absoluteFill} /> : <Icon name="book" size={18} color={colors.textDim} />}
+    </View>
+    <View style={styles.grow}>
+      {prompt ? <Text {...dynamicType} numberOfLines={expands && !expanded ? 2 : undefined} style={[typography.caption, { color: colors.textDim }]}>{prompt}</Text> : null}
+      <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>{title}</Text>
+      <Text {...dynamicType} style={[typography.caption, { color: row.correct ? colors.success : colors.danger }]}>{row.correct ? "✓" : "✗"} {verdict}</Text>
+    </View>
+    {expands ? <Icon name={expanded ? "chevronDown" : "chevronRight"} size={16} color={colors.textDim} /> : null}
+  </>;
   return <View style={[styles.answerRow, { borderColor: colors.border }]}>
-    <Pressable accessibilityRole="button" accessibilityState={{ expanded }} accessibilityLabel={row.answer ? t("quizzes.answerLabelNumbered", { number: row.number, title, verdict: verdict.toLowerCase() }) : t("quizzes.answerLabel", { title, verdict: verdict.toLowerCase() })} onPress={onToggle} style={styles.answerHead}>
-      <View style={[styles.thumb, { backgroundColor: cover ? colors.border : colors.accentSoft }]}>
-        {cover ? <Image source={{ uri: uriFor(cover) }} contentFit="contain" style={StyleSheet.absoluteFill} /> : <Icon name="book" size={18} color={colors.textDim} />}
-      </View>
-      <View style={styles.grow}>
-        <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>{title}</Text>
-        <Text {...dynamicType} style={[typography.caption, { color: row.correct ? colors.success : colors.danger }]}>{row.correct ? "✓" : "✗"} {verdict}</Text>
-      </View>
-      <Icon name={expanded ? "chevronDown" : "chevronRight"} size={16} color={colors.textDim} />
-    </Pressable>
-    {expanded ? <View style={styles.answerBody}>
-      {row.answer ? <View style={styles.answerColumn}><AnswerValue value={row.answer} /></View> : <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("quizzes.answerUnavailable")}</Text>}
-      {row.pick ? <View style={[styles.answerColumn, styles.pickColumn, { borderColor: colors.border }]}><AnswerValue value={row.pick} picked /></View> : null}
+    {expands
+      ? <Pressable accessibilityRole="button" accessibilityState={{ expanded }} accessibilityLabel={label} onPress={onToggle} style={styles.answerHead}>{head}</Pressable>
+      : <View accessible accessibilityLabel={label} style={styles.answerHead}>{head}</View>}
+    {expands && expanded ? <View style={styles.answerExpanded}>
+      {row.answer && row.pick?.kind === "cover" ? <View style={styles.answerBody}>
+        <View style={styles.answerColumn}><AnswerValue value={row.answer} /></View>
+        <View style={[styles.answerColumn, styles.pickColumn, { borderColor: colors.border }]}><AnswerValue value={row.pick} picked /></View>
+      </View> : null}
+      {row.answer ? null : <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("quizzes.answerUnavailable")}</Text>}
+      {row.workId ? <Pressable accessibilityRole="link" onPress={() => router.push(workPath(row.workId!, segments) as never)} style={styles.openBook}>
+        <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.accent }]}>{t("quizzes.openBook")}</Text>
+        <Icon name="chevronRight" size={16} color={colors.accent} />
+      </Pressable> : null}
     </View> : null}
   </View>;
 }
@@ -249,28 +271,41 @@ function AnswerValue({ value, picked = false }: { value: NonNullable<ScoreRow["a
   </View>;
 }
 
-function Leaderboard({ code }: { code: string }) {
+function usePublicResults(code: string, playId: string | null) {
+  return useQuery({ queryKey: ["quizzes", "results", code, playId], queryFn: () => fetchPublicResults(code, playId), retry: false });
+}
+
+function Leaderboard({ code, playId }: { code: string; playId: string | null }) {
   const t = useT();
   const locale = useLocale();
   const { colors } = useTheme();
-  const leaderboard = useQuery({ queryKey: ["quizzes", "results", code], queryFn: () => fetchPublicResults(code, null), retry: false });
-  if (leaderboard.isPending) return <View style={styles.section}><Skeleton height={180} /></View>;
-  if (leaderboard.isError) return <ErrorState body={t("quizzes.leaderboardFailed")} actionLabel={t("shell.retry")} onAction={() => void leaderboard.refetch()} />;
-  if (leaderboard.data.plays.length === 0) return <View style={styles.section}><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("quizzes.noPlays")}</Text></View>;
-  return <ScrollView contentContainerStyle={styles.section}>
-    {leaderboard.data.plays.map((play, i) => (
-      <View key={`${play.playerName ?? "Guest"}-${i}`} style={[styles.leaderRow, { borderColor: colors.border }]}>
-        <Text {...dynamicType} style={[typography.body, styles.rank, { color: colors.textDim }]}>{i + 1}</Text>
+  const leaderboard = usePublicResults(code, playId);
+  const data = leaderboard.data;
+  if (!data) return leaderboard.isError
+    ? <ErrorState body={t("quizzes.leaderboardFailed")} actionLabel={t("shell.retry")} onAction={() => void leaderboard.refetch()} />
+    : <View style={styles.section}><Skeleton height={180} /></View>;
+  if (data.plays.length === 0) return <View style={styles.section}><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("quizzes.noPlays")}</Text></View>;
+  return <ScrollView style={styles.board} contentContainerStyle={styles.boardContent} refreshControl={<RefreshControl refreshing={leaderboard.isRefetching} onRefresh={() => void leaderboard.refetch()} />}>
+    {data.plays.map((play, i) => {
+      const { name, guest } = playerLabel(play, locale);
+      const time = playDurationLabel(play.durationMs, locale);
+      const label = [play.isYou ? t("quizzes.you") : null, name, guest ? t("quizzes.guest") : null, t("quizzes.scoreLabel", { score: play.score, total: data.questionCount }), time].filter(Boolean).join(", ");
+      return <View key={`${play.playerName ?? "Guest"}-${i}`} accessible accessibilityLabel={label} style={[styles.leaderRow, { borderColor: colors.border }, play.isYou && [styles.ownRow, { backgroundColor: colors.accentSoft }]]}>
+        <Text {...dynamicType} style={[typography.body, styles.rank, i === 0 ? [styles.strong, { color: colors.accent }] : { color: colors.textDim }]}>{i + 1}</Text>
+        <View style={[styles.avatarRing, { borderColor: play.isYou ? colors.accent : "transparent" }]}>
+          <AuthorAvatar username={name} avatarUrl={play.avatarUrl} size={28} />
+        </View>
         <View style={styles.grow}>
-          <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{playerLabel(play, locale).name}</Text>
-          {playerLabel(play, locale).guest ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.guest")}</Text> : null}
+          <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{name}</Text>
+          {guest ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.guest")}</Text> : null}
         </View>
         <View style={styles.leaderScore}>
-          <Text {...dynamicType} numberOfLines={1} style={[typography.body, styles.strong, { color: colors.text }]}>{play.score}/{leaderboard.data.questionCount}</Text>
-          <Text {...dynamicType} numberOfLines={1} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.durationSeconds", { seconds: decimalText(play.durationMs / 1000, locale, 1) })}</Text>
+          <Text {...dynamicType} numberOfLines={1} style={[typography.body, styles.strong, { color: colors.text }]}>{play.score}/{data.questionCount}</Text>
+          <Text {...dynamicType} numberOfLines={1} style={[typography.caption, { color: colors.textDim }]}>{time}</Text>
         </View>
-      </View>
-    ))}
+      </View>;
+    })}
+    {data.plays.length === 1 && data.plays[0]!.isYou ? <Text {...dynamicType} style={[typography.caption, styles.justYou, { color: colors.textDim }]}>{t("quizzes.justYou")}</Text> : null}
   </ScrollView>;
 }
 
@@ -293,6 +328,11 @@ const styles = StyleSheet.create({
   complete: { gap: spacing.sm, paddingBottom: spacing.xl },
   section: { paddingTop: spacing.sm },
   leaderRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: minimumTouchTarget, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth },
+  board: { marginHorizontal: -spacing.sm },
+  boardContent: { paddingTop: spacing.sm, paddingHorizontal: spacing.sm },
+  ownRow: { borderRadius: radii.md, marginHorizontal: -spacing.sm, paddingHorizontal: spacing.sm },
+  avatarRing: { borderWidth: 1, borderRadius: radii.full },
+  justYou: { paddingTop: spacing.md },
   rank: { minWidth: spacing.xl },
   leaderScore: { alignItems: "flex-end" },
   end: { flex: 1, gap: spacing.md },
@@ -306,7 +346,9 @@ const styles = StyleSheet.create({
   answerRow: { borderBottomWidth: StyleSheet.hairlineWidth },
   answerHead: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: minimumTouchTarget, paddingVertical: spacing.sm },
   thumb: { width: 30, height: 44, borderRadius: radii.sm, overflow: "hidden", alignItems: "center", justifyContent: "center" },
-  answerBody: { flexDirection: "row", paddingBottom: spacing.md },
+  answerExpanded: { gap: spacing.sm, paddingBottom: spacing.md },
+  answerBody: { flexDirection: "row" },
+  openBook: { flexDirection: "row", alignItems: "center", gap: spacing.xs, minHeight: minimumTouchTarget },
   answerColumn: { flex: 1 },
   pickColumn: { borderLeftWidth: StyleSheet.hairlineWidth, paddingLeft: spacing.md },
   answerValue: { gap: spacing.xs },
