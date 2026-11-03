@@ -859,13 +859,14 @@ Accepted, by the user after the spike or as Claude's call:
   - It takes the section's `onEndReached` (threshold 0.4), `ListEmptyComponent` and `ListFooterComponent`.
   - `scrollY` comes from its `useAnimatedScrollHandler`, whose `onBeginDrag` cancels `fling`.
   - **Android:** keep a RefreshControl mounted with `enabled={Boolean(section.onRefresh)}`, as Task 16 does, and add `progressViewOffset={heroHeight + tabBarHeight}`. **iOS:** render it only when `onRefresh` is set.
-- **Header:** absolute at `top: 0`, full width, with `translateY = -min(activeY, heroHeight)`.
-  - `activeY` is the active page's `scrollY`, read on the UI thread.
+- **Header:** absolute at `top: 0`, full width. It is not translated itself.
+  - `collapse = min(activeY, heroHeight)`, where `activeY` is the active page's `scrollY`, read on the UI thread.
   - On Android, clamp `activeY` at 0 first. On iOS, don't clamp, so the header follows the overscroll and the refresh spinner shows above the rows.
   - Inside the header:
-    - the backdrop, `pointerEvents="none"`, absolute at `top: 0`, height `headerHeight + heroHeight`;
-    - a `pointerEvents="box-none"`, `overflow: "hidden"` View at `marginTop: headerHeight`, height `heroHeight + tabBarHeight`, holding the hero and the tab bar.
-  - The clip stops the hero from drawing over the nav bar once it is pinned. It needs the counter-translate: its inner content takes `translateY: -collapse` while the clip box itself stays put. `collapse` is the same `min(…)` value.
+    - the backdrop, `pointerEvents="none"`, absolute at `top: 0`, height `headerHeight + heroHeight`, with `translateY: -collapse`;
+    - a clip View, `pointerEvents="box-none"`, `overflow: "hidden"`, absolute at `top: headerHeight`, height `heroHeight + tabBarHeight`, which never moves;
+    - inside the clip, one `pointerEvents="box-none"` View with the hero and the tab bar, with `translateY: -collapse`.
+  - Because the clip stays put, the hero is cut off at the nav bar once it is pinned. Where the content has moved up, the clip is empty and passes touches through to the pages.
   - Measure `heroHeight` and `tabBarHeight` with `onLayout`, into both state and shared values.
   - The tab bar keeps ProfileScroller's tab look.
   - The indicator is one bar with a Reanimated style interpolated from `x / width` across the measured tab layouts, so it slides with the finger.
