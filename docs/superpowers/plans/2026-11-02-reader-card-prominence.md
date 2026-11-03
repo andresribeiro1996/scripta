@@ -879,7 +879,8 @@ Accepted, by the user after the spike or as Claude's call:
   - **onUpdate:** `x = dragX(startX, absoluteX - downX, tabs.length, width)`.
   - **onEnd(event, success):**
     - `target = success ? swipeTarget(order, current, absoluteX - downX, velocityX) ?? current : current`.
-    - Set `activeIndex` to the target index, then animate `x` to `targetIndex * width` with `withSpring({ damping: 20, mass: 1, stiffness: 100 })`.
+    - Set `activeIndex` to the target index, then animate `x` to `targetIndex * width` with `withTiming` over `settleDuration(distance, velocityX)` and `Easing.out(Easing.cubic)`. This amends the spring: on the phone the user found the spring didn't match Library's pager, which finishes in about 300 ms at the finger's speed.
+  - `settleDuration(distance, velocity)` in `pinnedOffset.ts` is `3 · distance / |velocity|` in ms, so an out-cubic settle starts at the finger's speed, clamped to 150–300 ms. At zero velocity it is 300 ms. Tab taps use it with velocity 0.
     - When the target differs, call `scheduleOnRN` at release, through the existing `latest` ref pattern, so `onChange` gets the target value.
   - **Reduced motion:** no follow during the drag, and `x` jumps to the target on release.
 - **Vertical drags on the header:** `Gesture.Race` the swipe with a second `Gesture.Pan()`, `activeOffsetY([-8, 8])` and `failOffsetX([-12, 12])`.
