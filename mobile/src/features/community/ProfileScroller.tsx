@@ -1,16 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { Platform, Pressable, RefreshControl, StyleSheet, useWindowDimensions, View, type FlatList } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { Extrapolation, cancelAnimation, interpolate, scrollTo, useAnimatedReaction, useAnimatedRef, useAnimatedScrollHandler, useAnimatedStyle, useReducedMotion, useSharedValue, withDecay, withSpring, withTiming, type AnimatedRef, type SharedValue } from "react-native-reanimated";
+import Animated, { Extrapolation, cancelAnimation, interpolate, scrollTo, useAnimatedReaction, useAnimatedRef, useAnimatedScrollHandler, useAnimatedStyle, useReducedMotion, useSharedValue, withDecay, withTiming, Easing, type AnimatedRef, type SharedValue } from "react-native-reanimated";
 import { scheduleOnRN, scheduleOnUI } from "react-native-worklets";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { Text } from "../../ui/Text";
 import { dynamicType, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
 import { useScreenOptions } from "../../ui/navigation";
-import { dragX, swipeTarget, syncedOffset } from "./pinnedOffset";
+import { dragX, settleDuration, swipeTarget, syncedOffset } from "./pinnedOffset";
 
-const SPRING = { damping: 20, mass: 1, stiffness: 100 } as const;
-const TAP_DURATION = 220;
 
 export type ProfileSection<T = unknown> = {
   data: readonly T[];
@@ -90,9 +88,9 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
   const order = useMemo(() => orderKey.split("\n") as T[], [orderKey]);
   const count = order.length;
   const index = Math.max(0, order.indexOf(value));
-  const refs = useRef(tabs.map(() => useAnimatedRef<FlatList<unknown>>())).current;
-  const ys = useRef(tabs.map(() => useSharedValue(0))).current;
-  const heights = useRef(tabs.map(() => useSharedValue(0))).current;
+  const refs = tabs.map(() => useAnimatedRef<FlatList<unknown>>());
+  const ys = tabs.map(() => useSharedValue(0));
+  const heights = tabs.map(() => useSharedValue(0));
   const x = useSharedValue(index * width);
   const activeIndex = useSharedValue(index);
   const fling = useSharedValue(0);
@@ -119,7 +117,7 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
   const syncOthers = () => {
     "worklet";
     const active = activeIndex.get();
-    const activeY = ys[active]!.get();
+    const activeY = Math.max(ys[active]!.get(), 0);
     for (let other = 0; other < count; other++) {
       if (other === active) continue;
       const target = syncedOffset(activeY, ys[other]!.get(), heroH.get());
@@ -128,13 +126,19 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
     }
   };
 
+  const settle = (target: number, velocity: number) => {
+    "worklet";
+    activeIndex.set(target);
+    const to = target * width;
+    x.set(reducedMotion ? to : withTiming(to, { duration: settleDuration(Math.abs(to - x.get()), velocity), easing: Easing.out(Easing.cubic) }));
+  };
+
   const jump = (target: number) => {
     "worklet";
     cancelAnimation(fling);
     cancelAnimation(x);
     syncOthers();
-    activeIndex.set(target);
-    x.set(reducedMotion ? target * width : withTiming(target * width, { duration: TAP_DURATION }));
+    settle(target, 0);
   };
 
   const collapseStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -Math.min(activeScroll(), heroH.get()) }] }));
@@ -169,7 +173,14 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
     });
   }, [width]);
 
+  const sent = useRef<T[]>([]);
+
   useEffect(() => {
+    const echoed = sent.current.indexOf(value);
+    if (echoed >= 0) {
+      sent.current.splice(0, echoed + 1);
+      return;
+    }
     const target = order.indexOf(value);
     if (target < 0) return;
     scheduleOnUI(() => {
@@ -182,7 +193,10 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
   latest.current = onChange;
 
   const gesture = useMemo(() => {
-    const choose = (next: T) => latest.current(next);
+    const choose = (next: T) => {
+      sent.current.push(next);
+      latest.current(next);
+    };
     return Gesture.Race(
       Gesture.Pan()
         .activeOffsetX([-12, 12])
@@ -204,8 +218,7 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
           const current = activeIndex.get();
           const next = success ? swipeTarget(order, order[current]!, event.absoluteX - downX.get(), event.velocityX) : null;
           const target = next === null ? current : order.indexOf(next);
-          activeIndex.set(target);
-          x.set(reducedMotion ? target * width : withSpring(target * width, SPRING));
+          settle(target, event.velocityX);
           if (next !== null) scheduleOnRN(choose, next);
         }),
       Gesture.Pan()
@@ -232,6 +245,7 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
 
   function tap(tabIndex: number, next: T) {
     scheduleOnUI(jump, tabIndex);
+    if (next !== value) sent.current.push(next);
     onChange(next);
   }
 
@@ -243,7 +257,7 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
             <Animated.View pointerEvents="none" style={[styles.backdrop, { height: headerHeight + heroHeight }, collapseStyle]}>
               {backdrop}
             </Animated.View>
-            <View pointerEvents="box-none" style={[styles.clip, { top: headerHeight, height: heroHeight + tabBarHeight }]}>
+            <View pointerEvents="box-none" style={[styles.clip, { top: headerHeight }]}>
               <Animated.View pointerEvents="box-none" style={collapseStyle}>
                 <View
                   onLayout={(event) => {
@@ -325,9 +339,9 @@ export function ProfileScroller<T extends string>({ hero, backdrop, notice, tabs
 
 const styles = StyleSheet.create({
   grow: { flex: 1 },
-  header: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 1 },
+  header: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1 },
   backdrop: { position: "absolute", top: 0, left: 0, right: 0 },
-  clip: { position: "absolute", left: 0, right: 0, overflow: "hidden" },
+  clip: { position: "absolute", left: 0, right: 0, bottom: 0, overflow: "hidden" },
   pages: { flex: 1, overflow: "hidden" },
   row: { flex: 1, flexDirection: "row" },
   notice: { position: "absolute", left: 0, right: 0 },

@@ -27,3 +27,12 @@ export function dragX(startX: number, dx: number, count: number, width: number):
   if (x > last) return last + rubberBand(x - last, true);
   return x;
 }
+
+const SETTLE_MIN = 150;
+const SETTLE_MAX = 300;
+
+export function settleDuration(distance: number, velocity: number): number {
+  "worklet";
+  const speed = Math.abs(velocity);
+  return speed ? Math.min(Math.max((3 * distance * 1000) / speed, SETTLE_MIN), SETTLE_MAX) : SETTLE_MAX;
+}

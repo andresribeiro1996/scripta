@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dragX, rubberBand, swipeTarget, syncedOffset } from "./pinnedOffset";
+import { dragX, settleDuration, rubberBand, swipeTarget, syncedOffset } from "./pinnedOffset";
 
 test("swipeTarget moves to the neighbouring tab for a far or fast enough swipe", () => {
   const tabs = ["shelf", "activity", "daily"];
@@ -29,4 +29,11 @@ test("dragX moves the pages opposite the finger and damps the drag past either e
   assert.equal(dragX(320, 100, 3, 320), 220);
   assert.equal(dragX(0, 90, 3, 320), -30);
   assert.equal(dragX(640, -90, 3, 320), 670);
+});
+
+test("settleDuration hands the finger's speed to the settle, within 150-300 ms", () => {
+  assert.equal(settleDuration(200, 0), 300);
+  assert.equal(settleDuration(200, 3000), 200);
+  assert.equal(settleDuration(200, -4000), 150);
+  assert.equal(settleDuration(320, 1000), 300);
 });
