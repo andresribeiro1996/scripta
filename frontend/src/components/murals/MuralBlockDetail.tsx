@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode } from "react";
-import { type Group, type PublicReaderCard, booksByWork, workIdOf } from "@scripta/shared";
-import { Link, useNavigate } from "react-router-dom";
+import { booksByWork, workIdOf } from "@scripta/shared";
+import { Link } from "react-router-dom";
 import type { ThemeId, ThemeScheme } from "@scripta/shared/themes";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
@@ -22,18 +22,10 @@ import { CoverImage } from "../BookCard";
 import { BookSummary } from "../BookSummary";
 import { Sheet } from "../Sheet";
 import { ProfileBlockView } from "./blocks/MiscBlocks";
-import { NO_GROUPS, useReaderCard } from "../../hooks/useReaderCard";
-import { ReaderCardViewer } from "../readerCard/ReaderCardViewer";
 import { useLocale, useT } from "../../i18n";
 
 function detailSheetStyle(theme: ThemeId, scheme: ThemeScheme) {
   return { ...muralThemeStyle(theme, scheme), backgroundColor: "var(--color-surface)" };
-}
-
-function ReaderCardDetailViewer({ books, groups, readerCardOverride, readerName, onClose }: { books: Array<Record<string, unknown>>; groups: Group[]; readerCardOverride?: PublicReaderCard; readerName: string; onClose: () => void }) {
-  const input = useReaderCard(books, groups, readerName, readerCardOverride);
-  const navigate = useNavigate();
-  return <ReaderCardViewer input={input} onClose={onClose} onEdit={readerCardOverride ? undefined : () => navigate("/dashboard/reader-card")} />;
 }
 
 export function MuralBlockDetail({
@@ -43,9 +35,7 @@ export function MuralBlockDetail({
   books,
   images,
   profile,
-  groups: libraryGroups,
   shelfThemeOverride,
-  readerCardOverride,
   statsOverride,
   tierlistData,
   onClose,
@@ -57,9 +47,7 @@ export function MuralBlockDetail({
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   profile?: ReaderProfile;
-  groups?: Group[];
   shelfThemeOverride?: ShelfTheme;
-  readerCardOverride?: PublicReaderCard;
   statsOverride?: Record<string, number>;
   tierlistData?: (tierlistId: string) => ResolvedTierlist | undefined;
   onClose: () => void;
@@ -71,9 +59,6 @@ export function MuralBlockDetail({
   const [selectedBook, setSelectedBook] = useState<Record<string, unknown> | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const collectionScroll = useRef(0);
-  if (block.type === "readerCard") {
-    return <ReaderCardDetailViewer books={books} groups={libraryGroups ?? NO_GROUPS} readerCardOverride={readerCardOverride} readerName={profile?.username || t("muralEditor.fallbackReader")} onClose={onClose} />;
-  }
   const spotlight = block.type === "spotlight" ? books.find((book) => bookKey(book) === block.bookKey) : undefined;
   const book = selectedBook ?? spotlight;
   const tierlist = block.type === "tierlist" ? tierlistData?.(block.tierlistId) : undefined;

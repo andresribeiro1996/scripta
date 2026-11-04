@@ -1,5 +1,5 @@
 import { MuralBlockDetail } from "./MuralBlockDetail";
-import { blockEffects, blockTextColors, localDay, muralBlockStyle, muralColors, resolveBlockColor, resolveHomeBlock, type Group, type PublicReaderCard } from "@scripta/shared";
+import { blockEffects, blockTextColors, floatingBlockShadow, localDay, muralBlockStyle, muralColors, resolveBlockColor, resolveHomeBlock, type Group } from "@scripta/shared";
 import type { ThemeScheme } from "@scripta/shared/themes";
 import GridLayout from "react-grid-layout";
 import { DndContext } from "@dnd-kit/core";
@@ -33,8 +33,8 @@ export function MuralCanvas({
   images,
   profile,
   hideProfileName,
+  floating,
   shelfThemeOverride,
-  readerCardOverride,
   onLayoutChange,
   onDragChange,
   onToggleExpansion,
@@ -64,8 +64,8 @@ export function MuralCanvas({
   images: GalleryImage[];
   profile?: ReaderProfile;
   hideProfileName?: boolean;
+  floating?: boolean;
   shelfThemeOverride?: ShelfTheme;
-  readerCardOverride?: PublicReaderCard;
   onDragChange?: (dragging: boolean) => void;
   onLayoutChange?: (blockId: string, layout: BlockLayout) => void;
   onToggleExpansion?: (blockId: string, axis: "w" | "h", bottom: number, top: number) => void;
@@ -122,9 +122,7 @@ export function MuralCanvas({
         books={books}
         images={images}
         profile={profile}
-        groups={groups}
         shelfThemeOverride={shelfThemeOverride}
-        readerCardOverride={readerCardOverride}
         selectedBlockId={selectedBlockId}
         draft={mobileDraft}
         busy={busy}
@@ -144,6 +142,7 @@ export function MuralCanvas({
         onCancelDraft={onCancelMobileDraft}
         statsOverride={statsOverride}
         tierlistData={tierlistData}
+        floating={floating}
         revertNonce={revertNonce}
       />
     );
@@ -157,7 +156,7 @@ export function MuralCanvas({
   return (
     <>
     <DndContext {...drag.context}>
-    <div ref={canvasRef} className="relative overflow-hidden" onClick={(event) => { if (editMode && !(event.target as Element).closest(".react-grid-item")) onSelectBlock?.(null); }} style={{ ...muralThemeStyle(mural.theme, scheme), minHeight: editMode ? Math.max(0, ...drag.blocks.map((block) => block.layout.y + block.layout.h), drag.drop ? drag.drop.layout.y + drag.drop.layout.h : 0) * 38 + 160 : undefined }}>
+    <div ref={canvasRef} className={`relative ${floating ? "" : "overflow-hidden"}`} onClick={(event) => { if (editMode && !(event.target as Element).closest(".react-grid-item")) onSelectBlock?.(null); }} style={{ ...muralThemeStyle(mural.theme, scheme), ...(floating ? { backgroundColor: undefined } : {}), minHeight: editMode ? Math.max(0, ...drag.blocks.map((block) => block.layout.y + block.layout.h), drag.drop ? drag.drop.layout.y + drag.drop.layout.h : 0) * 38 + 160 : undefined }}>
     <ResponsiveGridLayout
       key={revertNonce}
       layout={layout}
@@ -188,7 +187,7 @@ export function MuralCanvas({
             style={{
               borderRadius: `${style.cardRadius}px`,
               opacity: effects.opacity,
-              "--block-shadow": effects.boxShadow,
+              "--block-shadow": floating ? floatingBlockShadow(effects.boxShadow, appScheme) : effects.boxShadow,
               "--block-hover-shadow": effects.hoverShadow,
               backgroundColor: resolveBlockColor(style.backgroundColor, themeColors) ?? "var(--color-surface)",
               backgroundImage: blockFinishImage(style, themeColors),
@@ -209,7 +208,7 @@ export function MuralCanvas({
             } as CSSProperties}
           >
             {!editMode ? <button className="absolute inset-0 z-10 rounded-[inherit] focus-visible:outline-2 focus-visible:outline-[var(--block-accent,var(--color-accent))]" aria-label={t("muralEditor.openBlock", { type: locale === "en" ? block.type : blockLabel(block.type, locale) })} onClick={() => onOpenBlock ? onOpenBlock(block) : setFocusedId(block.id)} /> : null}
-            <BlockRenderer block={block} books={books} images={images} profile={profile} hideProfileName={hideProfileName} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} editing={editMode} />
+            <BlockRenderer block={block} books={books} images={images} profile={profile} hideProfileName={hideProfileName} shelfThemeOverride={shelfThemeOverride} statsOverride={statsOverride} tierlistData={tierlistData} editing={editMode} />
             {effects.fadeColor && effects.fadeOpacity > 0 ? <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[1] rounded-[inherit]" style={{ backgroundColor: effects.fadeColor, opacity: effects.fadeOpacity }} /> : null}
             {editMode && !drag.drop && (
               <div className="mural-block-controls absolute top-0 right-0 z-20 opacity-0 transition-opacity group-hover:opacity-100">
@@ -233,7 +232,7 @@ export function MuralCanvas({
     </ResponsiveGridLayout>
     </div>
     </DndContext>
-    {focusedId && mural.blocks.some((block) => block.id === focusedId) ? <MuralBlockDetail theme={mural.theme} scheme={scheme} block={mural.blocks.find((block) => block.id === focusedId)!} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} onClose={() => setFocusedId(null)} /> : null}
+    {focusedId && mural.blocks.some((block) => block.id === focusedId) ? <MuralBlockDetail theme={mural.theme} scheme={scheme} block={mural.blocks.find((block) => block.id === focusedId)!} books={books} images={images} profile={profile} shelfThemeOverride={shelfThemeOverride} statsOverride={statsOverride} tierlistData={tierlistData} onClose={() => setFocusedId(null)} /> : null}
     </>
   );
 }

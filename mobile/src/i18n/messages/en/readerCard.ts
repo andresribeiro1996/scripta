@@ -66,4 +66,9 @@ export const readerCard = {
   "readerCard.finishHintStamp": "Uneven, broken, slightly rotated ink",
   "readerCard.finishHintKraft": "Brown wrapping paper",
   "readerCard.finishHintRiso": "Two misregistered inks",
+  "readerCard.shareCard": "Share card",
+  "readerCard.openCard": "Open the card",
+  "readerCard.sharedInvalid": "This card link is invalid or no longer active.",
+  "readerCard.sharedLoadFailed": "Couldn't load this card.",
+  "readerCard.booksRead": { one: "{count} book read", other: "{count} books read" },
 } satisfies Messages;

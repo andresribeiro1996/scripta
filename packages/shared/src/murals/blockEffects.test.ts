@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { resolveBlockStyle } from "../library/libraryStyle.js";
 import { themes } from "../themes/palettes.js";
-import { blockEffects } from "./blockEffects.js";
+import { blockEffects, floatingBlockShadow } from "./blockEffects.js";
 
 const palette = themes.light.colors;
 
@@ -52,4 +52,10 @@ test("invalid stored effects fall back safely and numeric values stay bounded", 
   assert.equal(effects.boxShadow, "0 2px 4px rgba(0, 0, 0, 0.12)");
   assert.equal(effects.opacity, 0.72);
   assert.equal(effects.fadeColor, null);
+});
+
+test("floating blocks swap their shadow for a scheme-aware soft one and keep shadow-free blocks flat", () => {
+  assert.equal(floatingBlockShadow("0 2px 4px rgba(0, 0, 0, 0.12)", "dark"), "0 6px 18px rgba(0, 0, 0, 0.45)");
+  assert.equal(floatingBlockShadow("0 2px 4px rgba(0, 0, 0, 0.12)", "light"), "0 4px 14px rgba(0, 0, 0, 0.12)");
+  assert.equal(floatingBlockShadow("none", "dark"), "none");
 });

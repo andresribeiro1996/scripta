@@ -28,6 +28,7 @@ Skim layer over the detailed sections below. Pages render through one layout rou
 | `/dashboard/reader-card` | `ReaderCardPage.tsx` | the reader card editor: counter, trait, layout, signature book and note, highlight, glyph; reached from "Edit card" in your own card's viewer and from Settings |
 | `/dashboard/settings` | `SettingsPage.tsx` | account + username + socials connections |
 | `/shared/library/:token`, `/shared/murals/:token` | `SharedLibraryPage.tsx` / `SharedMuralPage.tsx` | public share-link views, no account needed |
+| `/shared/cards/:token` | `SharedCardPage.tsx` | public reader-card link: the card over its blurred backdrop and the reader's name, no account needed |
 
 The Daily Chapter editor accepts both draft packs and the [reviewed launch fortnight](../docs/daily-chapter/launch-fortnight.md). Reviewed packs retain question approval; publishing each saved edition is a separate action.
 

@@ -23,7 +23,7 @@ export function ReaderCardViewer({ input, onClose, onEdit }: { input: ReaderCard
         <Pressable accessible={false} importantForAccessibility="no" onPress={onClose} style={StyleSheet.absoluteFill} />
         <View accessibilityViewIsModal style={styles.content}>
           <View style={[styles.bar, { width }]}>
-            {onEdit && input.view === "owner" ? (
+            {onEdit ? (
               <Pressable accessibilityRole="button" onPress={onEdit} style={[styles.pill, { backgroundColor: colors.surface }]}>
                 <Text style={[typography.body, { color: colors.text }]}>{t("murals.editCard")}</Text>
               </Pressable>

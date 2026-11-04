@@ -1,24 +1,29 @@
 import { useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text } from "../../ui/Text";
-import { buildMuralPreset, ensureBookBlockHeights, orderLibraryBooks, shelfPresetSummary, type Mural } from "@scripta/shared";
+import { buildMuralPreset, ensureBookBlockHeights, orderLibraryBooks, ownProfileCard, readerCardInputOf, shelfPresetSummary, type Mural } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { API_URL } from "../../core/config";
-import { ActionSheet, Button, Dialog, dynamicType, EmptyState, ErrorState, HeaderActions, IconButton, Screen, Skeleton, spacing, SwipeableTabs, Toast, typography, useTheme, type ActionItem } from "../../ui";
-import { fetchGalleryImages } from "../gallery/api";
+import { ActionSheet, Button, Dialog, dynamicType, EmptyState, ErrorState, HeaderActions, IconButton, Screen, Skeleton, spacing, Toast, typography, useTheme, type ActionItem } from "../../ui";
+import { fetchGalleryImages, type GalleryImage } from "../gallery/api";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { MuralCanvas } from "../murals";
 import { NO_GROUPS } from "../murals/MuralCanvas";
+import { PLATE_RATIO, ReaderCardImage } from "../murals/ReaderCardImage";
 import { fetchMural } from "../murals/api";
 import { useMurals } from "../murals/useMurals";
-import { fetchTierlists } from "../tierlists/api";
-import { DailyChapterProfileSection } from "../dailyChapter/daily-chapter-profile-section";
-import { ActivityList } from "./ActivityList";
+import { ProfileCardBackdrop, ProfileCardHero, ProfileCardSkeleton, ProfileHeroIdentity } from "../readerCard/ProfileCardHero";
+import { useOwnCardStyle, useReaderCardStyle } from "../readerCard/useReaderCardStyle";
+import { ContentShareSheet } from "../sharing/ContentShareSheet";
+import { fetchTierlists, type Tierlist } from "../tierlists/api";
+import { DailyChapterProfileSection, OwnDailyChapterFooter } from "../dailyChapter/daily-chapter-profile-section";
+import { useActivitySection } from "./ActivityList";
 import { FeedSettingsDialog } from "./FeedSettingsDialog";
+import { ProfileScroller, elementSection, transparentHeader, usePlainHeader, type ProfileSection } from "./ProfileScroller";
 import { ShelfPreview } from "./ShelfPreview";
-import { fetchOwnProfile, publishProfile, setShelfMural, unpublishProfile } from "./api";
+import { fetchCardShare, fetchOwnProfile, publishProfile, setShelfMural, shareCard, unpublishProfile, unshareCard } from "./api";
 import { MuralPicker } from "./ProfileScreen";
 import { useLocale, useT, type MessageKey } from "../../i18n";
 
@@ -32,11 +37,20 @@ type MyShelfTab = (typeof MY_SHELF_TABS)[number]["value"];
 
 let lastTab: MyShelfTab = "shelf";
 
+const CARD_SHARE_KEY = ["community", "card-share"] as const;
+const NO_BOOKS: Array<Record<string, unknown>> = [];
+const NO_IMAGES: GalleryImage[] = [];
+const NO_TIERLISTS: Tierlist[] = [];
+const SHARE_CARD_WIDTH = 300;
+const SHARE_SHEET_CHROME_HEIGHT = 400;
+const SHARE_SHEET_CHROME_WIDTH = 72;
+
 export function MyShelfScreen() {
   const locale = useLocale();
   const t = useT();
   const { colors, id: theme } = useTheme();
   const { user } = useAuth();
+  const { width, height } = useWindowDimensions();
   const queryClient = useQueryClient();
   const username = user?.username ?? "";
 
@@ -51,6 +65,11 @@ export function MyShelfScreen() {
   const gallery = useQuery({ queryKey: ["gallery"], queryFn: fetchGalleryImages });
   const tierlistsQuery = useQuery({ queryKey: ["tierlists"], queryFn: fetchTierlists });
   const murals = useMurals();
+  const styleQuery = useReaderCardStyle();
+  const ownStyle = useOwnCardStyle();
+  const cardShare = useQuery({ queryKey: CARD_SHARE_KEY, queryFn: fetchCardShare });
+  const activitySection = useActivitySection(username);
+  const plainHeader = usePlainHeader();
 
   const [tab, setTab] = useState<MyShelfTab>(lastTab);
   const [switchingMural, setSwitchingMural] = useState(false);
@@ -58,20 +77,22 @@ export function MyShelfScreen() {
   const [answer, setAnswer] = useState<boolean | null>(null);
   const [confirmingUnpublish, setConfirmingUnpublish] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sharingCard, setSharingCard] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const books = library?.data.books ?? [];
+  const books = library?.data.books ?? NO_BOOKS;
   const groups = library?.data.groups ?? NO_GROUPS;
-  const images = gallery.data ?? [];
-  const tierlists = tierlistsQuery.data ?? [];
-  const profile = user?.username
-    ? { username: user.username, avatarUrl: user.avatarId ? `${API_URL}/auth/avatar/${user.avatarId}/file` : null }
-    : undefined;
+  const images = gallery.data ?? NO_IMAGES;
+  const tierlists = tierlistsQuery.data ?? NO_TIERLISTS;
+  const avatarId = user?.avatarId;
+  const profile = useMemo(() => (username ? { username, avatarUrl: avatarId ? `${API_URL}/auth/avatar/${avatarId}/file` : null } : undefined), [username, avatarId]);
 
+  const card = useMemo(() => (libraryQuery.isSuccess ? ownProfileCard(readerCardInputOf(books, groups, username, locale, undefined, ownStyle)) : null), [libraryQuery.isSuccess, books, groups, username, locale, ownStyle]);
   const ordered = useMemo(() => orderLibraryBooks(books, groups), [books, groups]);
   const preview = useMemo(() => buildMuralPreset("shelf", ordered, locale, groups), [ordered, locale, groups]);
-  const previewMural: Mural = { id: "shelf-preview", name: preview.name, theme, blocks: preview.blocks, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
+  const previewMural = useMemo<Mural>(() => ({ id: "shelf-preview", name: preview.name, theme, blocks: preview.blocks, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null }), [preview, theme]);
+  const shelfMural = useMemo(() => (mural.data ? { ...mural.data, blocks: ensureBookBlockHeights(mural.data.blocks) } : null), [mural.data]);
   const pendingShelf = useRef<string | null>(null);
   const working = useRef(false);
 
@@ -99,6 +120,17 @@ export function MyShelfScreen() {
     }
   }
 
+  async function enableCardLink() {
+    const { shareUrl } = await shareCard();
+    await queryClient.invalidateQueries({ queryKey: CARD_SHARE_KEY });
+    return shareUrl;
+  }
+
+  async function disableCardLink() {
+    await unshareCard();
+    await queryClient.invalidateQueries({ queryKey: CARD_SHARE_KEY });
+  }
+
   function handleChipPress() {
     if (!own.data) return;
     if (own.data.published) setConfirmingUnpublish(true);
@@ -108,7 +140,7 @@ export function MyShelfScreen() {
   if (own.isPending) {
     return (
       <Screen top={false}>
-        <Stack.Screen options={{ headerShown: true, title: t("community.myShelf") }} />
+        <Stack.Screen options={{ headerShown: true, title: t("community.myShelf"), ...plainHeader }} />
         <View style={styles.tabPad}><Skeleton height={180} /></View>
       </Screen>
     );
@@ -117,7 +149,7 @@ export function MyShelfScreen() {
   if (own.isError) {
     return (
       <Screen top={false}>
-        <Stack.Screen options={{ headerShown: true, title: t("community.myShelf") }} />
+        <Stack.Screen options={{ headerShown: true, title: t("community.myShelf"), ...plainHeader }} />
         <ErrorState title={t("community.shelfUnavailable")} body={t("community.shelfLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void own.refetch()} />
       </Screen>
     );
@@ -172,8 +204,81 @@ export function MyShelfScreen() {
     setAnswer(null);
   }
 
+  function shelfBody() {
+    if (hasMural && mural.isPending) return <View style={styles.tabPad}><Skeleton height={240} /></View>;
+    if (hasMural && mural.isError) return <ErrorState body={t("community.shelfLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void mural.refetch()} />;
+    if (hasMural && muralHasBlocks) {
+      return (
+        <View style={styles.canvasScroll}>
+          <MuralCanvas
+            mural={shelfMural!}
+            books={books}
+            groups={groups}
+            images={images}
+            tierlists={tierlists}
+            profile={profile}
+            profileInHero
+            initialWidth={width - spacing.sm * 2}
+          />
+        </View>
+      );
+    }
+    if (libraryQuery.isPending) return <View style={styles.tabPad}><Skeleton height={240} /></View>;
+    if (libraryQuery.isError) return <ErrorState body={t("shell.libraryLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void libraryQuery.refetch()} />;
+    if (!books.length) {
+      return (
+        <EmptyState
+          title={t("library.startTitle")}
+          body={t("community.startLibraryManualBody")}
+          actionLabel={t("shell.importLibrary")}
+          onAction={() => router.push("/import" as never)}
+          secondaryActionLabel={t("shell.addBook")}
+          onSecondaryAction={() => router.push("/add-book" as never)}
+        />
+      );
+    }
+    return <ShelfPreview mural={previewMural} summary={shelfPresetSummary(books, ownData.published, locale)} busy={busy} books={books} groups={groups} images={images} tierlists={tierlists} profile={profile} onKeep={() => void keepShelf()} onBlank={() => void startBlank()} />;
+  }
+
+  const glyph = ownData.published && ownData.feedSettings.readerGlyph && card?.input.card.state === "settled" ? card.input.card.identity ?? undefined : undefined;
+  const cardActions = card ? (
+    <>
+      <ProfileHeroIdentity username={username} avatarUrl={profile?.avatarUrl ?? null} glyph={glyph} finished={card.input.card.facts?.finished} />
+      {card.progress ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{card.progress}</Text> : null}
+      {cardShare.isError ? <Text accessibilityRole="alert" {...dynamicType} style={[typography.caption, { color: colors.danger }]}>{t("community.somethingWentWrongRetry")}</Text> : null}
+      {cardShare.isError ? <Button label={t("shell.retry")} variant="secondary" onPress={() => void cardShare.refetch()} /> : null}
+    </>
+  ) : null;
+
+  const hero = card && styleQuery.isSuccess ? (
+    <ProfileCardHero
+      input={card.input}
+      width={width}
+      withBackdrop={false}
+      badge={<IconButton name="share" tone="accent" accessibilityLabel={t("readerCard.shareCard")} disabled={!cardShare.data} onPress={() => setSharingCard(true)} />}
+      onEdit={() => router.push("/reader-card" as never)}
+    >
+      {cardActions}
+    </ProfileCardHero>
+  ) : card && styleQuery.isError ? (
+    <View style={styles.cardError}>
+      <Text accessibilityRole="alert" {...dynamicType} style={[typography.caption, { color: colors.danger }]}>{t("community.somethingWentWrongRetry")}</Text>
+      <Button label={t("shell.retry")} variant="secondary" onPress={() => void styleQuery.refetch()} />
+      {cardActions}
+    </View>
+  ) : libraryQuery.isError ? null : (
+    <ProfileCardSkeleton width={width} />
+  );
+
+  function sectionFor(value: MyShelfTab): ProfileSection {
+    if (value === "daily") return elementSection([<DailyChapterProfileSection key="daily" userId={user!.id} own />]);
+    if (value === "activity") return activitySection;
+    return elementSection([<View key="shelf">{shelfBody()}</View>]);
+  }
+
   const menuGroups: ActionItem[][] = [
     [
+      ...(card ? [{ label: t("murals.editCard"), icon: "edit" as const, onPress: () => router.push("/reader-card" as never) }] : []),
       ...(hasMural ? [{ label: t("community.editShelf"), icon: "edit" as const, onPress: () => router.push(`/murals/${ownData.muralId}` as never) }] : []),
       { label: t("community.switchShelfMural"), icon: "murals", onPress: () => setSwitchingMural(true) },
     ],
@@ -195,49 +300,29 @@ export function MyShelfScreen() {
 
   return (
     <Screen top={false}>
-      <Stack.Screen options={{ headerShown: true, title: t("community.myShelf"), headerRight }} />
-      {error ? <Toast visible message={error} tone="error" /> : null}
-      <SwipeableTabs
+      <Stack.Screen options={{ headerShown: true, ...transparentHeader, headerRight }} />
+      <ProfileScroller
+        notice={error ? <Toast visible message={error} tone="error" /> : null}
         accessibilityLabel={t("community.myShelfSections")}
-        options={MY_SHELF_TABS.map((tab) => ({ value: tab.value, label: t(tab.labelKey) }))}
+        hero={hero}
+        backdrop={card && styleQuery.isSuccess ? <ProfileCardBackdrop input={card.input} /> : null}
+        tabs={MY_SHELF_TABS.map((entry) => ({ value: entry.value, label: t(entry.labelKey) }))}
         value={tab}
         onChange={handleTabChange}
-        renderPage={(value) => {
-          if (value === "daily") return <DailyChapterProfileSection userId={user!.id} own />;
-          if (value === "activity") return <ActivityList username={username} />;
-          if (hasMural && mural.isPending) return <View style={styles.tabPad}><Skeleton height={240} /></View>;
-          if (hasMural && mural.isError) return <ErrorState body={t("community.shelfLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void mural.refetch()} />;
-          if (hasMural && muralHasBlocks) {
-            return (
-              <ScrollView contentContainerStyle={styles.canvasScroll}>
-                <MuralCanvas
-                  mural={{ ...mural.data!, blocks: ensureBookBlockHeights(mural.data!.blocks) }}
-                  books={books}
-                  groups={groups}
-                  images={images}
-                  tierlists={tierlists}
-                  profile={profile}
-                />
-              </ScrollView>
-            );
-          }
-          if (libraryQuery.isPending) return <View style={styles.tabPad}><Skeleton height={240} /></View>;
-          if (libraryQuery.isError) return <ErrorState body={t("shell.libraryLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void libraryQuery.refetch()} />;
-          if (!books.length) {
-            return (
-              <EmptyState
-                title={t("library.startTitle")}
-                body={t("community.startLibraryManualBody")}
-                actionLabel={t("shell.importLibrary")}
-                onAction={() => router.push("/import" as never)}
-                secondaryActionLabel={t("shell.addBook")}
-                onSecondaryAction={() => router.push("/add-book" as never)}
-              />
-            );
-          }
-          return <ShelfPreview mural={previewMural} summary={shelfPresetSummary(books, ownData.published, locale)} busy={busy} books={books} groups={groups} images={images} tierlists={tierlists} profile={profile} onKeep={() => void keepShelf()} onBlank={() => void startBlank()} />;
-        }}
+        sectionFor={sectionFor}
       />
+      {card ? (
+        <ContentShareSheet
+          visible={sharingCard}
+          onClose={() => setSharingCard(false)}
+          title={t("readerCard.title")}
+          url={cardShare.data?.shareUrl}
+          onEnableLink={enableCardLink}
+          onDisableLink={disableCardLink}
+        >
+          {styleQuery.isSuccess ? <View style={styles.sharePreview}><ReaderCardImage input={card.input} width={Math.min(SHARE_CARD_WIDTH, width - SHARE_SHEET_CHROME_WIDTH, (height - SHARE_SHEET_CHROME_HEIGHT) / PLATE_RATIO)} /></View> : null}
+        </ContentShareSheet>
+      ) : null}
       <MuralPicker
         visible={switchingMural}
         busy={busy}
@@ -251,6 +336,7 @@ export function MyShelfScreen() {
           setSwitchingMural(false);
         })}
       />
+      {tab === "daily" ? <OwnDailyChapterFooter /> : null}
       <Dialog visible={confirmingPublish} title={t("community.publishShelfTitle")} onClose={() => setConfirmingPublish(false)}>
         <View style={styles.dialogGap}>
           <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>
@@ -296,6 +382,8 @@ export function MyShelfScreen() {
 
 const styles = StyleSheet.create({
   tabPad: { flex: 1, padding: spacing.lg },
-  canvasScroll: { paddingHorizontal: spacing.sm, paddingTop: spacing.lg, paddingBottom: spacing.xxl },
+  canvasScroll: { paddingHorizontal: spacing.sm, paddingTop: spacing.lg },
+  cardError: { padding: spacing.lg, gap: spacing.md },
+  sharePreview: { alignItems: "center" },
   dialogGap: { gap: spacing.md },
 });

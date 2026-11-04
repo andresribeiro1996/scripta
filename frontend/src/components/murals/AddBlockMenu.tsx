@@ -18,7 +18,6 @@ const BLOCK_CHOICES: Array<{ type: BlockType; description: Extract<keyof WebMess
   { type: "image", description: "muralEditor.addDescImage" },
   { type: "text", description: "muralEditor.addDescText" },
   { type: "profile", description: "muralEditor.addDescProfile" },
-  { type: "readerCard", description: "muralEditor.addDescReaderCard" },
   { type: "currentlyReading", description: "muralEditor.addDescCurrentlyReading" },
   { type: "stats", description: "muralEditor.addDescStats" },
   { type: "empty", description: "muralEditor.addDescEmpty" },

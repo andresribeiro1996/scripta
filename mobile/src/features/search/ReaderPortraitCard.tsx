@@ -33,7 +33,7 @@ export function ReaderPortraitCard({ person, width, canvasWidth, busy, onToggleF
       <Pressable accessibilityRole="button" accessibilityLabel={[t("book.openProfile", { username: person.user.username }), glyphLabel, caption].filter(Boolean).join(", ")} onPress={() => openProfile(person.user.username)} style={({ pressed }) => [styles.open, { opacity: pressed ? 0.75 : 1 }]}>
         <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.preview, { height: width * 0.8, backgroundColor: palette.background }]}>
           {preview?.mural.coverImageUrl ? <Image source={{ uri: preview.mural.coverImageUrl }} contentFit="cover" style={StyleSheet.absoluteFill} /> : preview?.mural.blocks.length ? (
-            <MuralThumbnail mural={preview.mural} canvasWidth={canvasWidth} books={preview.books} images={preview.images} tierlists={preview.tierlists} profile={person.user} shelfThemeOverride={payload?.library.shelfTheme} readerCardOverride={payload?.library.readerCard ?? fallback.card} statsOverride={payload?.library.stats} />
+            <MuralThumbnail mural={preview.mural} canvasWidth={canvasWidth} books={preview.books} images={preview.images} tierlists={preview.tierlists} profile={person.user} shelfThemeOverride={payload?.library.shelfTheme} statsOverride={payload?.library.stats} />
           ) : <View style={styles.fallback}><ReaderCardImage input={fallback} width={width} /></View>}
           <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" viewBox="0 0 1 1" preserveAspectRatio="none">
             <Defs><LinearGradient id={fadeId} x1="0" y1="0" x2="0" y2="1">

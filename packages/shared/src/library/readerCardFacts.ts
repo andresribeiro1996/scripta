@@ -83,3 +83,7 @@ export function readerCardInputOf(books: Book[], groups: Group[], readerName: st
 export function visitorView(input: ReaderCardBase): ReaderCardBase {
   return readerCardInputOf([], [], input.readerName, input.locale, { ...input.card, style: input.style });
 }
+
+export function ownProfileCard(ownerInput: ReaderCardBase): { input: ReaderCardBase; progress: string | null } {
+  return { input: visitorView(ownerInput), progress: ownerInput.card.state === "unwritten" ? ownerInput.missing ?? null : null };
+}

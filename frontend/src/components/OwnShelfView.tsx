@@ -1,9 +1,10 @@
 import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ownProfileCard, readerCardInputOf } from "@scripta/shared";
 import type { FeedCategory, FeedSettings } from "@scripta/shared/community";
 import { DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
-import { fetchOwnProfile, publishProfile, setShelfMural, unpublishProfile, updateFeedSettings } from "../api/community";
+import { fetchCardShare, fetchOwnProfile, publishProfile, setShelfMural, shareCard, unpublishProfile, unshareCard, updateFeedSettings } from "../api/community";
 import { useAuth } from "../auth/AuthContext";
 import { Avatar, avatarUrlFor } from "./Avatar";
 import { EmptyState } from "./EmptyState";
@@ -13,13 +14,18 @@ import { MuralsIcon } from "./NavIcons";
 import { MuralCanvas } from "./murals/MuralCanvas";
 import { ProfileActivity } from "./ProfileActivity";
 import { ProfileLibraryPanel } from "./ProfileLibraryPanel";
+import { ProfileCardHero } from "./readerCard/ProfileCardHero";
+import { ShareModal } from "./ShareModal";
 import { Sheet } from "./Sheet";
 import { SkeletonCardGrid } from "./Skeleton";
 import { SwipeTabs } from "./SwipeTabs";
+import { ShareIcon } from "./Toolbar";
 import { useCommunityActivity } from "../hooks/useCommunity";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
+import { useOwnCardStyle } from "../hooks/useReaderCard";
+import { useReaderCardStyle } from "../hooks/useReaderCardStyle";
 import { backTo } from "../lib/areas";
 import { bookHref } from "../lib/libraryView";
 import { bookKey } from "../lib/merge";
@@ -37,6 +43,9 @@ const OWN_SHELF_TABS = [
 
 type OwnShelfTab = (typeof OWN_SHELF_TABS)[number]["value"];
 
+const CARD_SHARE_KEY = ["community", "card-share"] as const;
+const SHARE_BADGE = "flex h-11 w-11 items-center justify-center rounded-full bg-(--color-accent) text-(--color-on-accent) hover:opacity-90 disabled:opacity-50";
+
 export function OwnShelfView({ username }: { username: string }) {
   const locale = useLocale();
   const t = useT();
@@ -53,9 +62,14 @@ export function OwnShelfView({ username }: { username: string }) {
   const [tab, setTab] = useState<OwnShelfTab>("mural");
   const [busy, setBusy] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [sharingCard, setSharingCard] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const books = useMemo(() => library?.data.books ?? [], [library]);
   const groups = useMemo(() => library?.data.groups ?? [], [library]);
+  const styleQuery = useReaderCardStyle();
+  const ownStyle = useOwnCardStyle();
+  const { input: cardInput, progress } = useMemo(() => ownProfileCard(readerCardInputOf(books, groups, username, locale, undefined, ownStyle)), [books, groups, username, locale, ownStyle]);
+  const cardShare = useQuery({ queryKey: CARD_SHARE_KEY, queryFn: fetchCardShare });
   const ordered = useMemo(() => orderLibraryBooks(books, groups), [books, groups]);
   const preview = useMemo(() => buildMuralPreset("shelf", ordered, locale, groups), [ordered, locale, groups]);
   const previewMural: Mural = { id: "shelf-preview", name: preview.name, theme: viewerTheme, blocks: preview.blocks, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
@@ -77,6 +91,17 @@ export function OwnShelfView({ username }: { username: string }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function shareOwnCard() {
+    const result = await shareCard();
+    await queryClient.invalidateQueries({ queryKey: CARD_SHARE_KEY });
+    return result;
+  }
+
+  async function unshareOwnCard() {
+    await unshareCard();
+    await queryClient.invalidateQueries({ queryKey: CARD_SHARE_KEY });
   }
 
   function publish(shareReading: boolean) {
@@ -156,8 +181,8 @@ export function OwnShelfView({ username }: { username: string }) {
     ? { username: session.user.username, avatarUrl: session.user.avatarId ? avatarUrlFor(session.user.avatarId) : null }
     : undefined;
 
-  return (
-    <Page title={null} back={backTo("profile")}>
+  const shelfHeader = (
+    <>
       <div className="flex flex-wrap items-center gap-5">
         {session?.user && <Avatar user={session.user} size={72} />}
         <h1 className="font-display min-w-0 flex-1 basis-48 break-words text-3xl font-bold lg:text-[2.5rem] lg:leading-[3rem]">@{username}</h1>
@@ -190,6 +215,61 @@ export function OwnShelfView({ username }: { username: string }) {
           />
         </div>
       </div>
+      {libraryQuery.isSuccess && progress ? <p className="mt-3 text-sm text-(--color-text-dim)">{progress}</p> : null}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Link to="/dashboard/reader-card" className={BUTTON_SECONDARY}>
+          {t("readerCard.editCard")}
+        </Link>
+        {cardShare.isError && (
+          <>
+            <p className="text-sm text-(--color-danger)">{t("library.shelfActionFailed")}</p>
+            <button onClick={() => void cardShare.refetch()} className={BUTTON_SECONDARY}>
+              {t("library.retry")}
+            </button>
+          </>
+        )}
+      </div>
+    </>
+  );
+
+  return (
+    <Page title={null} back={backTo("profile")}>
+      {libraryQuery.isSuccess && styleQuery.isSuccess ? (
+        <ProfileCardHero
+          input={cardInput}
+          badge={
+            <button type="button" aria-label={t("readerCard.shareCard")} onClick={() => setSharingCard(true)} disabled={!cardShare.data} className={SHARE_BADGE}>
+              <ShareIcon />
+            </button>
+          }
+          onEdit={() => navigate("/dashboard/reader-card")}
+        >
+          {shelfHeader}
+        </ProfileCardHero>
+      ) : (
+        <>
+          {libraryQuery.isSuccess && styleQuery.isError ? (
+            <div className="flex flex-wrap items-center gap-3 py-6">
+              <p className="text-sm text-(--color-danger)">{t("library.shelfActionFailed")}</p>
+              <button onClick={() => void styleQuery.refetch()} className={BUTTON_SECONDARY}>
+                {t("library.retry")}
+              </button>
+            </div>
+          ) : null}
+          {shelfHeader}
+        </>
+      )}
+      {sharingCard && cardShare.data && (
+        <ShareModal
+          title={t("shell.areaReaderCard")}
+          shareToken={cardShare.data.shareToken}
+          shareUrl={cardShare.data.shareUrl}
+          defaultCaption={t("shell.areaReaderCard")}
+          onShare={shareOwnCard}
+          onUnshare={unshareOwnCard}
+          onClose={() => setSharingCard(false)}
+        />
+      )}
       <div className="mt-6">
         {error && <p className="mb-4 text-sm text-(--color-danger)">{error}</p>}
         <SwipeTabs tabs={OWN_SHELF_TABS.map((entry) => ({ value: entry.value, label: t(entry.label) }))} value={tab} onChange={setTab} label={t("library.shelfSections")}>
@@ -199,7 +279,7 @@ export function OwnShelfView({ username }: { username: string }) {
             return (
               <div className="mb-8">
                 {shelfMural && muralHasBlocks ? (
-                  <MuralCanvas mural={shelfMural} editMode={false} groups={groups} books={books} images={images} profile={profile} />
+                  <MuralCanvas mural={shelfMural} editMode={false} groups={groups} books={books} images={images} profile={profile} floating />
                 ) : libraryQuery.isPending ? (
                   <SkeletonCardGrid count={2} label={t("library.libraryLoadingOwn")} tileClassName="min-h-[120px]" />
                 ) : libraryQuery.isError ? (

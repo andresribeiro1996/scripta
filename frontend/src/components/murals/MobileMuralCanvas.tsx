@@ -1,4 +1,4 @@
-import { blockEffects, blockTextColors, moveMuralBlock, muralBlockStyle, muralColors, resolveBlockColor, type Group, type PublicReaderCard } from "@scripta/shared";
+import { blockEffects, blockTextColors, floatingBlockShadow, moveMuralBlock, muralBlockStyle, muralColors, resolveBlockColor } from "@scripta/shared";
 import type { ThemeId, ThemeScheme } from "@scripta/shared/themes";
 import GridLayout from "react-grid-layout";
 import { DndContext } from "@dnd-kit/core";
@@ -7,7 +7,7 @@ import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import { BLOCK_PAD_SCALE, blockFinishImage, blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
 import { isConfigurable, muralBlockTitle, GRID_COLUMNS, screenPointToGrid, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
-import { muralThemeStyle } from "../../lib/theme";
+import { muralThemeStyle, useAppScheme } from "../../lib/theme";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../page/buttonClasses";
 import { ActionSheet } from "../Sheet";
 import { MobileBlockPreview } from "./MobileBlockPreview";
@@ -67,9 +67,7 @@ function BlockFrame({
   books,
   images,
   profile,
-  groups,
   shelfThemeOverride,
-  readerCardOverride,
   statsOverride,
   tierlistData,
   onActivate,
@@ -77,6 +75,7 @@ function BlockFrame({
   scale,
   theme,
   scheme,
+  floatScheme,
   editing
 }: {
   block: MuralBlock;
@@ -87,9 +86,7 @@ function BlockFrame({
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   profile?: ReaderProfile;
-  groups?: Group[];
   shelfThemeOverride?: ShelfTheme;
-  readerCardOverride?: PublicReaderCard;
   statsOverride?: Record<string, number>;
   tierlistData?: (tierlistId: string) => ResolvedTierlist | undefined;
   onActivate: () => void;
@@ -97,6 +94,7 @@ function BlockFrame({
   scale: number;
   theme: ThemeId;
   scheme: ThemeScheme;
+  floatScheme?: ThemeScheme;
   editing: boolean;
 }) {
   const locale = useLocale();
@@ -130,7 +128,7 @@ function BlockFrame({
       style={{
         borderRadius: `${style.cardRadius}px`,
         opacity: effects.opacity * (draft ? 0.8 : 1),
-        "--block-shadow": effects.boxShadow,
+        "--block-shadow": floatScheme ? floatingBlockShadow(effects.boxShadow, floatScheme) : effects.boxShadow,
         backgroundColor: resolveBlockColor(style.backgroundColor, themeColors) ?? "var(--color-surface)",
         backgroundImage: blockFinishImage(style, themeColors),
         borderTopWidth: `${style.cardBorderSides.top ? style.cardBorderWidth : 0}px`,
@@ -150,7 +148,7 @@ function BlockFrame({
       } as CSSProperties}
     >
       <div className="pointer-events-none h-full origin-top-left" style={{ width: `${scale * 100}%`, height: `${scale * 100}%`, transform: `scale(${1 / scale})`, fontSize: 14 } as CSSProperties}>
-        <MobileBlockPreview block={block} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} editing={editing} width={((CANVAS_WIDTH - PADDING * 2 + MARGIN) / GRID_COLUMNS * block.layout.w - MARGIN) * scale} height={(block.layout.h * (ROW_HEIGHT + MARGIN) - MARGIN) * scale} />
+        <MobileBlockPreview block={block} books={books} images={images} profile={profile} shelfThemeOverride={shelfThemeOverride} statsOverride={statsOverride} tierlistData={tierlistData} editing={editing} width={((CANVAS_WIDTH - PADDING * 2 + MARGIN) / GRID_COLUMNS * block.layout.w - MARGIN) * scale} height={(block.layout.h * (ROW_HEIGHT + MARGIN) - MARGIN) * scale} />
       </div>
       {effects.fadeColor && effects.fadeOpacity > 0 ? <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-[inherit]" style={{ backgroundColor: effects.fadeColor, opacity: effects.fadeOpacity }} /> : null}
     </div>
@@ -164,9 +162,7 @@ export function MobileMuralCanvas({
   books,
   images,
   profile,
-  groups,
   shelfThemeOverride,
-  readerCardOverride,
   selectedBlockId,
   draft,
   busy,
@@ -186,6 +182,7 @@ export function MobileMuralCanvas({
   onCancelDraft,
   statsOverride,
   tierlistData,
+  floating,
   revertNonce = 0
 }: {
   mural: Mural;
@@ -194,9 +191,7 @@ export function MobileMuralCanvas({
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   profile?: ReaderProfile;
-  groups?: Group[];
   shelfThemeOverride?: ShelfTheme;
-  readerCardOverride?: PublicReaderCard;
   selectedBlockId?: string | null;
   draft?: MobileMuralDraft | null;
   busy?: boolean;
@@ -216,9 +211,11 @@ export function MobileMuralCanvas({
   onCancelDraft?: () => void;
   statsOverride?: Record<string, number>;
   tierlistData?: (tierlistId: string) => ResolvedTierlist | undefined;
+  floating?: boolean;
   revertNonce?: number;
 }) {
   const t = useT();
+  const appScheme = useAppScheme();
   const viewportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
@@ -283,8 +280,8 @@ export function MobileMuralCanvas({
     <div className={`relative bg-(--color-bg) ${controlsPadding}`}>
       <div
         ref={setViewport}
-        className="mural-overview-stage relative w-full overflow-hidden"
-        style={{ ...muralThemeStyle(mural.theme, scheme), height: logicalHeight * scale, minHeight: editMode ? "52dvh" : undefined }}
+        className={`mural-overview-stage relative w-full ${floating ? "" : "overflow-hidden"}`}
+        style={{ ...muralThemeStyle(mural.theme, scheme), ...(floating ? { backgroundColor: undefined } : {}), height: logicalHeight * scale, minHeight: editMode ? "52dvh" : undefined }}
       >
         {viewportWidth > 0 && (
           <div
@@ -328,15 +325,14 @@ export function MobileMuralCanvas({
                     scale={scale}
                     theme={mural.theme}
                     scheme={scheme}
+                    floatScheme={floating ? appScheme : undefined}
                     editing={editMode}
                     draft={block.id === draft?.block.id}
                     invalid={block.id === draft?.block.id && !draft.valid}
                     books={books}
                     images={images}
                     profile={profile}
-                    groups={groups}
                     shelfThemeOverride={shelfThemeOverride}
-                    readerCardOverride={readerCardOverride}
                     statsOverride={statsOverride}
                     tierlistData={tierlistData}
                     onActivate={() => activate(block)}
@@ -438,9 +434,7 @@ export function MobileMuralCanvas({
           books={books}
           images={images}
           profile={profile}
-          groups={groups}
           shelfThemeOverride={shelfThemeOverride}
-          readerCardOverride={readerCardOverride}
           statsOverride={statsOverride}
           tierlistData={tierlistData}
           onClose={() => {

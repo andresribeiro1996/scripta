@@ -16,7 +16,6 @@ export interface BlockReferences {
   needsCurrentlyReading: boolean;
   statsMetrics: Set<string>;
   needsShelfTheme: boolean;
-  needsReaderCard: boolean;
 }
 
 type Block<T extends BlockType> = Extract<MuralBlock, { type: T }>;
@@ -144,9 +143,7 @@ const KINDS: { [T in BlockType]: Kind<T> } = {
       if (!data) return [];
       const byWork = booksByWork(books);
       return [...new Set([...data.tiers.flatMap((tier) => tier.workIds), ...data.pool])].flatMap<Book>((id) => byWork.get(id) ?? []);
-    } },
-  readerCard: { label: "shared.murals.kindReaderCard", size: { w: 4, h: 6 }, minHeight: 0, configurable: false, content: () => ({}),
-    valid: always, references: (_b, refs) => { refs.needsReaderCard = true; }, rekey: same, scrub: same, draws: noBooks }
+    } }
 };
 
 export const BLOCK_TYPES = Object.keys(KINDS) as BlockType[];
@@ -192,8 +189,7 @@ export function blockReferences(blocks: unknown): BlockReferences {
     imageIds: new Set(),
     needsCurrentlyReading: false,
     statsMetrics: new Set(),
-    needsShelfTheme: false,
-    needsReaderCard: false
+    needsShelfTheme: false
   };
   if (!Array.isArray(blocks)) return refs;
   for (const value of blocks) {

@@ -529,7 +529,6 @@ export const en = {
   "shared.murals.kindStats": "Stats",
   "shared.murals.kindEmpty": "Empty block",
   "shared.murals.kindTierlist": "Tier list",
-  "shared.murals.kindReaderCard": "Reader card",
   "shared.murals.noteTitle": "Note",
   "shared.murals.metricTotalBooks": "Books in your library",
   "shared.murals.metricBooksFinished": "Books finished",

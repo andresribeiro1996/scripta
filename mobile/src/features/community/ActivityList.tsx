@@ -1,15 +1,18 @@
+import { useEffect } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { FlatList, Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { activityDay, activityRow, relativeTime, type ActivityItem } from "@scripta/shared/community";
 import { EmptyState, ErrorState, Icon, Skeleton, dynamicType, radii, spacing, typography, useTheme, type IconName } from "../../ui";
 import { fetchActivity } from "./api";
 import { renderableActivity } from "./communityHome";
 import { CoverFan, SLOT_HEIGHT, SLOT_WIDTH } from "./CoverFan";
+import type { ProfileSection } from "./ProfileScroller";
 import { useLocale, useT } from "../../i18n";
+import { useToast } from "../../ui/ToastHost";
 
-export function ActivityList({ username }: { username: string }) {
+export function useActivitySection(username: string): ProfileSection<{ item: ActivityItem; day: string | null }> {
   const locale = useLocale();
   const t = useT();
   const activity = useInfiniteQuery({
@@ -18,41 +21,42 @@ export function ActivityList({ username }: { username: string }) {
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
+  const toast = useToast();
+  useEffect(() => {
+    if (activity.isRefetchError && !activity.isRefetching) toast.show(t("community.refreshActivityFailed"), "error");
+  }, [activity.isRefetchError, activity.isRefetching]);
   const items = renderableActivity(activity.data?.pages.flatMap((page) => page.items) ?? [], locale);
+  const rows = items.map((item, index) => {
+    const day = activityDay(item.createdAt, locale);
+    return { item, day: index === 0 || activityDay(items[index - 1]!.createdAt, locale) !== day ? day : null };
+  });
 
-  if (activity.isPending)
-    return (
+  return {
+    data: rows,
+    keyExtractor: (row) => row.item.id,
+    renderItem: (row) => <ActivityRowView item={row.item} day={row.day} />,
+    refreshing: activity.isRefetching,
+    onRefresh: () => void activity.refetch(),
+    onEndReached: () => {
+      if (activity.hasNextPage && !activity.isFetchingNextPage) void activity.fetchNextPage();
+    },
+    ListEmptyComponent: (
       <View style={styles.body}>
-        <Skeleton height={120} />
+        {activity.isPending ? (
+          <Skeleton height={120} />
+        ) : activity.isError ? (
+          <ErrorState body={t("community.activityLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void activity.refetch()} />
+        ) : (
+          <EmptyState title={t("community.noActivityTitle")} body={t("community.noActivityBody")} />
+        )}
       </View>
-    );
-  if (activity.isError)
-    return (
-      <View style={styles.body}>
-        <ErrorState body={t("community.activityLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void activity.refetch()} />
-      </View>
-    );
-
-  return (
-    <FlatList
-      style={styles.grow}
-      data={items}
-      keyExtractor={(item) => item.id}
-      contentContainerStyle={styles.list}
-      refreshing={activity.isRefetching}
-      onRefresh={() => void activity.refetch()}
-      onEndReached={() => {
-        if (activity.hasNextPage && !activity.isFetchingNextPage) void activity.fetchNextPage();
-      }}
-      onEndReachedThreshold={0.4}
-      ListEmptyComponent={<View style={styles.body}><EmptyState title={t("community.noActivityTitle")} body={t("community.noActivityBody")} /></View>}
-      ListFooterComponent={activity.isFetchingNextPage ? <View style={styles.body}><Skeleton height={80} /></View> : undefined}
-      renderItem={({ item, index }) => {
-        const day = activityDay(item.createdAt, locale);
-        return <ActivityRowView item={item} day={index === 0 || activityDay(items[index - 1]!.createdAt, locale) !== day ? day : null} />;
-      }}
-    />
-  );
+    ),
+    ListFooterComponent: activity.isFetchingNextPage ? (
+      <View style={styles.body}><Skeleton height={80} /></View>
+    ) : activity.isFetchNextPageError ? (
+      <View style={styles.body}><ErrorState body={t("community.activityLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void activity.fetchNextPage()} /></View>
+    ) : undefined,
+  };
 }
 
 function iconFor(item: ActivityItem): IconName {
@@ -142,7 +146,6 @@ const styles = StyleSheet.create({
   grow: { flex: 1 },
   strong: { fontWeight: "700" },
   body: { padding: spacing.lg },
-  list: { paddingBottom: spacing.huge, flexGrow: 1 },
   day: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xs },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth },
   slot: { width: SLOT_WIDTH, height: SLOT_HEIGHT, justifyContent: "center" },

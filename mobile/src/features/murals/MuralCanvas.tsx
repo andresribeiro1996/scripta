@@ -5,6 +5,7 @@ import {
   FINISH_TILE_SIZE,
   blockFinish,
   blockEffects,
+  floatingBlockShadow,
   blockGradient,
   blockTextColors,
   calculateShelfTheme,
@@ -32,14 +33,12 @@ import {
   type BlockStyle,
   type Mural,
   type MuralBlock,
-  type PublicReaderCard,
   type ReaderProfile,
   type ShelfTheme,
   type StatMetric,
 } from "@scripta/shared";
-import type { ThemeId } from "@scripta/shared/themes";
+import type { ThemeId, ThemeScheme } from "@scripta/shared/themes";
 import { CoverImage } from "../library/components/CoverImage";
-import { ReaderCardBlock } from "./ReaderCardBlock";
 import { Image } from "expo-image";
 import { SvgXml } from "react-native-svg";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -82,7 +81,7 @@ function blockPadding(style: BlockStyle) {
   return { padding: BLOCK_PADDING[style.innerSpacing] ?? BLOCK_PADDING.normal };
 }
 
-function blockFrameStyle(style: BlockStyle, colors: ThemeColors) {
+function blockFrameStyle(style: BlockStyle, colors: ThemeColors, floatScheme?: ThemeScheme) {
   const effects = blockEffects(style, colors);
   return {
     backgroundColor: resolveBlockColor(style.backgroundColor, colors) ?? colors.surface,
@@ -92,7 +91,7 @@ function blockFrameStyle(style: BlockStyle, colors: ThemeColors) {
     borderStyle: resolveBorderStyle(style.cardBorderStyle),
     borderRadius: style.cardRadius,
     opacity: effects.opacity,
-    boxShadow: effects.boxShadow,
+    boxShadow: floatScheme ? floatingBlockShadow(effects.boxShadow, floatScheme) : effects.boxShadow,
   };
 }
 
@@ -174,7 +173,7 @@ function CoverRow({ blockId, books, mode, caption, dim, accent, editable, onAsse
   }) : null}</ScrollView>;
 }
 
-export function BlockContent({ block, books, images, tierlists, profile, groups, shelfThemeOverride, readerCardOverride, statsOverride, editable, onAssetReady }: { block: MuralBlock; books: Array<Record<string, unknown>>; images: GalleryImage[]; tierlists: Tierlist[]; profile?: ReaderProfile; groups?: Group[]; shelfThemeOverride?: ShelfTheme; readerCardOverride?: PublicReaderCard; statsOverride?: Record<string, number>; editable?: boolean; onAssetReady?: (key: string) => void }) {
+export function BlockContent({ block, books, images, tierlists, profile, profileInHero, shelfThemeOverride, statsOverride, editable, onAssetReady }: { block: MuralBlock; books: Array<Record<string, unknown>>; images: GalleryImage[]; tierlists: Tierlist[]; profile?: ReaderProfile; profileInHero?: boolean; shelfThemeOverride?: ShelfTheme; statsOverride?: Record<string, number>; editable?: boolean; onAssetReady?: (key: string) => void }) {
   const locale = useLocale();
   const t = useT();
   const { colors: themeColors, id, mode } = useTheme();
@@ -190,10 +189,10 @@ export function BlockContent({ block, books, images, tierlists, profile, groups,
     const theme = shelfThemeOverride ?? calculateShelfTheme(books);
     const initial = (profile?.username || t("community.readerFallback"))[0]?.toUpperCase();
     return <View style={styles.profileBlock}>
-      <View style={styles.profileHeader}>
+      {profileInHero ? (block.bio ? <Text numberOfLines={3} style={[text.bio, dim]}>{block.bio}</Text> : null) : <View style={styles.profileHeader}>
         {profile?.avatarUrl && failedSource !== profile.avatarUrl ? <Image source={{ uri: profile.avatarUrl }} style={styles.profileAvatar} contentFit="cover" onDisplay={() => onAssetReady?.(`avatar:${block.id}:${profile.avatarUrl}`)} onError={() => { setFailedSource(profile.avatarUrl!); onAssetReady?.(`avatar:${block.id}:${profile.avatarUrl}`); }} /> : <View style={[styles.profileAvatar, styles.profileInitial, { backgroundColor: colors.accentSoft }]}><Text style={[styles.profileInitialText, { color: colors.accent }]}>{initial}</Text></View>}
         <View style={styles.profileCopy}><Text numberOfLines={1} style={text.name}>@{profile?.username || t("community.readerFallback")}</Text>{block.bio ? <Text numberOfLines={3} style={[text.bio, dim]}>{block.bio}</Text> : null}</View>
-      </View>
+      </View>}
       {block.favoriteGenres.length ? <View style={styles.genreSection}><Text style={[text.label, dim]}>{t("murals.whatILike")}</Text><View style={styles.genreRow}>{block.favoriteGenres.map((genre) => <View key={genre} style={[styles.genreChip, { backgroundColor: colors.accentSoft }]}><Text style={[text.caption, { color: colors.accent }]}>{genreLabel(genre, locale)}</Text></View>)}</View></View> : null}
       {theme.genres.length ? <View style={styles.genreSection}><Text style={[text.label, dim]}>{t("murals.shelfTheme")}</Text><Text style={text.body}>{theme.genres.map((genre) => genreLabel(genre, locale)).join(" · ")}</Text><Text style={[text.caption, dim]}>{t("murals.basedOn", { matched: theme.matchedBooks, total: theme.totalBooks })}</Text></View> : null}
     </View>;
@@ -242,7 +241,6 @@ export function BlockContent({ block, books, images, tierlists, profile, groups,
     </View>;
   }
   if (block.type === "tierlist") { const tierlist = tierlists.find((item) => item.id === block.tierlistId); return <>{eyebrow(tierlist?.name ?? t("shell.tierlistUnavailable"))}{tierlist?.data.tiers.map((tier) => <Text key={tier.id} style={text.body}>{t("murals.tierCount", { label: tier.label, count: tier.workIds.length })}</Text>)}</>; }
-  if (block.type === "readerCard") return <ReaderCardBlock books={books} groups={groups ?? NO_GROUPS} readerName={profile?.username || t("community.readerFallback")} publicCard={readerCardOverride} editable={editable} />;
   return <Text style={text.body}>{blockLabel(block.type, locale)}</Text>;
 }
 
@@ -254,7 +252,7 @@ const MOVE_ACTIONS = [
   { name: "moveDown", labelKey: "murals.moveDown" },
 ] as const;
 
-const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, selected, books, images, tierlists, profile, groups, shelfThemeOverride, readerCardOverride, statsOverride, onSelect, onMove, onAssetReady, drag, preview, drop, scroll }: {
+const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, selected, books, images, tierlists, profile, profileInHero, floatScheme, shelfThemeOverride, statsOverride, onSelect, onMove, onAssetReady, drag, preview, drop, scroll }: {
   block: MuralBlock;
   columnWidth: number;
   editable: boolean;
@@ -263,12 +261,12 @@ const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, se
   images: GalleryImage[];
   tierlists: Tierlist[];
   profile?: ReaderProfile;
-  groups?: Group[];
+  profileInHero?: boolean;
+  floatScheme?: ThemeScheme;
   shelfThemeOverride?: ShelfTheme;
-  readerCardOverride?: PublicReaderCard;
   statsOverride?: Record<string, number>;
-  onSelect: () => void;
-  onMove: (dx: number, dy: number) => void;
+  onSelect: (id: string) => void;
+  onMove: (id: string, dx: number, dy: number) => void;
   onAssetReady?: (key: string) => void;
   drag: SharedValue<DragState | null>;
   preview: SharedValue<Record<string, BlockLayout>>;
@@ -283,8 +281,8 @@ const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, se
   const reducedMotion = useReducedMotion();
   const callbacks = useRef({ onSelect, onMove });
   useLayoutEffect(() => { callbacks.current = { onSelect, onMove }; }, [onSelect, onMove]);
-  const select = useCallback(() => callbacks.current.onSelect(), []);
-  const move = useCallback((dx: number, dy: number) => callbacks.current.onMove(dx, dy), []);
+  const select = useCallback(() => callbacks.current.onSelect(block.id), [block.id]);
+  const move = useCallback((dx: number, dy: number) => callbacks.current.onMove(block.id, dx, dy), [block.id]);
   const x = useSharedValue(block.layout.x * columnWidth);
   const y = useSharedValue(block.layout.y * ROW_HEIGHT);
   const scrollOffset = scroll?.offset;
@@ -342,10 +340,10 @@ const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, se
       transform: [{ translateX: x.get() }, { translateY: y.get() }],
     };
   });
-  const body = <View pointerEvents={editable ? "none" : "auto"} style={styles.blockBody}><BlockContent block={block} books={books} images={images} tierlists={tierlists} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} editable={editable} onAssetReady={onAssetReady} /></View>;
+  const body = <View pointerEvents={editable ? "none" : "auto"} style={styles.blockBody}><BlockContent block={block} books={books} images={images} tierlists={tierlists} profile={profile} profileInHero={profileInHero} shelfThemeOverride={shelfThemeOverride} statsOverride={statsOverride} editable={editable} onAssetReady={onAssetReady} /></View>;
   const content = <Animated.View renderToHardwareTextureAndroid={editable && selected} shouldRasterizeIOS={editable && selected} style={[
         styles.block,
-        blockFrameStyle(style, colors),
+        blockFrameStyle(style, colors, floatScheme),
         {
           left: 0,
           top: 0,
@@ -355,7 +353,7 @@ const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, se
         animated,
       ]}>
         <FinishOverlay id={block.id} style={style} colors={colors} />
-        {editable ? <Pressable accessibilityRole="button" accessibilityLabel={t("murals.blockDragLabel", { block: blockLabel(block.type, locale) })} accessibilityActions={MOVE_ACTIONS.map(({ name, labelKey }) => ({ name, label: t(labelKey) }))} onAccessibilityAction={(event) => { const move = MOVES[event.nativeEvent.actionName]; if (move) onMove(move[0], move[1]); }} onPress={onSelect} style={[styles.blockPress, blockPadding(style)]}>{body}</Pressable> : <View style={[styles.blockPress, blockPadding(style)]}>{body}</View>}
+        {editable ? <Pressable accessibilityRole="button" accessibilityLabel={t("murals.blockDragLabel", { block: blockLabel(block.type, locale) })} accessibilityActions={MOVE_ACTIONS.map(({ name, labelKey }) => ({ name, label: t(labelKey) }))} onAccessibilityAction={(event) => { const step = MOVES[event.nativeEvent.actionName]; if (step) move(step[0], step[1]); }} onPress={select} style={[styles.blockPress, blockPadding(style)]}>{body}</Pressable> : <View style={[styles.blockPress, blockPadding(style)]}>{body}</View>}
         <FadeOverlay style={style} colors={colors} />
         {selected ? <View pointerEvents="none" style={{ position: "absolute", inset: 0, borderWidth: 2, borderRadius: style.cardRadius, borderColor: selectionBorderColor(style, colors) }} /> : null}
       </Animated.View>;
@@ -397,7 +395,7 @@ export function BlockPreview({ theme, block, canvasWidth, maxHeight, books, imag
           <FinishOverlay id={block.id} style={style} colors={colors} />
           <View style={[styles.blockPress, blockPadding(style)]}>
             <View style={styles.blockBody}>
-              <BlockContent block={resolved} books={books} images={images} tierlists={tierlists} profile={profile} groups={groups} editable />
+              <BlockContent block={resolved} books={books} images={images} tierlists={tierlists} profile={profile} editable />
             </View>
           </View>
           <FadeOverlay style={style} colors={colors} />
@@ -408,15 +406,16 @@ export function BlockPreview({ theme, block, canvasWidth, maxHeight, books, imag
   );
 }
 
-export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThemeOverride, readerCardOverride, statsOverride, editable = false, selectedBlockId, onSelectBlock, onLayoutChange, onImageReadyChange, onDragChange, groups = NO_GROUPS, dragScroll }: {
+export function MuralCanvas({ mural, books, images, tierlists, profile, profileInHero, initialWidth = 0, shelfThemeOverride, statsOverride, editable = false, selectedBlockId, onSelectBlock, onLayoutChange, onImageReadyChange, onDragChange, groups = NO_GROUPS, dragScroll }: {
   mural: Mural;
   groups?: Group[];
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   tierlists: Tierlist[];
   profile?: ReaderProfile;
+  profileInHero?: boolean;
+  initialWidth?: number;
   shelfThemeOverride?: ShelfTheme;
-  readerCardOverride?: PublicReaderCard;
   statsOverride?: Record<string, number>;
   editable?: boolean;
   selectedBlockId?: string | null;
@@ -427,10 +426,10 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
   dragScroll?: MuralDragScroll;
 }) {
   const locale = useLocale();
-  const theme = muralThemeId(mural.theme);
   const { mode } = useTheme();
+  const theme = muralThemeId(mural.theme);
   const colors = muralColors(theme, mode);
-  const [width, setWidth] = useState(0);
+  const [width, setWidth] = useState(initialWidth);
   const drag = useSharedValue<DragState | null>(null);
   const preview = useSharedValue<Record<string, BlockLayout>>({});
   const drop = useSharedValue<BlockLayout | null>(null);
@@ -483,6 +482,11 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
   }, editable);
   const [day] = useState(localDay);
   const [readyAssets, setReadyAssets] = useState<Set<string>>(() => new Set());
+  const selectBlock = useCallback((id: string) => onSelectBlock?.(id), [onSelectBlock]);
+  const moveBlock = useCallback((id: string, dx: number, dy: number) => {
+    const original = mural.blocks.find((item) => item.id === id)!;
+    onLayoutChange?.(id, { ...original.layout, x: original.layout.x + dx, y: original.layout.y + dy });
+  }, [mural.blocks, onLayoutChange]);
   const onAssetReady = useCallback((key: string) => setReadyAssets((current) => current.has(key) ? current : new Set(current).add(key)), []);
   const resolvedBlocks = useMemo(() => mural.blocks.map((block) => resolveHomeBlock(block, books, groups, day, locale)), [mural.blocks, books, groups, day, locale]);
   const assetKeys = resolvedBlocks.flatMap((block) => {
@@ -501,7 +505,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
     return { height: Math.max(height, Math.ceil(movingBottom / ROW_HEIGHT) * ROW_HEIGHT, ...Object.values(preview.get()).map((layout) => (layout.y + layout.h + 6) * ROW_HEIGHT)) };
   });
   const canvas = (
-    <Animated.View onLayout={(event) => setWidth(event.nativeEvent.layout.width)} style={[styles.canvas, { backgroundColor: colors.background }, canvasStyle]}>
+    <Animated.View onLayout={(event) => setWidth(event.nativeEvent.layout.width)} style={[styles.canvas, profileInHero ? styles.floatingCanvas : { backgroundColor: colors.background }, canvasStyle]}>
       {width > 0 ? resolvedBlocks.map((block) => <CanvasBlock
         key={block.id}
         block={block}
@@ -512,15 +516,12 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
         images={images}
         tierlists={tierlists}
         profile={profile}
-        groups={groups}
+        profileInHero={profileInHero}
+        floatScheme={profileInHero ? mode : undefined}
         shelfThemeOverride={shelfThemeOverride}
-        readerCardOverride={readerCardOverride}
         statsOverride={statsOverride}
-        onSelect={() => onSelectBlock?.(block.id)}
-        onMove={(dx, dy) => {
-          const original = mural.blocks.find((item) => item.id === block.id)!;
-          onLayoutChange?.(block.id, { ...original.layout, x: original.layout.x + dx, y: original.layout.y + dy });
-        }}
+        onSelect={selectBlock}
+        onMove={moveBlock}
         onAssetReady={onImageReadyChange ? onAssetReady : undefined}
         drag={drag}
         preview={preview}
@@ -543,6 +544,7 @@ export function MuralThumbnail({ canvasWidth, ...props }: ComponentProps<typeof 
 const styles = StyleSheet.create({
   thumbnail: { width: "100%", height: "100%", overflow: "hidden" },
   canvas: { position: "relative", width: "100%", overflow: "hidden" },
+  floatingCanvas: { overflow: "visible" },
   block: { position: "absolute", overflow: "hidden" },
   blockPress: { flex: 1, minHeight: minimumTouchTarget },
   blockBody: { flex: 1, gap: spacing.sm },

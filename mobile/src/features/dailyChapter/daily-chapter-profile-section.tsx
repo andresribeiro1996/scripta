@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ScrollView, View } from "react-native";
+import { View } from "react-native";
 import { dailyChapterSummary, dailyThemeName } from "@scripta/shared";
 import type { DailyChapterHistory } from "@scripta/shared";
 import { Text } from "../../ui/Text";
@@ -21,12 +21,9 @@ function OwnDailyChapterBody({ history }: { history: DailyChapterHistory }) {
   const summary = dailyChapterSummary(history, history.today.slice(0, 7));
   const { bestTheme } = summary;
   const bestAt = bestTheme ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("quizzes.bestAt", { theme: dailyThemeName(bestTheme.themeId, locale), percent: bestTheme.percent })}</Text> : undefined;
-  return <View style={{ flex: 1 }}>
-    <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.huge }}>
-      {history.results.length ? <DailyChapterTiles summary={summary} /> : null}
-      <DailyChapterPeriodSection history={history} period={period} afterCalendar={bestAt} />
-    </ScrollView>
-    <DailyChapterPlayFooter history={history} />
+  return <View style={{ padding: spacing.lg, gap: spacing.xl }}>
+    {history.results.length ? <DailyChapterTiles summary={summary} /> : null}
+    <DailyChapterPeriodSection history={history} period={period} afterCalendar={bestAt} />
   </View>;
 }
 
@@ -34,9 +31,14 @@ function OwnDailyChapterSection() {
   const t = useT();
   const identity = useDeviceIdentity();
   const history = useDailyHistory();
-  if (identity.isError || history.isLoadingError) return <ScrollView contentContainerStyle={{ padding: spacing.lg }}><ErrorState body={t("quizzes.loadChaptersFailed")} actionLabel={t("shell.retry")} onAction={() => { void identity.refetch(); void history.refetch(); }} /></ScrollView>;
-  if (!history.data) return <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}><Skeleton height={72} /><Skeleton height={120} /><Skeleton height={200} /></ScrollView>;
+  if (identity.isError || history.isLoadingError) return <View style={{ padding: spacing.lg }}><ErrorState body={t("quizzes.loadChaptersFailed")} actionLabel={t("shell.retry")} onAction={() => { void identity.refetch(); void history.refetch(); }} /></View>;
+  if (!history.data) return <View style={{ padding: spacing.lg, gap: spacing.md }}><Skeleton height={72} /><Skeleton height={120} /><Skeleton height={200} /></View>;
   return <OwnDailyChapterBody history={history.data} />;
+}
+
+export function OwnDailyChapterFooter() {
+  const history = useDailyHistory();
+  return history.data ? <DailyChapterPlayFooter history={history.data} /> : null;
 }
 
 export function DailyChapterProfileSection({ userId, own }: { userId: string; own: boolean }) {
@@ -63,5 +65,5 @@ function PlayerDailyChapterSection({ userId }: { userId: string }) {
       {bestTheme ? <View><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("quizzes.bestAt", { theme: themeName, percent: bestTheme.percent })}</Text></View> : null}
     </>;
   }
-  return <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.huge }}>{body}</ScrollView>;
+  return <View style={{ padding: spacing.lg, gap: spacing.xl }}>{body}</View>;
 }

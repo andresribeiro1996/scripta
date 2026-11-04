@@ -97,7 +97,6 @@ test("reader cards are named and described in the reader's language", () => {
 test("import errors, saved looks and block labels follow the language", () => {
   assert.throws(() => bookCsvToLibraryJson("Title,Author\n", "pt-PT"), /não tem nenhum livro/);
   assert.throws(() => readSavedBlockLooks("{}", "pt-PT"), /Não foi possível ler os estilos guardados\./);
-  assert.equal(blockLabel("readerCard", "pt-PT"), "Cartão de leitor");
   assert.equal(statMetricLabels("pt-PT").totalBooks, "Livros na sua biblioteca");
   assert.equal(blockThemeColorLabels("pt-PT").onAccent, "Sobre o realce");
   assert.equal(cardFontFamilyOptions("en")[0]!.shortLabel, "Sans-serif");

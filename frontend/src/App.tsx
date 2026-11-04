@@ -43,6 +43,7 @@ import { PeoplePage } from "./pages/PeoplePage";
 import { ReaderCardPage } from "./pages/ReaderCardPage";
 import { SeriesPage } from "./pages/SeriesPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { SharedCardPage } from "./pages/SharedCardPage";
 import { SharedLibraryPage } from "./pages/SharedLibraryPage";
 import { SharedMuralPage } from "./pages/SharedMuralPage";
 import { TierListEditorPage } from "./pages/TierListEditorPage";
@@ -71,6 +72,7 @@ export function App() {
           <Route path="/work/:id" element={<WorkPage />} />
           <Route path="/work/:id/stats" element={<WorkStatsPage />} />
           <Route path="/shared/murals/:token" element={<SharedMuralPage />} />
+          <Route path="/shared/cards/:token" element={<SharedCardPage />} />
           <Route path="/shared/library/:token" element={<SharedLibraryPage />} />
           <Route path="/vote/:code" element={<VoteTierlistPage />} />
           <Route path="/daily" element={<DailyChapterPage />} />

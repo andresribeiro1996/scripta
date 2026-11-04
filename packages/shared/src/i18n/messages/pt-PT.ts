@@ -530,7 +530,6 @@ export const ptPT: CatalogOf<typeof en> = {
   "shared.murals.kindStats": "Estatísticas",
   "shared.murals.kindEmpty": "Bloco vazio",
   "shared.murals.kindTierlist": "Tabela de níveis",
-  "shared.murals.kindReaderCard": "Cartão de leitor",
   "shared.murals.noteTitle": "Nota",
   "shared.murals.metricTotalBooks": "Livros na sua biblioteca",
   "shared.murals.metricBooksFinished": "Livros lidos",

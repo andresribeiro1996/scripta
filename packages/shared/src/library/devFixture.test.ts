@@ -31,8 +31,8 @@ test("every finished fixture book has a rating and a read date", () => {
   assert.deepEqual(bare.map((book) => book.Title), []);
 });
 
-test("the fixture's shelf preset has a reader card, a passage and favourites", () => {
+test("the fixture's shelf preset has a passage and favourites", () => {
   const blocks = buildMuralPreset("shelf", fixture.books, "en", fixture.groups).blocks;
-  assert.deepEqual(blocks.map((block) => (block.type === "shelf" ? `shelf:${block.title}` : block.type)), ["profile", "readerCard", "stats", "currentlyReading", "shelf:Finished", "quote", "shelf:Favourites"]);
+  assert.deepEqual(blocks.map((block) => (block.type === "shelf" ? `shelf:${block.title}` : block.type)), ["profile", "stats", "currentlyReading", "shelf:Finished", "quote", "shelf:Favourites"]);
   assert.equal(eligiblePassages(fixture.books).length, 4);
 });

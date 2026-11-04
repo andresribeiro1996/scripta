@@ -1,12 +1,10 @@
-import { genreLabel, type Group, type PublicReaderCard } from "@scripta/shared";
+import { genreLabel } from "@scripta/shared";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
-import { NO_GROUPS } from "../../hooks/useReaderCard";
 import { bookKey } from "../../lib/merge";
 import { computeStat } from "../../lib/muralStats";
 import { blockBooks, calculateShelfTheme, muralBlockTitle, resolveQuote, resolveQuoteCollection, type MuralBlock, type ReaderProfile, type ShelfTheme, type StatMetric } from "../../lib/murals";
 import { CoverImage } from "../BookCard";
-import { ReaderCardBlockView } from "./blocks/ReaderCardBlock";
 import { useLocale, useT, type WebMessages } from "../../i18n";
 
 const PREVIEW_STAT_LABELS: Record<StatMetric, Extract<keyof WebMessages, `muralEditor.previewStat${string}`>> = {
@@ -22,9 +20,7 @@ export function MobileBlockPreview({
   books,
   images,
   profile,
-  groups,
   shelfThemeOverride,
-  readerCardOverride,
   width,
   height,
   statsOverride,
@@ -35,9 +31,7 @@ export function MobileBlockPreview({
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   profile?: ReaderProfile;
-  groups?: Group[];
   shelfThemeOverride?: ShelfTheme;
-  readerCardOverride?: PublicReaderCard;
   width: number;
   height: number;
   statsOverride?: Record<string, number>;
@@ -61,13 +55,6 @@ export function MobileBlockPreview({
     const theme = shelfThemeOverride ?? calculateShelfTheme(books);
     const avatarSize = Math.max(16, Math.min(40, height - 8));
     return <div className={`flex h-full flex-col gap-2 overflow-hidden ${height < 56 ? "justify-center block-px-2" : "block-p-2"}`}><div className="flex items-center gap-2">{profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" className="shrink-0 rounded-full object-cover" style={{ width: avatarSize, height: avatarSize }} /> : <div className="flex shrink-0 items-center justify-center rounded-full bg-(--color-accent-soft) font-bold text-(--color-accent)" style={{ width: avatarSize, height: avatarSize }}>{(profile?.username || t("muralEditor.fallbackReader"))[0]?.toUpperCase()}</div>}<div className="min-w-0"><p className="truncate font-semibold">@{profile?.username || t("muralEditor.fallbackReader")}</p>{block.bio && height >= 80 ? <p className="line-clamp-2 text-[12px] text-(--color-text-dim)">{block.bio}</p> : null}</div></div>{height >= 100 && theme.genres.length > 0 ? <p className="truncate text-[12px] text-(--color-text-dim)">{theme.genres.map((genre) => genreLabel(genre, locale)).join(" · ")}</p> : null}</div>;
-  }
-  if (block.type === "readerCard") {
-    return (
-      <div className="flex h-full items-center justify-center overflow-hidden block-p-1">
-        <ReaderCardBlockView books={books} groups={groups ?? NO_GROUPS} readerCardOverride={readerCardOverride} readerName={profile?.username || t("muralEditor.fallbackReader")} />
-      </div>
-    );
   }
   if ((height < 32 || width < 48) && block.type !== "image" && block.type !== "spotlight") {
     const symbol =

@@ -6,15 +6,16 @@ import { BLOCK_TYPES, blockBooks, blockLabel, blockReferences, createBlockCandid
 const make = (type: BlockType, extra: Record<string, unknown> = {}) => ({ ...createBlockCandidate(type, []), ...extra }) as MuralBlock;
 
 test("every block type has a label and a default block of its own type", () => {
-  assert.equal(BLOCK_TYPES.length, 12);
+  assert.equal(BLOCK_TYPES.length, 11);
   for (const type of BLOCK_TYPES) {
     assert.ok(blockLabel(type, "en"));
     assert.equal(createBlockCandidate(type, []).type, type);
   }
 });
 
-test("only currentlyReading, empty and readerCard have nothing to configure", () => {
-  assert.deepEqual(BLOCK_TYPES.filter((type) => !isConfigurable(type)), ["currentlyReading", "empty", "readerCard"]);
+test("only currentlyReading and empty have nothing to configure", () => {
+  assert.deepEqual(BLOCK_TYPES.filter((type) => !isConfigurable(type)), ["currentlyReading", "empty"]);
+  assert.equal((BLOCK_TYPES as string[]).includes("readerCard"), false);
 });
 
 test("a new currentlyReading block already meets its minimum height", () => {
@@ -46,7 +47,6 @@ test("blockReferences collects what each block type points at", () => {
     { id: "9", type: "stats", metrics: ["totalBooks", 4] },
     { id: "10", type: "currentlyReading" },
     { id: "11", type: "profile", bio: "", favoriteGenres: [] },
-    { id: "12", type: "readerCard" },
     { id: "13", type: "tierlist", tierlistId: "t" },
     { id: "14", type: "text" },
     { id: "15", type: "empty" }
@@ -58,7 +58,6 @@ test("blockReferences collects what each block type points at", () => {
   assert.deepEqual([...refs.statsMetrics], ["totalBooks"]);
   assert.equal(refs.needsCurrentlyReading, true);
   assert.equal(refs.needsShelfTheme, true);
-  assert.equal(refs.needsReaderCard, true);
 });
 
 test("blockReferences skips anything it doesn't recognise and never throws", () => {
@@ -169,5 +168,5 @@ test("blockBooks returns the books each block draws, each once, in draw order", 
   assert.deepEqual(blockBooks(make("tierlist", { tierlistId: "t" }), books, tiers), [books[3], books[0]]);
   assert.deepEqual(blockBooks(make("tierlist", { tierlistId: "t" }), books, () => undefined), []);
   assert.deepEqual(blockBooks(make("tierlist", { tierlistId: "t" }), books), []);
-  for (const type of ["image", "text", "profile", "stats", "empty", "readerCard"] as const) assert.deepEqual(blockBooks(make(type), books), []);
+  for (const type of ["image", "text", "profile", "stats", "empty"] as const) assert.deepEqual(blockBooks(make(type), books), []);
 });

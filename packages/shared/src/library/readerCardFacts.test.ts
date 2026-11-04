@@ -3,7 +3,7 @@ import { test } from "node:test";
 import type { Group } from "./groups.js";
 import { DEFAULT_READER_CARD_STYLE, publicStyle } from "../readerCards/style.js";
 import { bookKey } from "./merge.js";
-import { publicReaderCardOf, readerCardFacts, readerCardInputOf, visitorView } from "./readerCardFacts.js";
+import { ownProfileCard, publicReaderCardOf, readerCardFacts, readerCardInputOf, visitorView } from "./readerCardFacts.js";
 import type { PublicReaderCard } from "./readerIdentity.js";
 
 type Book = Record<string, unknown>;
@@ -144,4 +144,20 @@ test("the owner's reader number joins the facts only when given", () => {
   assert.equal(readerCardInputOf(books, [], "andre", "en", undefined, { style, coverOf: () => null, readerNumber: 42 }).card.facts?.readerNumber, 42);
   assert.equal("readerNumber" in readerCardInputOf(books, [], "andre", "en", undefined, { style, coverOf: () => null }).card.facts!, false);
   assert.equal("readerNumber" in readerCardInputOf(books, [], "andre", "en", undefined, { style, coverOf: () => null, readerNumber: null }).card.facts!, false);
+});
+
+test("ownProfileCard shows progress only while unwritten", () => {
+  const unwritten = readerCardInputOf([book(1), book(2)], [], "andre", "en");
+  assert.match(ownProfileCard(unwritten).progress ?? "", /3/);
+  const settled = readerCardInputOf(Array.from({ length: 6 }, (_, i) => book(i, { _genres: ["Fantasy"] })), [], "andre", "en");
+  assert.equal(settled.card.state, "settled");
+  assert.equal(ownProfileCard(settled).progress, null);
+});
+
+test("ownProfileCard returns the visitor view", () => {
+  const owner = readerCardInputOf(Array.from({ length: 6 }, (_, i) => book(i, { _genres: ["Fantasy"] })), [], "andre", "en");
+  const { input } = ownProfileCard(owner);
+  assert.equal(input.view, "visitor");
+  assert.equal(input.leaders, undefined);
+  assert.equal(input.missing, undefined);
 });

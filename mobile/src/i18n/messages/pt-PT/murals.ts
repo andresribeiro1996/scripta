@@ -147,7 +147,6 @@ export const murals: CatalogOf<typeof en> = {
   "murals.ofColumns": "de {count} colunas",
   "murals.ofFinished": "de {total} lidos",
   "murals.openMural": "Abrir {name}",
-  "murals.opensReaderCard": "Abre o cartão de leitor",
   "murals.pageNumber": "Página {page}",
   "murals.pageOf": "Página {page} de {total}",
   "murals.passage": "Passagem",
