@@ -479,7 +479,7 @@ export function ReaderList({ title, rows, signedIn }: { title: string | null; ro
         {rows.map((row) => {
           const body = (
             <>
-              <AuthorAvatar author={{ ...row, userId: row.username }} size={32} />
+              <AuthorAvatar author={row} size={32} />
               <span className="flex min-w-0 flex-1 items-center gap-1 text-sm font-semibold">
                 <span className="truncate">{row.username}</span>
                 <ReaderGlyph identity={row.readerGlyph} />

@@ -29,7 +29,8 @@ const cases: Array<[string, (api: QuizzesApi) => Promise<unknown>, string, ApiRe
   ["submitPlay", (api) => api.submitPlay("c1", submission), "/quizzes/voting/c1/play", { method: "POST", body: submission, auth: "optional" }],
   ["fetchPlay own", (api) => api.fetchPlay("c1", null), "/quizzes/voting/c1/play", { auth: "optional" }],
   ["fetchPlay by id", (api) => api.fetchPlay("c1", "p1"), "/quizzes/voting/c1/play/p1", { auth: "optional" }],
-  ["fetchPublicResults", (api) => api.fetchPublicResults("c1"), "/quizzes/voting/c1/results", { auth: "none" }],
+  ["fetchPublicResults without a play", (api) => api.fetchPublicResults("c1", null), "/quizzes/voting/c1/results", { auth: "optional" }],
+  ["fetchPublicResults with a play", (api) => api.fetchPublicResults("c1", "p/1"), "/quizzes/voting/c1/results?playId=p%2F1", { auth: "optional" }],
 ];
 
 for (const [name, call, path, init] of cases) {

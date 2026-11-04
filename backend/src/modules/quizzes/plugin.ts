@@ -16,13 +16,13 @@ import { openQuizzesDb } from "./adapters/sqlite/connection.js";
 import { createSqliteQuizzesRepository } from "./adapters/sqlite/sqliteQuizzesRepository.js";
 import type { QuizWorks } from "./domain/ports.js";
 import { buildPublicQuizRoutes, buildQuizRoutes } from "./routes.js";
-import type { EmitPlayed, EmitPublished, QuizzesPublicApi, ResolveUsernames } from "./service.js";
+import type { EmitPlayed, EmitPublished, QuizzesPublicApi, ResolveProfiles } from "./service.js";
 import { createQuizzesPublicApi, createQuizzesService } from "./service.js";
 
 export interface QuizzesPluginOptions {
   emitPublished?: EmitPublished;
   emitPlayed?: EmitPlayed;
-  resolveUsernames?: ResolveUsernames;
+  resolveProfiles?: ResolveProfiles;
   dailyPeople?: DailyChapterPeople;
 }
 
@@ -31,7 +31,7 @@ export const quizWorks: QuizWorks = { knownWorkIds, resolveTitleWorks, canonical
 export async function quizzesPlugin(app: FastifyInstance, opts: QuizzesPluginOptions = {}) {
   // --- composition: swap this one block to change storage technology ---
   const db = openQuizzesDb();
-  const quizzesService = createQuizzesService(createSqliteQuizzesRepository(db), quizWorks, opts.emitPublished, opts.emitPlayed, opts.resolveUsernames);
+  const quizzesService = createQuizzesService(createSqliteQuizzesRepository(db), quizWorks, opts.emitPublished, opts.emitPlayed, opts.resolveProfiles);
   // -----------------------------------------------------------------------
 
   await app.register(buildQuizRoutes(quizzesService));

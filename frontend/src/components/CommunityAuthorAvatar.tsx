@@ -1,6 +1,6 @@
-import type { CommunityAuthor } from "@scripta/shared/community";
+import type { ReaderProfile } from "@scripta/shared";
 
-export function AuthorAvatar({ author, size = 20 }: { author: CommunityAuthor; size?: number }) {
+export function AuthorAvatar({ author, size = 20 }: { author: ReaderProfile; size?: number }) {
   if (author.avatarUrl) {
     return <img src={author.avatarUrl} alt="" width={size} height={size} className="shrink-0 rounded-full object-cover" style={{ width: size, height: size }} />;
   }

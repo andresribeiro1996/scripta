@@ -38,8 +38,9 @@ export function createQuizzesApi(request: ApiRequest) {
       const path = playId === null ? apiPath`/quizzes/voting/${code}/play` : apiPath`/quizzes/voting/${code}/play/${playId}`;
       return request<PlayResponse>(path, { auth: "optional" });
     },
-    fetchPublicResults(code: string): Promise<{ plays: PublicResultPlay[]; questionCount: number }> {
-      return request(apiPath`/quizzes/voting/${code}/results`, { auth: "none" });
+    fetchPublicResults(code: string, playId: string | null): Promise<{ plays: PublicResultPlay[]; questionCount: number }> {
+      const path = apiPath`/quizzes/voting/${code}/results`;
+      return request(playId === null ? path : `${path}?playId=${encodeURIComponent(playId)}`, { auth: "optional" });
     },
   };
 }

@@ -181,6 +181,7 @@ export const ptPT: CatalogOf<typeof en> = {
   "shared.labels.questionWithBook": "P{number} · {title}",
   "shared.labels.unknownBook": "Livro desconhecido",
   "shared.labels.guest": "Convidado",
+  "shared.labels.seconds": "{value} s",
   "shared.labels.clueCharacters": "Que livro tem estas personagens?",
   "shared.labels.clueCover": "Que capa pertence a este título?",
   "shared.labels.clueBook": "De que livro é isto?",
