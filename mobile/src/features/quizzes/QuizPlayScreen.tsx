@@ -152,12 +152,14 @@ export function QuizPlayScreen({ code }: { code: string }) {
 
 function ElapsedCaption({ clock, complete, label }: { clock: PlayClock; complete: boolean; label: string }) {
   const { colors } = useTheme();
-  const [, setTick] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
-    const timer = setInterval(() => setTick((value) => value + 1), 1000);
+    const tick = () => setElapsed(clock.elapsed(Date.now(), complete));
+    tick();
+    const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
-  }, []);
-  return <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{label} · {Math.floor(clock.elapsed(Date.now(), complete) / 1000)}s</Text>;
+  }, [clock, complete]);
+  return <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{label} · {Math.floor(elapsed / 1000)}s</Text>;
 }
 
 function Prompt({ question }: { question: PublicQuizQuestion }) {
