@@ -78,7 +78,7 @@ export const quizzes: CatalogOf<typeof en> = {
   "quizzes.incorrect": "Errada",
   "quizzes.answerUnavailable": "Os detalhes da resposta não estão disponíveis para este jogo.",
   "quizzes.resultsTabs": "Resultados do quiz",
-  "quizzes.yourAnswers": "As suas respostas",
+  "quizzes.yourAnswers": "Respostas",
   "quizzes.leaderboard": "Classificação",
   "quizzes.passItOn": "Passe a palavra.",
   "quizzes.passItOnBody": "Os mesmos livros. Um novo par de olhos. Veja como se sai um amigo.",
