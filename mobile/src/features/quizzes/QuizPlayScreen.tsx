@@ -265,7 +265,7 @@ function AnswerRow({ row, question, expanded, onToggle }: { row: ScoreRow; quest
       </View> : null}
       {row.answer ? null : <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("quizzes.answerUnavailable")}</Text>}
       {row.workId ? <Pressable accessibilityRole="link" onPress={() => router.push(workPath(row.workId!, segments) as never)} style={styles.openBook}>
-        <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.accent }]}>{t("quizzes.openBook")}</Text>
+        <Text {...dynamicType} numberOfLines={1} style={[typography.body, styles.strong, { color: colors.accent }]}>{t("quizzes.openBook")}</Text>
         <Icon name="chevronRight" size={16} color={colors.accent} />
       </Pressable> : null}
     </View> : null}
@@ -299,7 +299,7 @@ function Leaderboard({ code, playId }: { code: string; playId: string | null }) 
     ? <ErrorState body={t("quizzes.leaderboardFailed")} actionLabel={t("shell.retry")} onAction={() => void leaderboard.refetch()} />
     : <View style={styles.section}><Skeleton height={180} /></View>;
   if (data.plays.length === 0) return <View style={styles.section}><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("quizzes.noPlays")}</Text></View>;
-  return <ScrollView style={styles.board} contentContainerStyle={styles.boardContent} refreshControl={<RefreshControl refreshing={leaderboard.isRefetching} onRefresh={() => void leaderboard.refetch()} />}>
+  return <ScrollView contentContainerStyle={styles.boardContent} refreshControl={<RefreshControl refreshing={leaderboard.isRefetching} onRefresh={() => void leaderboard.refetch()} />}>
     {data.plays.map((play, i) => {
       const { name, guest } = playerLabel(play, locale);
       const time = playDurationLabel(play.durationMs, locale);
@@ -341,12 +341,11 @@ const styles = StyleSheet.create({
   option: { minHeight: 52, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, justifyContent: "center" },
   complete: { gap: spacing.sm, paddingBottom: spacing.xl },
   section: { paddingTop: spacing.sm },
-  leaderRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: minimumTouchTarget, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth },
-  board: { marginHorizontal: -spacing.sm },
-  boardContent: { paddingTop: spacing.sm, paddingHorizontal: spacing.sm },
-  ownRow: { borderRadius: radii.md, marginHorizontal: -spacing.sm, paddingHorizontal: spacing.sm },
+  leaderRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: minimumTouchTarget, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth },
+  boardContent: { paddingTop: spacing.sm },
+  ownRow: { borderRadius: radii.md },
   avatarRing: { borderWidth: 1, borderRadius: radii.full },
-  justYou: { paddingTop: spacing.md },
+  justYou: { paddingTop: spacing.md, paddingHorizontal: spacing.sm },
   rank: { minWidth: spacing.xl },
   leaderScore: { alignItems: "flex-end" },
   end: { flex: 1, gap: spacing.md },
