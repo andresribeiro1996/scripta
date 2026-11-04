@@ -122,7 +122,7 @@ test("a wrong text answer names the pick on the collapsed row", () => {
 
 test("a quote prompt is curly-quoted, and clamped while it can expand", () => {
   const [quote, , plain] = answerRows(render(detail, [], detailQuestions));
-  assert.match(quote!, /line-clamp-2[^>]*>“A long quote from a book”</);
+  assert.match(quote!, /<span class="(?![^"]*\bblock\b)[^"]*line-clamp-2[^"]*"[^>]*>“A long quote from a book”</);
   assert.match(plain!, /<span class="[^"]*"[^>]*>“A blurb”</);
   assert.doesNotMatch(plain!.slice(0, plain!.indexOf("id=\"quiz-answer-")), /line-clamp-2/);
 });

@@ -42,7 +42,7 @@ function QuizAnswer({ row, question, expanded, onToggle }: { row: ScoreRow; ques
       </span>
       <span className="min-w-0 flex-1">
         {row.answer && <span className="sr-only">{t("quizzes.questionNumberLabel", { number: row.number })}</span>}
-        {prompt && <span className={`mb-1 block text-xs break-words text-(--color-text-dim) ${expands && !expanded ? "line-clamp-2" : ""}`}>{prompt}</span>}
+        {prompt && <span className={`mb-1 text-xs break-words text-(--color-text-dim) ${expands && !expanded ? "line-clamp-2" : "block"}`}>{prompt}</span>}
         <span className="block text-sm break-words">{title}</span>
         <span className={`mt-1 block text-xs break-words ${row.correct ? "text-(--color-success)" : "text-(--color-danger)"}`}><span aria-hidden="true">{row.correct ? "✓" : "✗"} </span>{verdict}</span>
       </span>
@@ -69,7 +69,7 @@ function QuizAnswer({ row, question, expanded, onToggle }: { row: ScoreRow; ques
           {row.pick && <div className="border-l border-(--color-border) pl-3 lg:pl-4"><AnswerValue value={row.pick} picked /></div>}
           {!row.answer && <p className="text-sm text-(--color-text-dim)">{t("quizzes.answerUnavailable")}</p>}
         </div>
-        {row.workId && <Link to={`/work/${row.workId}`} className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-(--color-accent) hover:underline">{t("quizzes.openBook")}</Link>}
+        {row.workId && <Link to={`/work/${row.workId}`} className="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-(--color-accent) hover:underline">{t("quizzes.openBook")}<ChevronRightIcon size={16} /></Link>}
       </div>
     </li>
   );
