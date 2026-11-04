@@ -67,7 +67,7 @@ const results = () => rendered(
 test("quiz results, leaderboard and decimal duration render in Portuguese", () => {
   const html = inPortuguese(results).replaceAll("<!-- -->", "");
   assert.match(html, /aria-label="1 de 2 certas"/);
-  assert.match(html, /As suas respostas/);
+  assert.match(html, />Respostas</);
   assert.match(html, /Resposta certa/);
   assert.match(html, /Desafiar um amigo/);
   assert.match(html, /Convidado/);
