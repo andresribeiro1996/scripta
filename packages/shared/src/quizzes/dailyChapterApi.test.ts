@@ -22,3 +22,9 @@ test("a guest's history and play send no credentials", async () => {
   await api.play("e1", "guest", [], false);
   assert.deepEqual(calls.map((call) => call.auth), ["none", "none"]);
 });
+
+test("reviewing a past chapter requires auth", async () => {
+  const { calls, api } = recorder();
+  await api.review("e1");
+  assert.deepEqual(calls.map((call) => call.auth), ["required"]);
+});

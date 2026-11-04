@@ -1,5 +1,5 @@
 import type { PublicQuizQuestion, SubmittedAnswer } from "./types.js";
-import type { Locale } from "../i18n/locale.js";
+import { intlLocale, type Locale } from "../i18n/locale.js";
 import { decimalText } from "../i18n/numbers.js";
 import { sharedT } from "../i18n/sharedT.js";
 import { recapMonthName } from "../topShelf/api.js";
@@ -88,6 +88,13 @@ export interface DailyChapterThemeStats {
   perfectStreak: number;
 }
 
+export interface DailyChapterPastEdition {
+  id: string;
+  date: string;
+  title: string;
+  themeId: string;
+}
+
 export interface DailyChapterHistory {
   results: DailyChapterResult[];
   startedOn: string | null;
@@ -99,6 +106,33 @@ export interface DailyChapterHistory {
   editionDates: string[];
   themes: DailyChapterThemeStats[];
   today: string;
+  pastEditions?: DailyChapterPastEdition[];
+}
+
+export type DailyChapterDayStatus = "played" | "missed" | "today" | "none";
+
+export interface DailyChapterCalendarDay {
+  date: string;
+  status: DailyChapterDayStatus;
+  score: number | null;
+  editionId: string | null;
+}
+
+export interface DailyChapterRow {
+  date: string;
+  editionId: string;
+  title: string;
+  themeId: string;
+  score: number | null;
+  marks: boolean[] | null;
+}
+
+export interface DailyChapterReview {
+  editionId: string;
+  date: string;
+  title: string;
+  themeId: string;
+  questions: Array<Omit<DailyChapterAnswer, "choiceIndex">>;
 }
 
 export interface DailyChapterDay {
@@ -212,11 +246,80 @@ export function dailyChapterMonth(history: Pick<DailyChapterHistory, "results" |
   const scores = new Map(history.results.map((result) => [result.date, result.score]));
   const { startedOn, today } = history;
   const published = new Set(history.editionDates.filter((date) => startedOn !== null && date >= startedOn && (date !== today || scores.has(date))));
+  return dailyChapterMonthDates(month).map((date) => ({ date, published: published.has(date), score: scores.get(date) ?? null }));
+}
+
+export function dailyChapterMonthDates(month: string): string[] {
   const length = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
-  return Array.from({ length }, (_, index) => {
-    const date = month + "-" + String(index + 1).padStart(2, "0");
-    return { date, published: published.has(date), score: scores.get(date) ?? null };
+  return Array.from({ length }, (_, index) => month + "-" + String(index + 1).padStart(2, "0"));
+}
+
+const shiftDay = (date: string, by: number) => new Date(Date.parse(date + "T00:00:00Z") + by * 86400000).toISOString().slice(0, 10);
+
+export function dailyChapterWeekDates(today: string, weeksBack: number): string[] {
+  const last = shiftDay(today, -7 * weeksBack);
+  return Array.from({ length: 7 }, (_, index) => shiftDay(last, index - 6));
+}
+
+export function dailyChapterShiftMonth(month: string, by: number): string {
+  return new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1 + by, 1)).toISOString().slice(0, 7);
+}
+
+export function dailyChapterPosterMonth(today: string, weeksBack: number): string {
+  return shiftDay(today, -7 * weeksBack).slice(0, 7);
+}
+
+export function dailyChapterDays(history: DailyChapterHistory, dates: readonly string[]): DailyChapterCalendarDay[] {
+  const played = new Map(history.results.map((result) => [result.date, result]));
+  const missed = new Map((history.pastEditions ?? []).map((edition) => [edition.date, edition]));
+  return dates.map((date) => {
+    const result = played.get(date);
+    if (result) return { date, status: "played", score: result.score, editionId: result.editionId };
+    if (date === history.today && history.editionDates.includes(date)) return { date, status: "today", score: null, editionId: null };
+    const edition = missed.get(date);
+    return { date, status: edition ? "missed" : "none", score: null, editionId: edition?.id ?? null };
   });
+}
+
+export function dailyChapterRows(history: DailyChapterHistory, days: readonly DailyChapterCalendarDay[]): DailyChapterRow[] {
+  const played = new Map(history.results.map((result) => [result.date, result]));
+  const missed = new Map((history.pastEditions ?? []).map((edition) => [edition.date, edition]));
+  return days.flatMap((day): DailyChapterRow[] => {
+    const result = played.get(day.date);
+    if (day.status === "played" && result) return [{ date: day.date, editionId: result.editionId, title: result.title, themeId: result.themeId, score: result.score, marks: result.answers.map((answer) => answer.choiceIndex === answer.answerIndex) }];
+    const edition = missed.get(day.date);
+    if (day.status === "missed" && edition) return [{ date: day.date, editionId: edition.id, title: edition.title, themeId: edition.themeId, score: null, marks: null }];
+    return [];
+  }).sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export function dailyChapterHasEarlierWeek(history: DailyChapterHistory, weeksBack: number): boolean {
+  const first = history.editionDates.at(-1);
+  return first !== undefined && dailyChapterWeekDates(history.today, weeksBack)[0]! > first;
+}
+
+export function dailyChapterHasEarlierMonth(history: DailyChapterHistory, month: string): boolean {
+  const first = history.editionDates.at(-1);
+  return first !== undefined && month > first.slice(0, 7);
+}
+
+export function dailyChapterHasLaterMonth(history: DailyChapterHistory, month: string): boolean {
+  return month < history.today.slice(0, 7);
+}
+
+export function dailyChapterCanPlayToday(history: DailyChapterHistory): boolean {
+  return history.editionDates.includes(history.today) && !history.results.some((result) => result.date === history.today);
+}
+
+const utcDate = (date: string, locale: Locale, options: Intl.DateTimeFormatOptions) => new Date(date + "T00:00:00Z").toLocaleDateString(intlLocale(locale), { ...options, timeZone: "UTC" });
+
+export function dailyChapterDayLabel(date: string, locale: Locale): string {
+  return utcDate(date, locale, { weekday: "short", month: "short", day: "numeric" });
+}
+
+export function dailyChapterRangeLabel(first: string, last: string, locale: Locale): string {
+  const options = { month: "short", day: "numeric" } as const;
+  return utcDate(first, locale, options) + " – " + utcDate(last, locale, options);
 }
 
 export function dailyChapterThemeRates(themes: Array<Pick<DailyChapterThemeStats, "themeId" | "correct" | "answered">>): Array<{ themeId: string; percent: number }> {

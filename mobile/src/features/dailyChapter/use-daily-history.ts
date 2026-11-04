@@ -1,6 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useEffect } from "react";
+import { AppState } from "react-native";
 import { randomUUID } from "expo-crypto";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DAILY_CHAPTER_GUEST_STORAGE, isDailyChapterGuestId } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { dailyChapterApi } from "./api";
@@ -20,5 +22,12 @@ export function useDeviceIdentity() {
 export function useDailyHistory() {
   const { user } = useAuth();
   const guestId = useDeviceIdentity().data;
+  const client = useQueryClient();
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void client.invalidateQueries({ queryKey: ["daily-chapter", "history"] });
+    });
+    return () => subscription.remove();
+  }, [client]);
   return useQuery({ queryKey: ["daily-chapter", "history", user?.id, guestId], queryFn: () => dailyChapterApi.history(guestId!, true), enabled: Boolean(user && guestId) });
 }

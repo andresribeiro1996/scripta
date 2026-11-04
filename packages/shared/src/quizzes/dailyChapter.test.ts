@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { dailyThemeName } from "./dailyThemes.js";
-import { dailyChapterCoverage, dailyChapterMonth, dailyChapterMonthShare, dailyChapterMonthStats, dailyChapterShare, dailyChapterStats, dailyChapterSubmission, dailyChapterSummary, dailyChapterThemeRates, readDailyChapterDraft, type DailyChapterBook, type DailyChapterQuestion, type DailyChapterResult } from "./dailyChapter.js";
+import { dailyChapterCanPlayToday, dailyChapterCoverage, dailyChapterDayLabel, dailyChapterDays, dailyChapterHasEarlierMonth, dailyChapterHasEarlierWeek, dailyChapterHasLaterMonth, dailyChapterMonth, dailyChapterMonthDates, dailyChapterMonthShare, dailyChapterMonthStats, dailyChapterPosterMonth, dailyChapterRangeLabel, dailyChapterRows, dailyChapterShare, dailyChapterShiftMonth, dailyChapterStats, dailyChapterSubmission, dailyChapterSummary, dailyChapterThemeRates, readDailyChapterDraft, type DailyChapterBook, type DailyChapterHistory, type DailyChapterQuestion, type DailyChapterResult, dailyChapterWeekDates } from "./dailyChapter.js";
+
+process.env.TZ = "America/Sao_Paulo";
 
 const book: DailyChapterBook = { id: "book-1", title: "A Book", author: "A Writer", language: "en", themeIds: ["retold-myths"] };
 const question: DailyChapterQuestion = { id: "q1", bookId: book.id, type: "quote_title", prompt: "A passage", options: ["A Book", "Two", "Three", "Four"], answerIndex: 0, explanation: "An explanation", sourceUrl: "https://example.org/book", sourceEdition: "First edition", rights: { basis: "public-domain", evidence: "Reviewed evidence" }, approvedAt: "2030-01-01", approvedBy: "editor" };
 const result = (id: string, date: string, score = 5): DailyChapterResult => ({ editionId: id, date, title: "Old myths, new voices", themeId: "retold-myths", score, completedAt: date + "T12:00:00Z", answers: [{ questionId: "q1", prompt: "Secret passage", choiceIndex: 0, answerIndex: 0, options: ["A Book", "Two", "Three", "Four"], explanation: "Secret explanation", sourceUrl: "https://example.org/book", book }] });
+const releases = ["01", "03", "05", "07"].map((day) => ({ id: "e" + day, date: "2030-01-" + day, themeId: "retold-myths" }));
+const withPast = (stats: DailyChapterHistory, ids: string[]) => ({ ...stats, pastEditions: ids.map((id) => ({ id, date: "2030-01-" + id.slice(1), title: "Title " + id, themeId: "retold-myths" })) });
 
 test("quote coverage counts books once, excludes clues and drafts, and separates unused stock", () => {
   const second = { ...book, id: "book-2" };
@@ -131,4 +135,82 @@ test("the share text is Portuguese for a Portuguese reader", () => {
   assert.equal(dailyChapterShare(result("e01", "2030-01-01"), "https://example.org/daily", "pt-PT"), "O Capítulo do Dia · 2030-01-01\nOld myths, new voices\n🟩 5/5\nhttps://example.org/daily");
   assert.equal(dailyThemeName("retold-myths", "pt-PT"), "Mitos recontados");
   assert.equal(dailyThemeName("unknown", "pt-PT"), "unknown");
+});
+
+test("calendar days separate played, missed, today and days with no chapter", () => {
+  const history = withPast(dailyChapterStats([result("e03", "2030-01-03", 4)], releases, "2030-01-07"), ["e01", "e03", "e05"]);
+  const days = dailyChapterDays(history, dailyChapterWeekDates("2030-01-07", 0));
+  assert.deepEqual(days.map((day) => day.status), ["missed", "none", "played", "none", "missed", "none", "today"]);
+  assert.deepEqual(days[2], { date: "2030-01-03", status: "played", score: 4, editionId: "e03" });
+  assert.deepEqual(days[0], { date: "2030-01-01", status: "missed", score: null, editionId: "e01" });
+  assert.deepEqual(days[6], { date: "2030-01-07", status: "today", score: null, editionId: null });
+});
+
+test("someone who has never played sees every past chapter as missed", () => {
+  const history = withPast(dailyChapterStats([], releases, "2030-01-07"), ["e01", "e03", "e05"]);
+  assert.deepEqual(dailyChapterDays(history, ["2030-01-01", "2030-01-03", "2030-01-05"]).map((day) => day.status), ["missed", "missed", "missed"]);
+  assert.equal(dailyChapterCanPlayToday(history), true);
+});
+
+test("a played today is an ordinary played day and hides the play button", () => {
+  const history = withPast(dailyChapterStats([result("e07", "2030-01-07", 5)], releases, "2030-01-07"), ["e01", "e03", "e05"]);
+  assert.equal(dailyChapterDays(history, ["2030-01-07"])[0]!.status, "played");
+  assert.equal(dailyChapterCanPlayToday(history), false);
+});
+
+test("no chapter today is a plain day with no play button", () => {
+  const history = withPast(dailyChapterStats([], releases, "2030-01-08"), ["e01", "e03", "e05", "e07"]);
+  assert.equal(dailyChapterDays(history, ["2030-01-08"])[0]!.status, "none");
+  assert.equal(dailyChapterCanPlayToday(history), false);
+});
+
+test("rows are the period's played and missed chapters, newest first, without today", () => {
+  const history = withPast(dailyChapterStats([result("e03", "2030-01-03", 4)], releases, "2030-01-07"), ["e01", "e03", "e05"]);
+  const rows = dailyChapterRows(history, dailyChapterDays(history, dailyChapterWeekDates("2030-01-07", 0)));
+  assert.deepEqual(rows.map((row) => [row.editionId, row.score]), [["e05", null], ["e03", 4], ["e01", null]]);
+  assert.equal(rows[0]!.title, "Title e05");
+  assert.equal(rows[0]!.marks, null);
+  assert.deepEqual(rows[1]!.marks, [true]);
+});
+
+test("a week crosses a year boundary and steps back seven days", () => {
+  assert.deepEqual(dailyChapterWeekDates("2030-01-03", 0), ["2029-12-28", "2029-12-29", "2029-12-30", "2029-12-31", "2030-01-01", "2030-01-02", "2030-01-03"]);
+  assert.equal(dailyChapterWeekDates("2030-01-03", 1)[6], "2029-12-27");
+  assert.equal(dailyChapterMonthDates("2030-02").length, 28);
+});
+
+test("the earlier arrows stop at the window holding the first chapter", () => {
+  const history = withPast(dailyChapterStats([], [{ id: "e05", date: "2030-01-05", themeId: "retold-myths" }], "2030-01-20"), ["e05"]);
+  assert.equal(dailyChapterHasEarlierWeek(history, 1), true);
+  assert.equal(dailyChapterHasEarlierWeek(history, 2), false);
+  assert.equal(dailyChapterHasEarlierMonth(history, "2030-02"), true);
+  assert.equal(dailyChapterHasEarlierMonth(history, "2030-01"), false);
+});
+
+test("labels name the UTC day on a device west of UTC", () => {
+  assert.match(dailyChapterDayLabel("2026-11-02", "en"), /\b2\b/);
+  assert.doesNotMatch(dailyChapterDayLabel("2026-11-02", "en"), /\b1\b/);
+  assert.match(dailyChapterRangeLabel("2026-10-28", "2026-11-03", "en"), /28.* – .*3/);
+});
+
+test("a new app on an older backend draws no missed days and doesn't throw", () => {
+  const history = dailyChapterStats([result("e03", "2030-01-03", 4)], releases, "2030-01-07");
+  assert.deepEqual(dailyChapterDays(history, ["2030-01-01", "2030-01-03"]).map((day) => day.status), ["none", "played"]);
+  assert.deepEqual(dailyChapterRows(history, dailyChapterDays(history, ["2030-01-01"])), []);
+});
+
+test("arrows don't throw with no chapters at all", () => {
+  const history = dailyChapterStats([], [], "2030-01-07");
+  assert.equal(dailyChapterHasEarlierWeek(history, 0), false);
+  assert.equal(dailyChapterHasEarlierMonth(history, "2030-01"), false);
+  assert.equal(dailyChapterCanPlayToday(history), false);
+});
+
+test("months shift across a year, the later arrow stops now, and the poster takes the week's last day", () => {
+  assert.equal(dailyChapterShiftMonth("2030-01", -1), "2029-12");
+  const history = dailyChapterStats([], [], "2030-01-20");
+  assert.equal(dailyChapterHasLaterMonth(history, "2029-12"), true);
+  assert.equal(dailyChapterHasLaterMonth(history, "2030-01"), false);
+  assert.equal(dailyChapterPosterMonth("2030-02-03", 0), "2030-02");
+  assert.equal(dailyChapterPosterMonth("2030-02-03", 1), "2030-01");
 });
