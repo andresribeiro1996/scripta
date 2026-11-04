@@ -1,13 +1,13 @@
 // /play/:code — the page a challenge link recipient lands on (see
 // App.tsx: OUTSIDE every RequireAuth wrapper, same treatment as
-// /vote/:code). One question at a time, timer running from first render,
-// submit grades server-side and locks the play. The end screen shows the
-// score, the per-question verdicts, the leaderboard, and the same link
-// back — that loop is the challenge.
+// /vote/:code). One question at a time, with the timer running from the
+// first question to the last answer. Submit grades server-side and locks
+// the play. The end screen shows the score, the per-question verdicts,
+// the leaderboard, and the same link back — that loop is the challenge.
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import type { PublicQuizQuestion } from "@scripta/shared";
+import { createPlayClock, type PublicQuizQuestion } from "@scripta/shared";
 import { useAuth } from "../auth/AuthContext";
 import { CoverImage } from "../components/BookCard";
 import { Page } from "../components/page/Page";
@@ -82,13 +82,21 @@ export function PlayQuizPage() {
   const [submitted, setSubmitted] = useState<PlayResponse | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const startRef = useRef(Date.now());
+  const clock = useRef(createPlayClock()).current;
   const [elapsed, setElapsed] = useState(0);
+  const complete = Boolean(board.data) && Object.keys(answers).length === board.data!.questions.length;
+  const completeRef = useRef(complete);
+  completeRef.current = complete;
+  const playing = quizPlayStage({ playOpen: board.data?.playOpen ?? false, hasResult: Boolean(submitted ?? ownPlay.data), ownPlayPending: ownPlay.isLoading }) === "playing";
 
   useEffect(() => {
-    const timer = window.setInterval(() => setElapsed(Date.now() - startRef.current), 1000);
+    if (playing) clock.start(Date.now());
+  }, [playing, clock]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setElapsed(clock.elapsed(Date.now(), completeRef.current)), 1000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [clock]);
 
   if (board.isPending) return <InfoScreen message={t("library.loadingEllipsis")} back={back} />;
   if (board.isError) return <InfoScreen message={board.error instanceof Error ? board.error.message : t("quizzes.noQuizAtLink")} back={back} />;
@@ -103,7 +111,7 @@ export function PlayQuizPage() {
       <Page width="narrow" back={back} title={playBoard.name}>
         <div className="flex flex-col gap-6">
           <p className="text-center text-(--color-text-dim)">{t("quizzes.isClosed")}</p>
-          <QuizLeaderboard code={code ?? ""} />
+          <QuizLeaderboard code={code ?? ""} playId={null} />
         </div>
       </Page>
     );
@@ -117,6 +125,7 @@ export function PlayQuizPage() {
   if (!question) return <InfoScreen message={t("quizzes.noQuestionsYet")} back={back} />;
 
   function pick(choiceIndex: number) {
+    clock.answered(Date.now());
     setPicked(choiceIndex);
     setAnswers((value) => ({ ...value, [question!.id]: choiceIndex }));
     window.setTimeout(() => {
@@ -132,7 +141,7 @@ export function PlayQuizPage() {
     try {
       const response = await submitPlayApi(code ?? "", {
         answers: questions.map((q) => ({ questionId: q.id, choiceIndex: answers[q.id] ?? 0 })),
-        durationMs: Date.now() - startRef.current,
+        durationMs: clock.durationMs(Date.now()),
         ...(playerName.trim() ? { playerName: playerName.trim() } : {})
       });
       storePlayId(code ?? "", response.playId);
@@ -158,16 +167,18 @@ export function PlayQuizPage() {
 
         {index === questions.length - 1 && answeredCount === questions.length && (
           <div className="flex flex-col gap-3">
-            <label className="flex flex-col gap-1 text-sm font-semibold">
-              {t("quizzes.leaderboardName")}
-              <input
-                value={playerName}
-                onChange={(event) => setPlayerName(event.target.value)}
-                maxLength={40}
-                placeholder={t("quizzes.guest")}
-                className={FIELD_CLASS}
-              />
-            </label>
+            {!session?.user.username && (
+              <label className="flex flex-col gap-1 text-sm font-semibold">
+                {t("quizzes.leaderboardName")}
+                <input
+                  value={playerName}
+                  onChange={(event) => setPlayerName(event.target.value)}
+                  maxLength={40}
+                  placeholder={t("quizzes.guest")}
+                  className={FIELD_CLASS}
+                />
+              </label>
+            )}
             {submitError && <p role="alert" className="text-sm text-(--color-danger)">{submitError}</p>}
             <button
               type="button"

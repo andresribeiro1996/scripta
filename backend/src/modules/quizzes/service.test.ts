@@ -504,7 +504,7 @@ test("participation shows up to three of the quiz's book covers", () => {
 
 function namedPlaysFixture(names: Map<string, string>) {
   const repo = createInMemoryRepo();
-  const service = createQuizzesService(repo, fakeWorks(), undefined, undefined, (userIds) => new Map(userIds.flatMap((id) => (names.has(id) ? [[id, names.get(id)!] as [string, string]] : []))));
+  const service = createQuizzesService(repo, fakeWorks(), undefined, undefined, (userIds) => new Map(userIds.flatMap((id) => (names.has(id) ? [[id, { username: names.get(id)!, avatarUrl: "/a.jpg" }] as const] : []))));
   const made = created(service.createQuiz("u1", "My quiz", {
     sourceLabel: "Shelf",
     questionCount: 3,
@@ -525,16 +525,16 @@ test("results name a signed-in player by their current username, fall back to th
   service.submitPlay(code, answers, 3000, "Typed", { kind: "user", userId: "typed-id" });
   service.submitPlay(code, answers, 4000, "Gus", { kind: "anonymous", playId: null });
   service.submitPlay(code, answers, 5000, null, { kind: "anonymous", playId: null });
-  const shown = (plays: Array<{ playerName: string | null; anonymous: boolean }>) => plays.map((p) => ({ playerName: p.playerName, anonymous: p.anonymous }));
+  const shown = (plays: Array<{ playerName: string | null; anonymous: boolean; avatarUrl: string | null }>) => plays.map((p) => ({ playerName: p.playerName, anonymous: p.anonymous, avatarUrl: p.avatarUrl }));
   const expected = [
-    { playerName: "alice", anonymous: false },
-    { playerName: "Reader", anonymous: false },
-    { playerName: "Typed", anonymous: false },
-    { playerName: "Gus", anonymous: true },
-    { playerName: null, anonymous: true }
+    { playerName: "alice", anonymous: false, avatarUrl: "/a.jpg" },
+    { playerName: "Reader", anonymous: false, avatarUrl: null },
+    { playerName: "Typed", anonymous: false, avatarUrl: null },
+    { playerName: "Gus", anonymous: true, avatarUrl: null },
+    { playerName: null, anonymous: true, avatarUrl: null }
   ];
   assert.deepEqual(shown(service.getResults("u1", quizId)!.plays), expected);
-  const publicPlays = service.getPublicResults(code)!.plays;
+  const publicPlays = service.getPublicResults(code, { kind: "anonymous", playId: null })!.plays;
   assert.deepEqual(shown(publicPlays), expected);
   for (const play of publicPlays) assert.equal("playId" in play, false);
   names.set("alice-id", "alice2");
@@ -553,8 +553,8 @@ test("a signed-in player's typed name is not shown when the resolver has a usern
 
 test("submitPlay and getPlay return the player's pick and the correct index per question, for users and guests", () => {
   const { service, code, quizId, answers } = namedPlaysFixture(new Map());
-  const stored = (service.getQuiz("u1", quizId)!.data as { questions: Array<{ id: string; answerIndex: number }> }).questions;
-  const expected = Object.fromEntries(stored.map((q) => [q.id, { choiceIndex: 0, answerIndex: q.answerIndex }]));
+  const stored = (service.getQuiz("u1", quizId)!.data as { questions: Array<{ id: string; answerIndex: number; workId: string | null }> }).questions;
+  const expected = Object.fromEntries(stored.map((q) => [q.id, { choiceIndex: 0, answerIndex: q.answerIndex, workId: q.workId }]));
   const user = service.submitPlay(code, answers, 1000, null, { kind: "user", userId: "u9" });
   assert.ok(user.ok);
   assert.deepEqual(user.ok && user.answers, expected);

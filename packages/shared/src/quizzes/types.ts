@@ -85,6 +85,7 @@ export interface ResultPlay {
   playId: string;
   playerName: string | null;
   anonymous: boolean;
+  avatarUrl: string | null;
   score: number;
   durationMs: number;
   createdAt: string;
@@ -113,10 +114,10 @@ export interface PlayResponse {
   playId: string;
   score: number;
   correct: Record<string, boolean>;
-  answers?: Record<string, { choiceIndex: number; answerIndex: number }>;
+  answers?: Record<string, { choiceIndex: number; answerIndex: number; workId: string | null }>;
 }
 
-export type PublicResultPlay = Omit<ResultPlay, "playId">;
+export type PublicResultPlay = Omit<ResultPlay, "playId"> & { isYou: boolean };
 
 export interface PlaySubmission {
   answers: Array<{ questionId: string; choiceIndex: number }>;

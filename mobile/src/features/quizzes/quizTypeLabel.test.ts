@@ -18,7 +18,7 @@ test("quiz messages follow the pick", () => {
   setLocalePreference("pt-PT");
   try {
     assert.equal(t("quizzes.questionOf", { number: 2, total: 5 }), "Pergunta 2 de 5");
-    assert.equal(t("quizzes.durationSeconds", { seconds: "12,3" }), "12,3 s");
+    assert.equal(t("quizzes.rankOf", { rank: 3, total: 6 }), "3.º de 6 jogadores");
   } finally {
     setLocalePreference("auto");
   }
