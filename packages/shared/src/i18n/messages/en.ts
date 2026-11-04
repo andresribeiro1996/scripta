@@ -180,6 +180,7 @@ export const en = {
   "shared.labels.questionWithBook": "Q{number} · {title}",
   "shared.labels.unknownBook": "Unknown book",
   "shared.labels.guest": "Guest",
+  "shared.labels.seconds": "{value}s",
   "shared.labels.clueCharacters": "Which book has these characters?",
   "shared.labels.clueCover": "Which cover belongs to this title?",
   "shared.labels.clueBook": "Which book is this from?",

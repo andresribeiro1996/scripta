@@ -6,7 +6,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { QUIZ_QUESTION_TYPES, decimalText, eligibleTypes, playerLabel, quizOptionLabel, quizQuestionLabel, type QuizData } from "@scripta/shared";
+import { QUIZ_QUESTION_TYPES, eligibleTypes, playDurationLabel, playerLabel, quizOptionLabel, quizQuestionLabel, type QuizData } from "@scripta/shared";
 import { Page } from "../components/page/Page";
 import { BUTTON_DANGER_OUTLINE, BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
 import { ShareLinkRow } from "../components/ShareLinkRow";
@@ -298,7 +298,7 @@ function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; 
                   {playerLabel(play, locale).guest && <span className="ml-2 text-xs text-(--color-text-dim)">{t("quizzes.guestLower")}</span>}
                 </td>
                 <td className="py-1.5 pr-3">{play.score}/{results.data!.questionCount}</td>
-                <td className="py-1.5">{t("quizzes.seconds", { value: decimalText(play.durationMs / 1000, locale, 1) })}</td>
+                <td className="py-1.5">{playDurationLabel(play.durationMs, locale)}</td>
               </tr>
             ))}
           </tbody>
