@@ -18,7 +18,7 @@ import { ProfileCardBackdrop, ProfileCardHero, ProfileCardSkeleton, ProfileHeroI
 import { useOwnCardStyle, useReaderCardStyle } from "../readerCard/useReaderCardStyle";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import { fetchTierlists, type Tierlist } from "../tierlists/api";
-import { DailyChapterProfileSection } from "../dailyChapter/daily-chapter-profile-section";
+import { DailyChapterProfileSection, OwnDailyChapterFooter } from "../dailyChapter/daily-chapter-profile-section";
 import { useActivitySection } from "./ActivityList";
 import { FeedSettingsDialog } from "./FeedSettingsDialog";
 import { ProfileScroller, elementSection, transparentHeader, usePlainHeader, type ProfileSection } from "./ProfileScroller";
@@ -336,6 +336,7 @@ export function MyShelfScreen() {
           setSwitchingMural(false);
         })}
       />
+      {tab === "daily" ? <OwnDailyChapterFooter /> : null}
       <Dialog visible={confirmingPublish} title={t("community.publishShelfTitle")} onClose={() => setConfirmingPublish(false)}>
         <View style={styles.dialogGap}>
           <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>

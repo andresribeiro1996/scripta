@@ -406,13 +406,14 @@ function withPeople() {
   const repo = createSqliteDailyChapterRepository(db);
   const plays = createSqliteQuizzesRepository(db);
   const profiles = new Map([["reader", { username: "Reader", avatarUrl: null }], ["pub", { username: "Pub", avatarUrl: null }]]);
-  const people = { followees: (id: string) => id === "reader" ? ["pub", "priv", "nameless"] : [], published: (ids: string[]) => new Set(ids.filter((id) => id === "pub" || id === "nameless")), profiles: (ids: string[]) => new Map(ids.flatMap((id) => profiles.has(id) ? [[id, profiles.get(id)!] as const] : [])) };
-  const service = createDailyChapterService(repo, plays, () => new Date("2030-01-01T12:00:00.000Z"), people);
+  const people = { followees: (id: string) => id === "reader" ? ["pub", "priv", "nameless"] : id === "watcher" ? ["pub"] : [], published: (ids: string[]) => new Set(ids.filter((id) => id === "pub" || id === "nameless")), profiles: (ids: string[]) => new Map(ids.flatMap((id) => profiles.has(id) ? [[id, profiles.get(id)!] as const] : [])) };
+  let now = new Date("2030-01-01T12:00:00.000Z");
+  const service = createDailyChapterService(repo, plays, () => now, people);
   const answers = seed(service);
   service.publish("edition-1");
   const wrong = (count: number) => answers.map((answer, index) => ({ ...answer, choiceIndex: index < count ? 0 : 1 }));
   for (const [id, correct] of [["reader", 5], ["pub", 3], ["priv", 4], ["nameless", 2], [dailyGuestKey("guest"), 1]] as const) service.play("edition-1", id, wrong(correct));
-  return { db, service };
+  return { db, service, on: (date: string) => { now = new Date(date); } };
 }
 
 test("people for an edition are the viewer and published followees, squares only", () => {
@@ -425,9 +426,17 @@ test("people for an edition are the viewer and published followees, squares only
 });
 
 test("people stay hidden until the viewer has played that edition", () => {
-  const { service } = withPeople();
+  const { service, on } = withPeople();
+  on("2030-01-01T12:00:00.000Z");
   assert.throws(() => service.people("edition-1", "pub-viewer-without-play"), (error: InstanceType<typeof DailyChapterError>) => error.status === 403);
   assert.throws(() => service.people("missing", "reader"), (error: InstanceType<typeof DailyChapterError>) => error.status === 404);
+});
+
+test("people need a play only while the chapter is open", () => {
+  const { service, on } = withPeople();
+  assert.throws(() => service.people("edition-1", "watcher"), (error: InstanceType<typeof DailyChapterError>) => error.status === 403);
+  on("2030-01-02T00:00:00.000Z");
+  assert.deepEqual(service.people("edition-1", "watcher").map((person) => [person.userId, person.you]), [["pub", false]]);
 });
 
 test("a player summary is visible to its owner and to everyone only when published", () => {
@@ -529,10 +538,62 @@ test("player-facing daily errors follow the request language and editor errors s
   assert.deepEqual(closed.body, { error: "Esta edição diária já fechou. Volte para o capítulo de hoje." });
   assert.deepEqual((await play()).body, { error: "This daily edition has closed. Come back for today's chapter." });
   assert.deepEqual((await play("pt-PT", "missing")).body, { error: "Não existe nenhuma edição diária nessa ligação." });
+  on("2030-01-13T12:00:00Z");
   const people = await call(service, { method: "GET", url: "/daily-chapter/edition-13/people", headers: { "accept-language": "pt-PT" } }, "reader");
   assert.deepEqual(people.body, { error: "Jogue este capítulo para ver como se saíram os outros." });
-  on("2030-01-13T12:00:00Z");
   assert.deepEqual((await play("pt-PT", "edition-13", { answers: answers.slice(1) })).body, { error: "Pedido inválido." });
   const admin = await call(service, { method: "GET", url: "/daily-chapter/admin", headers: { "accept-language": "pt-PT" } }, "reader");
   assert.deepEqual(admin.body, { error: "Only the editor can manage daily editions." });
+});
+
+function withReview() {
+  const { service, on } = setup();
+  on("2029-12-31T12:00:00.000Z");
+  seed(service, "unpub-01", "2029-12-31");
+  on("2030-01-01T12:00:00.000Z");
+  seed(service, "on-01", "2030-01-01");
+  service.publish("on-01");
+  on("2030-01-02T12:00:00.000Z");
+  seed(service, "today-02", "2030-01-02");
+  service.publish("today-02");
+  seed(service, "future-03", "2030-01-03");
+  service.publish("future-03");
+  return { service, on };
+}
+
+test("history lists closed published chapters only", () => {
+  const { service } = withReview();
+  assert.deepEqual(service.history("reader").pastEditions.map((edition) => edition.id), ["on-01"]);
+  assert.deepEqual(Object.keys(service.history("reader").pastEditions[0]!).sort(), ["date", "id", "themeId", "title"]);
+});
+
+test("review answers only for a closed published chapter", async () => {
+  const { service } = withReview();
+  assert.equal((await call(service, { method: "GET", url: "/daily-chapter/on-01/review" })).status, 401);
+  const open = await call(service, { method: "GET", url: "/daily-chapter/on-01/review" }, "reader");
+  assert.equal(open.status, 200);
+  assert.equal(open.headers["cache-control"], "no-store");
+  assert.equal(open.body.questions.length, 5);
+  assert.equal(open.body.questions[0].answerIndex, 0);
+  assert.deepEqual(Object.keys(open.body).sort(), ["date", "editionId", "questions", "themeId", "title"]);
+  assert.deepEqual(Object.keys(open.body.questions[0]).sort(), ["answerIndex", "book", "explanation", "options", "prompt", "questionId", "sourceUrl"]);
+  assert.equal((await call(service, { method: "GET", url: "/daily-chapter/today-02/review" }, "reader")).status, 403);
+  assert.equal((await call(service, { method: "GET", url: "/daily-chapter/future-03/review" }, "reader")).status, 404);
+  assert.equal((await call(service, { method: "GET", url: "/daily-chapter/unpub-01/review" }, "reader")).status, 404);
+  assert.equal((await call(service, { method: "GET", url: "/daily-chapter/missing/review" }, "reader")).status, 404);
+});
+
+test("a chapter becomes reviewable when its day closes", async () => {
+  const { service, on } = withReview();
+  on("2030-01-02T23:59:59.000Z");
+  assert.equal((await call(service, { method: "GET", url: "/daily-chapter/today-02/review" }, "reader")).status, 403);
+  on("2030-01-03T00:00:00.000Z");
+  assert.equal((await call(service, { method: "GET", url: "/daily-chapter/today-02/review" }, "reader")).status, 200);
+});
+
+test("reading a missed chapter changes nothing in the player's history", () => {
+  const { service } = withReview();
+  const before = service.history("reader");
+  service.review("on-01");
+  assert.deepEqual(service.history("reader"), before);
 });
