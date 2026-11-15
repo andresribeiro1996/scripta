@@ -10,7 +10,6 @@ import { FeedRow, useActivityFeed, useDashboardFeed, useSkipEmptyPages } from ".
 import { digestRoute } from "./feedRowModel";
 import { CommentsSheet } from "./CommentsSheet";
 import { SavedContentSheet } from "./SavedContentSheet";
-import { useDailyHistory } from "../dailyChapter/use-daily-history";
 import { RecapHomeCard } from "../topShelf/RecapHomeCard";
 import { AwardHomeCard, RECENT_AWARDS_QUERY_KEY } from "../awards/AwardHomeCard";
 import { ENGAGEMENT_QUERY_KEY, SAVED_STATE_QUERY_KEY, useHomeActions } from "./useHomeActions";
@@ -31,7 +30,6 @@ export function HomeScreen() {
   const items = dashboard.data?.pages.flatMap((page) => page.items) ?? [];
   const actions = useHomeActions(items);
   const activity = useActivityFeed();
-  const hasChapters = Boolean(useDailyHistory().data?.results.length);
   const activityBadge = newCountLabel(activity.data?.pages[0]?.personalNewCount ?? 0);
   const sections = [{ title: t("community.yourReadingCircle"), data: items }];
   useSkipEmptyPages(dashboard, items.length);
@@ -56,7 +54,7 @@ export function HomeScreen() {
   const empty = dashboard.isPending || (dashboard.hasNextPage && !dashboard.isError && !items.length) ? <Skeleton height={80} /> : dashboard.isError && !dashboard.data ? <ErrorState body={t("community.activityLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void dashboard.refetch()} /> : dashboard.hasNextPage ? null : <EmptyState title={t("community.circleStartsTitle")} body={t("community.circleStartsBody")} secondaryActionLabel={t("community.findPeople")} onSecondaryAction={findReaders} />;
   const noLibrary = actions.library.data === null || actions.library.data?.data.books.length === 0;
   return <Screen top={false}>
-    <Stack.Screen options={{ title: t("shell.tabHome"), headerShown: true, headerLeft: () => <View style={styles.mark}><BrandMark size={24} /></View>, headerRight: () => <HeaderActions>{hasChapters ? <IconButton name="stats" accessibilityLabel={t("community.openDailyStats")} onPress={() => router.push("/daily-chapters" as never)} /> : null}<IconButton name="bell" accessibilityLabel={t("community.openActivity")} badge={activityBadge} onPress={() => router.push("/activity" as never)} /><IconButton name="bookmark" accessibilityLabel={t("community.openSaved")} onPress={() => setSavedOpen(true)} /></HeaderActions> }} />
+    <Stack.Screen options={{ title: t("shell.tabHome"), headerShown: true, headerLeft: () => <View style={styles.mark}><BrandMark size={24} /></View>, headerRight: () => <HeaderActions><IconButton name="bell" accessibilityLabel={t("community.openActivity")} badge={activityBadge} onPress={() => router.push("/activity" as never)} /><IconButton name="bookmark" accessibilityLabel={t("community.openSaved")} onPress={() => setSavedOpen(true)} /></HeaderActions> }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     <SectionList sections={sections} keyExtractor={(item) => `${item.kind}:${item.id}`} stickySectionHeadersEnabled={false} maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 10 }} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.list}
       ListHeaderComponent={<>

@@ -10,7 +10,6 @@ export const community: CatalogOf<typeof en> = {
   "community.circleStartsTitle": "O seu círculo começa aqui",
   "community.circleStartsBody": "Siga leitores para ver os livros, os jogos e os murais que partilham.",
   "community.startLibraryBody": "Traga os seus livros para o seu mundo de leitura.",
-  "community.openDailyStats": "Abrir as estatísticas do Capítulo do Dia",
   "community.openActivity": "Abrir atividade",
   "community.openSaved": "Abrir jogos e murais guardados",
   "community.activity": "Atividade",

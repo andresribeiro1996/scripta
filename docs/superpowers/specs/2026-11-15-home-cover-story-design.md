@@ -18,7 +18,7 @@ The user chose the "Cover story" Home concept (pack: `~/.codex/visualizations/20
 
 Taking any of these into the build counts as a failure:
 
-- **Losing anything Home has today.** The header stays: the brand mark, plus Daily Chapter stats (when you have chapters), the activity bell with its badge, and saved. So do the `RecapHomeCard`, the `AwardHomeCard`, the no-library onboarding, and the full reading-circle feed with likes, comments, paging, pull to refresh, and its empty and error states.
+- **Losing anything Home has today.** The header stays: the brand mark, the activity bell with its badge, and saved. (The Daily Chapter stats icon was removed with the user on 2026-11-15: the card reaches the same screen through `/daily`.) So do the `RecapHomeCard`, the `AwardHomeCard`, the no-library onboarding, and the full reading-circle feed with likes, comments, paging, pull to refresh, and its empty and error states.
 - **The concept's search and avatar header buttons.** Both duplicate tabs.
 - **The concept's fixture content:** the "No. 04" issue number, "Today's plot.", "By Atmyshelf", invented headlines, and engagement numbers.
 - **The ↗ arrow glyph.** Everything opens in the app, so rows use ›.
@@ -57,7 +57,7 @@ Taking any of these into the build counts as a failure:
 Top to bottom in `ListHeaderComponent`, then the existing feed:
 
 ```
-[header: brand mark          stats  bell  saved]   unchanged
+[header: brand mark                 bell  saved]   stats icon removed
 ┌ Daily Chapter ─────────────────────────────┐
 │ THE DAILY CHAPTER                     [art]│
 │ <board.title, display face, large>         │

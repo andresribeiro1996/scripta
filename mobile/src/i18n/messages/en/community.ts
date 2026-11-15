@@ -9,7 +9,6 @@ export const community = {
   "community.circleStartsTitle": "Your circle starts here",
   "community.circleStartsBody": "Follow readers to see their books, games and murals.",
   "community.startLibraryBody": "Bring your books into your reading world.",
-  "community.openDailyStats": "Open your Daily Chapter stats",
   "community.openActivity": "Open activity",
   "community.openSaved": "Open saved games and murals",
   "community.activity": "Activity",
