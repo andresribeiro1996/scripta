@@ -1,19 +1,21 @@
-import { Pressable, StyleSheet, View } from "react-native";
+import { Keyboard, Pressable, StyleSheet, View } from "react-native";
 import { router, useSegments } from "expo-router";
 import { bookKey, searchResultByline, seriesLabel, type BookSearchResult, type LibraryBook } from "@scripta/shared";
 import { Text } from "../../ui/Text";
-import { Button, ErrorState, IconButton, Skeleton, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, EmptyState, ErrorState, IconButton, Skeleton, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
 import { DiscoverRow, StatusBadge } from "../community/DiscoverRow";
 import { PersonRow } from "../community/PersonRow";
 import type { useFollowToggle } from "../community/useFollowToggle";
 import { CoverImage } from "../library/components/CoverImage";
 import { workPath } from "../works/workPath";
-import { SCOPE_OF, SECTION_ERRORS, SECTION_TITLES, libraryStatus, type ResultSection, type SearchRow, type SearchScope } from "./searchModel";
+import { SCOPE_OF, SECTION_ERRORS, SECTION_TITLES, libraryStatus, noResultsCopy, type ResultSection, type SearchRow, type SearchScope } from "./searchModel";
 import { useLocale, useT } from "../../i18n";
 
 export type ResultActions = {
   query: string;
+  scope: SearchScope;
+  onClear: () => void;
   follow: ReturnType<typeof useFollowToggle>;
   onOpen: () => void;
   onAdd: (result: BookSearchResult) => void;
@@ -73,8 +75,22 @@ export function SearchResultRow({ row, actions }: { row: SearchRow; actions: Res
           <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text, textDecorationLine: "underline" }]}>{t("book.addByHand")}</Text>
         </Pressable>
       );
-    case "noResults":
-      return <Text {...dynamicType} style={[typography.body, styles.pad, styles.line, { color: colors.textDim }]}>{t("book.noResults", { query: actions.query })}</Text>;
+    case "noResults": {
+      const copy = noResultsCopy(actions.scope);
+      return (
+        <View style={styles.empty} accessibilityLiveRegion="polite">
+          <EmptyState
+            title={t(copy.title)}
+            body={t(copy.body, { query: actions.query })}
+            secondaryActionLabel={t(copy.action)}
+            onSecondaryAction={() => {
+              Keyboard.dismiss();
+              actions.onClear();
+            }}
+          />
+        </View>
+      );
+    }
   }
 }
 
@@ -157,6 +173,7 @@ const styles = StyleSheet.create({
   pad: { paddingHorizontal: spacing.lg },
   line: { paddingVertical: spacing.sm },
   stack: { gap: spacing.sm, paddingVertical: spacing.sm },
+  empty: { paddingTop: spacing.lg, maxWidth: 400, width: "100%", alignSelf: "center" },
   link: { minHeight: 44, justifyContent: "center" },
   title: { flexDirection: "row", alignItems: "baseline", gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xs },
   right: { marginLeft: "auto" },

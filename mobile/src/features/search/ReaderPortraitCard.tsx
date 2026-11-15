@@ -31,7 +31,7 @@ export function ReaderPortraitCard({ person, width, canvasWidth, busy, onToggleF
   return (
     <View style={[styles.card, { width, backgroundColor: colors.surface }]}>
       <Pressable accessibilityRole="button" accessibilityLabel={[t("book.openProfile", { username: person.user.username }), glyphLabel, caption].filter(Boolean).join(", ")} onPress={() => openProfile(person.user.username)} style={({ pressed }) => [styles.open, { opacity: pressed ? 0.75 : 1 }]}>
-        <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.preview, { height: width * 0.8, backgroundColor: palette.background }]}>
+        <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.preview, { height: width * 0.7, backgroundColor: palette.background }]}>
           {preview?.mural.coverImageUrl ? <Image source={{ uri: preview.mural.coverImageUrl }} contentFit="cover" style={StyleSheet.absoluteFill} /> : preview?.mural.blocks.length ? (
             <MuralThumbnail mural={preview.mural} canvasWidth={canvasWidth} books={preview.books} images={preview.images} tierlists={preview.tierlists} profile={person.user} shelfThemeOverride={payload?.library.shelfTheme} statsOverride={payload?.library.stats} />
           ) : <View style={styles.fallback}><ReaderCardImage input={fallback} width={width} /></View>}
@@ -47,8 +47,8 @@ export function ReaderPortraitCard({ person, width, canvasWidth, busy, onToggleF
         </View>
         <View style={styles.details}>
           <View style={[styles.avatar, { borderColor: colors.surface, backgroundColor: colors.surface }]}>
-            <AuthorAvatar username={person.user.username} avatarUrl={person.user.avatarUrl} size={48} />
-            {glyphLabel ? <View style={[styles.badge, { backgroundColor: colors.surface, borderColor: colors.surface }]}><ReaderGlyph identity={identity} size={14} /></View> : null}
+            <AuthorAvatar username={person.user.username} avatarUrl={person.user.avatarUrl} size={36} />
+            {glyphLabel ? <View style={[styles.badge, { backgroundColor: colors.surface, borderColor: colors.surface }]}><ReaderGlyph identity={identity} size={12} /></View> : null}
           </View>
           <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.name, { color: colors.text }]}>{person.user.username}</Text>
           <Text numberOfLines={2} {...dynamicType} style={[typography.caption, styles.caption, { color: colors.textDim }]}>{caption}</Text>
@@ -60,14 +60,14 @@ export function ReaderPortraitCard({ person, width, canvasWidth, busy, onToggleF
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: radii.xl, overflow: "hidden", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.12)" },
+  card: { borderRadius: radii.lg, overflow: "hidden", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.12)" },
   open: { flex: 1 },
   preview: { overflow: "hidden" },
-  fallback: { alignItems: "center", marginTop: -spacing.huge },
-  details: { alignItems: "center", gap: spacing.xs, paddingHorizontal: spacing.md },
-  avatar: { marginTop: -spacing.xxxl, marginBottom: spacing.xs, borderWidth: 2, borderRadius: radii.full, boxShadow: "0 2px 6px rgba(0, 0, 0, 0.12)" },
+  fallback: { alignItems: "center", marginTop: -spacing.xxl },
+  details: { alignItems: "center", gap: spacing.xs, paddingHorizontal: spacing.sm },
+  avatar: { marginTop: -spacing.xxl, marginBottom: spacing.xs, borderWidth: 2, borderRadius: radii.full, boxShadow: "0 2px 6px rgba(0, 0, 0, 0.12)" },
   badge: { position: "absolute", right: 0, bottom: 0, borderWidth: 1, borderRadius: radii.full },
   name: { fontWeight: "700", textAlign: "center" },
   caption: { textAlign: "center" },
-  action: { padding: spacing.md },
+  action: { padding: spacing.sm },
 });

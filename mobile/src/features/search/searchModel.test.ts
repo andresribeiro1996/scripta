@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { BookSearchResult } from "@scripta/shared";
 import type { DiscoverItem, PersonResult } from "@scripta/shared/community";
-import { idleSections, libraryStatus, mergeBookResults, ownedEntry, readRecentSearches, recentSearchesKey, recordRecentSearch, searchQueryFromParam, searchRows, type ResultsInput, type SearchRow } from "./searchModel.js";
+import { idleSections, noResultsCopy, libraryStatus, mergeBookResults, ownedEntry, readRecentSearches, recentSearchesKey, recordRecentSearch, searchQueryFromParam, searchRows, type ResultsInput, type SearchRow } from "./searchModel.js";
 
 const result = (title: string, workId?: string, isbn: string | null = null): BookSearchResult => ({ title, authors: ["Author"], year: 2001, isbn, publisher: null, coverUrl: null, genres: [], ...(workId ? { workId } : {}) });
 const person = (userId: string) => ({ user: { userId, username: userId, avatarUrl: null }, followerCount: 0, private: false }) as unknown as PersonResult;
@@ -138,4 +138,15 @@ test("ownedEntry matches a hand-added book with no ISBN by title and author", ()
 test("ownedEntry returns nothing for another edition the server's rule rejects", () => {
   const mine = { Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593" };
   assert.equal(ownedEntry({ Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780593099322" }, [mine]), undefined);
+});
+
+test("the no-results empty state has its own copy per scope, with Browse readers for people and Clear search elsewhere", () => {
+  assert.deepEqual(noResultsCopy("people"), { title: "book.noReadersTitle", body: "book.noReadersBody", action: "book.browseReaders" });
+  assert.equal(noResultsCopy("games").title, "book.noGamesTitle");
+  assert.equal(noResultsCopy("books").title, "book.noBooksTitle");
+  assert.equal(noResultsCopy("all").title, "book.noMatchesTitle");
+  for (const scope of ["all", "books", "games"] as const) {
+    assert.equal(noResultsCopy(scope).body, "book.noResultsBody");
+    assert.equal(noResultsCopy(scope).action, "shell.clearSearch");
+  }
 });
