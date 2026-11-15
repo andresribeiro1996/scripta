@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Text } from "../../ui/Text";
-import { Icon, Skeleton, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Icon, Skeleton, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { CoverFan, SLOT_HEIGHT, fanWidth } from "../community/CoverFan";
 import { FAN_SIZE } from "../community/communityHome";
 import { fetchDiscover } from "../community/api";
@@ -46,7 +46,7 @@ export function HomeNewGames() {
 const styles = StyleSheet.create({
   pending: { marginHorizontal: spacing.md, marginTop: spacing.xl },
   rows: { marginHorizontal: spacing.md, gap: spacing.sm },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, borderRadius: radii.lg },
+  row: { minHeight: minimumTouchTarget, flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, borderRadius: radii.lg },
   text: { flex: 1, minWidth: 0 },
   strong: { fontWeight: "700" },
   iconTile: { width: 48, height: 72, borderRadius: radii.sm, alignItems: "center", justifyContent: "center" }
