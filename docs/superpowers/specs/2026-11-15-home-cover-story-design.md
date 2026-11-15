@@ -50,7 +50,7 @@ Taking any of these into the build counts as a failure:
    - The feed and header are untouched.
 2. **Rebuild Home as a new screen following the concept's layout.** Rejected: it would drop or reshuffle current features, which is the anti-goal.
 3. **Reuse `DiscoverRow` for the games and the mural's reading block for the book.** Rejected: `DiscoverRow` is a full game ticket with an action footer, too heavy for a Home section. The mural reading block is a cover row, not a list row.
-   - Its parts are reused instead: `GameTicketArt`, `contentTarget`, `readingPercent`, `BookCover`.
+   - Its parts are reused instead: `CoverFan`, `contentTarget`, `readingPercent`, `CoverImage`.
 
 ## Layout
 
@@ -123,12 +123,12 @@ Your reading circle                 Find people →  existing section, heading r
   - Use `router.navigate("/my-arena")`, not `push`, so expo-router switches to the Games tab rather than stacking the screen on Home. The app has no tab-switch helper today.
   - Confirm on device.
 - **Row.** It is pressable, opens `contentTarget(content)`, and has a › at the end. Left to right:
-  - `GameTicketArt` (cover fan) at a compact size.
+  - `CoverFan` at the Home feed's size. `GameTicketArt` is 80+ wide, too big for a compact row.
   - The kind label (existing `community.kindQuiz` / `book.gameTournament` / `book.gameTierlist` style keys).
   - The game name, one line, truncated.
   - The meta line "by @username · {count}". The count is:
     - plays for a quiz (`playCount`)
-    - votes for a tier list (`ballotCount`)
+    - ballots for a tier list (`ballotCount`)
     - books for a tournament (`bookCount`)
   - Reuse existing plural count strings where they exist.
   - An unavailable author falls back the way `DiscoverRow` already does.
@@ -140,10 +140,12 @@ Your reading circle                 Find people →  existing section, heading r
 - **Which book.** Pick the books with `ReadStatus === 1` and show the one with the latest `DateLastRead`.
   - Books without a date sort last.
   - Ties keep library order.
-  - Put this in `@scripta/shared` next to `readingPercent` (`packages/shared/src/library/libraryView.ts`) as one small helper with tests. The mural's inline `ReadStatus === 1` filter may switch to it if that's a one-line change.
+  - Put this in a mobile Home model file as one small helper with tests.
+  - It reuses `parseBookDate` from `@scripta/shared`.
+  - It doesn't go in `@scripta/shared`, because `packages/AGENTS.md` admits only code that more than one consumer needs.
 - **Visibility.** Hidden when the library is missing, empty, or has no book marked reading. The no-library onboarding already covers the empty case.
 - **Row.**
-  - `BookCover` at a small size.
+  - `CoverImage` at a small size. Library books need `CoverImage`; `BookCover` takes a URL.
   - The caption "Currently reading" (reuse `murals.currentlyReading` if it reads right in context, otherwise a Home key), with " · {percent}%" only when `readingPercent` is not null.
   - "Title · Author" on one line, truncated.
   - A › at the end.
