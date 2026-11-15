@@ -131,4 +131,5 @@ export const community = {
   "community.unpublish": "Unpublish",
   "community.keepShelf": "Keep this shelf",
   "community.startBlank": "Start blank",
+  "community.homeGameBy": "by @{username}",
 } satisfies Messages;

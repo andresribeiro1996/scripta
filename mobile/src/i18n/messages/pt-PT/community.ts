@@ -132,4 +132,5 @@ export const community: CatalogOf<typeof en> = {
   "community.unpublish": "Anular publicação",
   "community.keepShelf": "Manter esta estante",
   "community.startBlank": "Começar em branco",
+  "community.homeGameBy": "de @{username}",
 };
