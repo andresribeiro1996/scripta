@@ -8,7 +8,7 @@ import { FAN_SIZE } from "../community/communityHome";
 import { fetchDiscover } from "../community/api";
 import { useLocale, useT } from "../../i18n";
 import { HomeSectionHeader } from "./HomeSectionHeader";
-import { newGameRows } from "./homeModel";
+import { gamesBrowseHref, newGameRows } from "./homeModel";
 
 export const NEW_GAMES_QUERY_KEY = ["home", "new-games"] as const;
 
@@ -22,7 +22,7 @@ export function HomeNewGames() {
   if (isPending) return <View style={styles.pending}><Skeleton height={64} /></View>;
   if (!rows.length) return null;
   return <View>
-    <HomeSectionHeader title={t("community.homeNewGames")} linkLabel={t("community.homeSeeAllGames")} onLink={() => router.navigate("/my-arena" as never)} />
+    <HomeSectionHeader title={t("community.homeNewGames")} linkLabel={t("community.homeSeeAllGames")} onLink={() => router.navigate(gamesBrowseHref(Date.now()) as never)} />
     <View style={styles.rows}>
       {rows.map((row) => {
         const color = row.content.kind === "quiz" ? colors.reference : row.content.kind === "tierlist" ? colors.success : colors.accent;

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DiscoverItem } from "@scripta/shared/community";
 import { contentKindLabel, contentTarget } from "../community/communityHome";
-import { currentRead, newGameRows } from "./homeModel";
+import { currentRead, gamesBrowseHref, newGameRows } from "./homeModel";
 
 const author = (username: string) => ({ userId: `u-${username}`, username, avatarUrl: null });
 const quiz: DiscoverItem = {
@@ -55,4 +55,7 @@ test("newGameRows meta for an unavailable author", () => {
 });
 test("newGameRows meta in pt-PT", () => {
   assert.match(newGameRows([quiz], "pt-PT")[0]!.meta, /^de @joao · 248 /);
+});
+test("gamesBrowseHref targets the Browse pane with a nonce", () => {
+  assert.deepEqual(gamesBrowseHref(42), { pathname: "/my-arena", params: { pane: "browse", t: "42" } });
 });

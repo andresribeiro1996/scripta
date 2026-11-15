@@ -4,6 +4,8 @@ import type { Locale } from "@scripta/shared/i18n";
 import { translatorFor } from "../../i18n";
 import { contentKindLabel, contentStats, contentTarget } from "../community/communityHome";
 
+export const gamesBrowseHref = (nonce: number) => ({ pathname: "/my-arena", params: { pane: "browse", t: String(nonce) } });
+
 export type NewGameRow = { key: string; content: PublishedContent; kind: string; name: string; meta: string; target: string };
 
 export function currentRead(books: LibraryBook[] | undefined): LibraryBook | null {
