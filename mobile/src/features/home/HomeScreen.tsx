@@ -15,6 +15,7 @@ import { RecapHomeCard } from "../topShelf/RecapHomeCard";
 import { AwardHomeCard, RECENT_AWARDS_QUERY_KEY } from "../awards/AwardHomeCard";
 import { ENGAGEMENT_QUERY_KEY, SAVED_STATE_QUERY_KEY, useHomeActions } from "./useHomeActions";
 import { HomeNewGames, NEW_GAMES_QUERY_KEY } from "./HomeNewGames";
+import { HomeReadingRow } from "./HomeReadingRow";
 import { HomeSectionHeader } from "./HomeSectionHeader";
 import { useLocale, useT } from "../../i18n";
 
@@ -64,6 +65,7 @@ export function HomeScreen() {
         <AwardHomeCard />
         {noLibrary ? <View style={styles.onboarding}><EmptyState title={t("library.startTitle")} body={t("community.startLibraryBody")} actionLabel={t("shell.importLibrary")} onAction={() => router.push("/import" as never)} secondaryActionLabel={t("shell.addBook")} onSecondaryAction={() => router.push("/add-book" as never)} /></View> : null}
         <HomeNewGames />
+        <HomeReadingRow books={actions.library.data?.data.books} />
       </>}
       renderSectionHeader={({ section }) => <HomeSectionHeader title={section.title} linkLabel={t("community.findPeopleArrow")} onLink={findReaders} />}
       renderItem={({ item }) => <FeedRow item={item} actions={actions} onOpen={() => router.push(digestRoute(item) as never)} onComments={() => setComments(item)} />}

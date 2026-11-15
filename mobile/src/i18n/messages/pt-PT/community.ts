@@ -135,4 +135,6 @@ export const community: CatalogOf<typeof en> = {
   "community.homeGameBy": "de @{username}",
   "community.homeNewGames": "Jogos novos",
   "community.homeSeeAllGames": "Ver todos ›",
+  "community.homeReading": "A ler agora",
+  "community.homeReadingPercent": "A ler agora · {percent}%",
 };

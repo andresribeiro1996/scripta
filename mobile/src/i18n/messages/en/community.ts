@@ -133,5 +133,7 @@ export const community = {
   "community.startBlank": "Start blank",
   "community.homeGameBy": "by @{username}",
   "community.homeNewGames": "New games",
-  "community.homeSeeAllGames": "See all ›"
+  "community.homeSeeAllGames": "See all ›",
+  "community.homeReading": "Currently reading",
+  "community.homeReadingPercent": "Currently reading · {percent}%"
 } satisfies Messages;
