@@ -21,7 +21,7 @@ export function SearchIdle({ scope, recent, onRecent, onClearRecent, follow, scr
   const t = useT();
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
-  const readerWidth = Math.min(220, (width - spacing.lg * 2) * 0.68);
+  const readerWidth = Math.min(220, (width - spacing.lg * 2) * 0.68) * 0.6;
   const show = idleSections(scope);
   const readers = useQuery({ queryKey: ["community", "people", "suggested", "portraits"], queryFn: fetchSuggestedReaderPortraits, enabled: show.readers, retry: false });
   const games = useInfiniteQuery({
@@ -59,7 +59,7 @@ export function SearchIdle({ scope, recent, onRecent, onClearRecent, follow, scr
           {!readers.data && readers.isError ? (
             <View style={styles.pad}><ErrorState body={t("book.readersLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void readers.refetch()} /></View>
           ) : readers.isPending ? (
-            <View style={styles.pad}><Skeleton height={280} /></View>
+            <View style={styles.pad}><Skeleton width={readerWidth} height={220} /></View>
           ) : (
             <FlatList
               horizontal

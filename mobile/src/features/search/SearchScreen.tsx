@@ -101,6 +101,11 @@ export function SearchScreen({ q, t: nonceParam }: { q?: string | string[]; t?: 
   const retries: Record<ResultSection, () => unknown> = { library: library.refetch, books: catalog.refetch, people: people.refetch, games: games.refetch };
   const actions: ResultActions = {
     query: needle,
+    scope,
+    onClear: () => {
+      setQuery("");
+      setSubmitted(null);
+    },
     follow,
     onOpen: () => recent.record(trimmed),
     onAdd: setAdding,
@@ -122,7 +127,7 @@ export function SearchScreen({ q, t: nonceParam }: { q?: string | string[]; t?: 
         onSubmitEditing={() => submit(query)}
         inputRef={inputRef}
         accessibilityLabel={t("book.searchLabel")}
-        placeholder={t("book.searchPlaceholder")}
+        placeholder={t(scope === "people" ? "book.searchPeoplePlaceholder" : "book.searchPlaceholder")}
       >
         {(scrollProps) => (
           <SwipeableTabs

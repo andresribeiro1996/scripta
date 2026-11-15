@@ -37,6 +37,12 @@ export function isNetworkQuery(query: string): boolean {
   return query.trim().length >= MIN_NETWORK_QUERY;
 }
 
+export function noResultsCopy(scope: SearchScope): { title: MessageKey; body: MessageKey; action: MessageKey } {
+  if (scope === "people") return { title: "book.noReadersTitle", body: "book.noReadersBody", action: "book.browseReaders" };
+  const title = scope === "games" ? "book.noGamesTitle" : scope === "books" ? "book.noBooksTitle" : "book.noMatchesTitle";
+  return { title, body: "book.noResultsBody", action: "shell.clearSearch" };
+}
+
 export function idleSections(scope: SearchScope): { readers: boolean; newGames: boolean } {
   return { readers: scope === "all" || scope === "people", newGames: scope === "all" || scope === "games" };
 }
