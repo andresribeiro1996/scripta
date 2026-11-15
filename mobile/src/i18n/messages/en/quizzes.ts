@@ -96,7 +96,7 @@ export const quizzes = {
   "quizzes.dailyCardLabel": "Play The Daily Chapter: {title}",
   "quizzes.dailyCardMeta": "5 questions · About 2 minutes",
   "quizzes.dailyCardPlay": "Play today's chapter",
-  "quizzes.dailyCardResults": "You scored {score}/5 · See results",
+  "quizzes.dailyCardResults": "The Daily Chapter · You scored {score}/5",
   "quizzes.dailyCardResultsLabel": "You scored {score}/5 in The Daily Chapter: {title}. See results",
   "quizzes.weekdayMon": "M",
   "quizzes.weekdayTue": "T",

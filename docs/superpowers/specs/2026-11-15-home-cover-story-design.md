@@ -62,7 +62,7 @@ Top to bottom in `ListHeaderComponent`, then the existing feed:
 │ THE DAILY CHAPTER                     [art]│
 │ <board.title, display face, large>         │
 │ 5 questions · About 2 minutes              │
-│ [ Play today's chapter              › ]    │   or [ You scored 4/5 · See results › ]
+│ [ Play today's chapter              › ]    │   once played: one compact row, like Currently reading
 └────────────────────────────────────────────┘
 RecapHomeCard / AwardHomeCard                    unchanged, when present
 No-library onboarding                            unchanged, when present
@@ -92,7 +92,12 @@ Your reading circle                 Find people →  existing section, heading r
   - A full-width filled button with an `accent` background and `onAccent` text.
   - Pressed uses the existing pressed treatment. Prefer an existing button from `mobile/src/ui` over a new one.
   - Unplayed: "Play today's chapter".
-  - Played: "You scored {score}/5 · See results". It goes to `/daily` in both cases, where results already show.
+  - Played: no hero. *Changed with the user on 2026-11-15: a played chapter shouldn't stand out.* The card collapses to a compact row styled like Currently reading:
+    - the surface background
+    - a small accent tile on the left with the chapter art scaled down
+    - "The Daily Chapter · You scored {score}/5" in accent, with the title on one line beneath
+    - a › chevron
+  - It goes to `/daily` in both cases, where results already show.
   - The `accessibilityLabel` keeps naming the chapter title.
 - **Played state.**
   - Use the same history query `/daily` uses: `daily-chapter-screen.tsx:25`, key `["daily-chapter","history", user?.id ?? "guest", identity, date]`.

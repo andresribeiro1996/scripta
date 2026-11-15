@@ -97,7 +97,7 @@ export const quizzes: CatalogOf<typeof en> = {
   "quizzes.dailyCardLabel": "Jogar O Capítulo do Dia: {title}",
   "quizzes.dailyCardMeta": "5 perguntas · Cerca de 2 minutos",
   "quizzes.dailyCardPlay": "Jogar o capítulo de hoje",
-  "quizzes.dailyCardResults": "Fez {score}/5 · Ver resultados",
+  "quizzes.dailyCardResults": "O Capítulo do Dia · Fez {score}/5",
   "quizzes.dailyCardResultsLabel": "Fez {score}/5 n'O Capítulo do Dia: {title}. Ver resultados",
   "quizzes.weekdayMon": "S",
   "quizzes.weekdayTue": "T",
