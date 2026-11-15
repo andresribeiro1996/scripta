@@ -1,12 +1,11 @@
 import { DailyChapterCard } from "../dailyChapter/daily-chapter-card";
 import { useCallback, useState } from "react";
-import { Pressable, RefreshControl, SectionList, StyleSheet, View } from "react-native";
+import { RefreshControl, SectionList, StyleSheet, View } from "react-native";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { newCountLabel, type DigestItem } from "@scripta/shared";
 import { feedRowModel } from "@scripta/shared/community";
-import { Text } from "../../ui/Text";
-import { BrandMark, EmptyState, ErrorState, HeaderActions, IconButton, Screen, Skeleton, Toast, dynamicType, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
+import { BrandMark, EmptyState, ErrorState, HeaderActions, IconButton, Screen, Skeleton, Toast, spacing } from "../../ui";
 import { FeedRow, useActivityFeed, useDashboardFeed, useSkipEmptyPages } from "./FeedRow";
 import { digestRoute } from "./feedRowModel";
 import { CommentsSheet } from "./CommentsSheet";
@@ -15,12 +14,13 @@ import { useDailyHistory } from "../dailyChapter/use-daily-history";
 import { RecapHomeCard } from "../topShelf/RecapHomeCard";
 import { AwardHomeCard, RECENT_AWARDS_QUERY_KEY } from "../awards/AwardHomeCard";
 import { ENGAGEMENT_QUERY_KEY, SAVED_STATE_QUERY_KEY, useHomeActions } from "./useHomeActions";
+import { HomeNewGames, NEW_GAMES_QUERY_KEY } from "./HomeNewGames";
+import { HomeSectionHeader } from "./HomeSectionHeader";
 import { useLocale, useT } from "../../i18n";
 
 export function HomeScreen() {
   const locale = useLocale();
   const t = useT();
-  const { colors } = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [pulling, setPulling] = useState(false);
@@ -42,11 +42,12 @@ export function HomeScreen() {
     void queryClient.invalidateQueries({ queryKey: ENGAGEMENT_QUERY_KEY });
     void queryClient.invalidateQueries({ queryKey: SAVED_STATE_QUERY_KEY });
     void queryClient.invalidateQueries({ queryKey: RECENT_AWARDS_QUERY_KEY });
+    void queryClient.invalidateQueries({ queryKey: NEW_GAMES_QUERY_KEY });
   }, [actions.library.refetch, dashboard.refetch, activity.refetch, queryClient]));
 
   async function onRefresh() {
     setPulling(true);
-    try { await Promise.all([actions.library.refetch(), dashboard.refetch(), activity.refetch(), queryClient.invalidateQueries({ queryKey: ENGAGEMENT_QUERY_KEY }), queryClient.invalidateQueries({ queryKey: SAVED_STATE_QUERY_KEY }), queryClient.invalidateQueries({ queryKey: RECENT_AWARDS_QUERY_KEY })]); }
+    try { await Promise.all([actions.library.refetch(), dashboard.refetch(), activity.refetch(), queryClient.invalidateQueries({ queryKey: ENGAGEMENT_QUERY_KEY }), queryClient.invalidateQueries({ queryKey: SAVED_STATE_QUERY_KEY }), queryClient.invalidateQueries({ queryKey: RECENT_AWARDS_QUERY_KEY }), queryClient.invalidateQueries({ queryKey: NEW_GAMES_QUERY_KEY })]); }
     finally { setPulling(false); }
   }
   const findReaders = () => router.push("/people" as never);
@@ -62,11 +63,9 @@ export function HomeScreen() {
         <RecapHomeCard />
         <AwardHomeCard />
         {noLibrary ? <View style={styles.onboarding}><EmptyState title={t("library.startTitle")} body={t("community.startLibraryBody")} actionLabel={t("shell.importLibrary")} onAction={() => router.push("/import" as never)} secondaryActionLabel={t("shell.addBook")} onSecondaryAction={() => router.push("/add-book" as never)} /></View> : null}
+        <HomeNewGames />
       </>}
-      renderSectionHeader={({ section }) => <View style={styles.sectionHeader}>
-        <Text accessibilityRole="header" {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{section.title}</Text>
-        <Pressable accessibilityRole="link" onPress={findReaders} style={styles.sectionAction}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>{t("community.findPeopleArrow")}</Text></Pressable>
-      </View>}
+      renderSectionHeader={({ section }) => <HomeSectionHeader title={section.title} linkLabel={t("community.findPeopleArrow")} onLink={findReaders} />}
       renderItem={({ item }) => <FeedRow item={item} actions={actions} onOpen={() => router.push(digestRoute(item) as never)} onComments={() => setComments(item)} />}
       renderSectionFooter={({ section }) => !section.data.length ? <View style={styles.onboarding}>{empty}</View> : null}
       ListFooterComponent={dashboard.isFetchingNextPage && items.length ? <View style={styles.onboarding}><Skeleton height={80} /></View> : dashboard.isFetchNextPageError ? <View style={styles.onboarding}><ErrorState body={t("book.loadMoreFailed")} actionLabel={t("shell.retry")} onAction={() => void dashboard.fetchNextPage()} /></View> : undefined}
@@ -79,9 +78,5 @@ export function HomeScreen() {
 const styles = StyleSheet.create({
   mark: { marginRight: spacing.sm },
   list: { paddingBottom: spacing.huge },
-  onboarding: { paddingHorizontal: spacing.md, paddingVertical: spacing.lg },
-  sectionHeader: { marginHorizontal: spacing.md, paddingTop: spacing.xl, paddingBottom: spacing.sm, flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  sectionAction: { minHeight: minimumTouchTarget, justifyContent: "center" },
-  strong: { fontWeight: "700" },
-  grow: { flex: 1, minWidth: 0 }
+  onboarding: { paddingHorizontal: spacing.md, paddingVertical: spacing.lg }
 });

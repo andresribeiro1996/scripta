@@ -132,4 +132,6 @@ export const community = {
   "community.keepShelf": "Keep this shelf",
   "community.startBlank": "Start blank",
   "community.homeGameBy": "by @{username}",
+  "community.homeNewGames": "New games",
+  "community.homeSeeAllGames": "See all ›"
 } satisfies Messages;

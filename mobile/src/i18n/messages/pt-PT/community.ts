@@ -133,4 +133,6 @@ export const community: CatalogOf<typeof en> = {
   "community.keepShelf": "Manter esta estante",
   "community.startBlank": "Começar em branco",
   "community.homeGameBy": "de @{username}",
+  "community.homeNewGames": "Jogos novos",
+  "community.homeSeeAllGames": "Ver todos ›",
 };
