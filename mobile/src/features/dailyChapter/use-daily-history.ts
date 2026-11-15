@@ -31,3 +31,9 @@ export function useDailyHistory() {
   }, [client]);
   return useQuery({ queryKey: ["daily-chapter", "history", user?.id, guestId], queryFn: () => dailyChapterApi.history(guestId!, true), enabled: Boolean(user && guestId) });
 }
+
+export function useChapterHistory(date: string | undefined) {
+  const { ready, user, unreachable } = useAuth();
+  const identity = useDeviceIdentity();
+  return useQuery({ queryKey: ["daily-chapter", "history", user?.id ?? "guest", identity.data, date], queryFn: () => dailyChapterApi.history(identity.data!, Boolean(user)), enabled: ready && !unreachable && Boolean(identity.data && date) });
+}
