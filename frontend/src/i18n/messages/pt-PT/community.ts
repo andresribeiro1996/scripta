@@ -28,6 +28,7 @@ export const community: CatalogOf<typeof en> = {
   "community.noPeopleBody": "Experimente outro nome de utilizador.",
   "community.followPerson": "{label} {username}",
   "community.loadingProfile": "A carregar o perfil",
+  "community.profileLoadFailed": "Não foi possível carregar este perfil.",
   "community.profileSections": "Secções do perfil",
   "community.published": "Publicados",
   "community.profilePrivate": "Este perfil é privado.",

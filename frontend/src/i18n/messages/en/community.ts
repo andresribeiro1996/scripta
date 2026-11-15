@@ -27,6 +27,7 @@ export const community = {
   "community.noPeopleBody": "Try another username.",
   "community.followPerson": "{label} {username}",
   "community.loadingProfile": "Loading profile",
+  "community.profileLoadFailed": "Couldn't load this profile.",
   "community.profileSections": "Profile sections",
   "community.published": "Published",
   "community.profilePrivate": "This profile is private.",

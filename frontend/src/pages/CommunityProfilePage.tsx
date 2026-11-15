@@ -36,7 +36,7 @@ export function CommunityProfilePage() {
   const viewerTheme = useResolvedTheme();
   const isOwnHandle = Boolean(username) && session?.user.username === username;
   const otherUsername = isOwnHandle ? "" : username ?? "";
-  const { view, isLoading, isNotFound } = useCommunityProfile(otherUsername);
+  const { view, isLoading, isNotFound, error: loadError, refetch } = useCommunityProfile(otherUsername);
   const activity = useCommunityActivity(otherUsername);
   const library = useCommunityLibrary(otherUsername, Boolean(view));
   const cardInput = useMemo(() => (view && !view.private && view.readerCard ? readerCardInputOf([], [], view.profile.user.username, locale, view.readerCard) : null), [view, locale]);
@@ -62,10 +62,25 @@ export function CommunityProfilePage() {
     return <OwnShelfView username={username ?? ""} />;
   }
 
-  if (!session || isLoading || (!view && !isNotFound && !error)) {
+  if (!session || isLoading) {
     return (
       <Page title={`@${username ?? ""}`} back={backTo("profile")}>
         <SkeletonCardGrid count={2} label={t("community.loadingProfile")} tileClassName="min-h-[120px]" />
+      </Page>
+    );
+  }
+
+  if (!view && loadError && !isNotFound) {
+    return (
+      <Page title={`@${username ?? ""}`} back={backTo("profile")}>
+        <EmptyState
+          title={t("community.profileLoadFailed")}
+          action={
+            <button onClick={() => void refetch()} className={BUTTON_SECONDARY}>
+              {t("library.retry")}
+            </button>
+          }
+        />
       </Page>
     );
   }
