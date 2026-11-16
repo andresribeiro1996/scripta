@@ -82,6 +82,8 @@ Files:
 
 Files:
 - Modify: `mobile/src/features/dailyChapter/daily-chapter-card.tsx`
+- Modify: `mobile/src/features/dailyChapter/dailyCardModel.ts`
+- Test: `mobile/src/features/dailyChapter/dailyCardModel.test.ts`
 - Modify: `mobile/src/features/home/HomeScreen.tsx`
 - Modify: `mobile/src/features/works/WorkScreen.tsx`
 - Modify: `DESIGN.md`
