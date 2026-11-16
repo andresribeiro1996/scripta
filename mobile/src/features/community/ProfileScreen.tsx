@@ -4,7 +4,7 @@ import { Stack, router } from "expo-router";
 import { FlatList, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { useAuth } from "../../core/auth";
 import { Text } from "../../ui/Text";
-import { followFailureMessage } from "@scripta/shared/community";
+import { AFTER_FOLLOW, followFailureMessage } from "@scripta/shared/community";
 import { ensureBookBlockHeights, readerCardInputOf, type Mural } from "@scripta/shared";
 import { Button, Dialog, EmptyState, ErrorState, Icon, IconButton, Screen, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { MuralCanvas } from "../murals";
@@ -89,7 +89,7 @@ export function ProfileScreen({ username }: { username: string }) {
     await run(async () => {
       if (view.profile.viewerFollows) await unfollowUser(view.profile.user.userId);
       else await followUser(view.profile.user.userId);
-      await queryClient.invalidateQueries({ queryKey: ["community", "people"] });
+      for (const queryKey of AFTER_FOLLOW) await queryClient.invalidateQueries({ queryKey });
     });
   }
 

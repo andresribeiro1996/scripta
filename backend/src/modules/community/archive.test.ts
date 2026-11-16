@@ -28,6 +28,7 @@ const NOW = Date.parse("2026-10-02T00:00:00.000Z");
 const CUTOFF = "2026-09-02T00:00:00.000Z";
 const END_OF_2001 = "2002-01-01T00:00:00.000Z";
 const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
 const ARCHIVED = "moved old community events to history";
 const FAILED = "community event archive failed";
 const SHOWS_READING = { ...DEFAULT_FEED_SETTINGS, reading: true };
@@ -123,7 +124,8 @@ test("a profile's activity pages through recent events and then history with no 
   }
 });
 
-test("registering the plugin moves events older than 30 days to history, purges their inbox rows, and logs the totals once", async (t) => {
+test("registering the plugin runs nothing, and 100 seconds later moves events older than 30 days to history, purges their inbox rows, and logs the totals once", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "setInterval"] });
   const { db, repo } = openRepo();
   repo.updateFeedSettings("job-author", SHOWS_READING);
   repo.insertFollow({ follower_id: "job-fan", followee_id: "job-author", created_at: "2026-09-10T00:00:00.000Z" });
@@ -135,6 +137,10 @@ test("registering the plugin moves events older than 30 days to history, purges 
   const { app, logged } = build(t);
 
   await app.register(communityPlugin, { ...inertDeps, ...topShelfDeps });
+  await app.ready();
+  assert.equal(logged(ARCHIVED).length, 0);
+  assert.equal(countRows(db, "events", "user_id = 'job-author'"), 2503);
+  t.mock.timers.tick(100_000);
   await until(() => logged(ARCHIVED).length === 1);
 
   assert.deepEqual(logged(ARCHIVED).map(({ level, moved, purged }) => ({ level, moved, purged })), [{ level: 30, moved: 2501, purged: 2501 }]);
@@ -146,15 +152,16 @@ test("registering the plugin moves events older than 30 days to history, purges 
 });
 
 test("the plugin runs again every 24 hours, and stops when the app closes", async (t) => {
-  t.mock.timers.enable({ apis: ["setInterval"] });
+  t.mock.timers.enable({ apis: ["setTimeout", "setInterval"] });
   const { db, repo } = openRepo();
   const event = (id: string) => repo.insertEvent({ id, user_id: "tick-author", type: "book_added", ref_type: "book", ref_id: id, payload: null, created_at: "2026-08-15T00:00:00.000Z" });
   const { app, logged } = build(t);
   await app.register(communityPlugin, { ...inertDeps, ...topShelfDeps });
+  t.mock.timers.tick(100_000);
   await until(() => logged(ARCHIVED).length === 1);
   event("tick-1");
 
-  t.mock.timers.tick(DAY_MS - 1);
+  t.mock.timers.tick(DAY_MS - 100_000 - 1);
   assert.equal(countRows(db, "events", "id = 'tick-1'"), 1);
   t.mock.timers.tick(1);
   await until(() => logged(ARCHIVED).length === 2);
@@ -167,27 +174,35 @@ test("the plugin runs again every 24 hours, and stops when the app closes", asyn
   assert.equal(countRows(db, "events", "id = 'tick-2'"), 1);
 });
 
-test("a recap freeze that throws is logged and does not fail registration", async (t) => {
+test("a recap freeze that throws is logged after 110 seconds, does not fail registration, and runs again every hour", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "setInterval"] });
   const { app, logged } = build(t);
   const refusing = { ...emptyShelfGame, shelfFacts: () => { throw new Error("freeze refuses"); } };
   const failing = { ...topShelfDeps, games: { tierlist: refusing, tournament: emptyShelfGame, quiz: emptyShelfGame } };
   await app.register(communityPlugin, { ...inertDeps, ...failing });
   await app.ready();
-  assert.equal(logged("top shelf recap freeze failed").length, 1);
+  assert.equal(logged("top shelf recap freeze failed").length, 0);
+  t.mock.timers.tick(110_000);
+  await until(() => logged("top shelf recap freeze failed").length === 1);
   assert.match(logged("top shelf recap freeze failed")[0]?.err?.message ?? "", /freeze refuses/);
+  t.mock.timers.tick(HOUR_MS - 110_000);
+  await until(() => logged("top shelf recap freeze failed").length === 2);
+  await app.close();
+  t.mock.timers.tick(HOUR_MS);
+  await new Promise(setImmediate);
+  assert.equal(logged("top shelf recap freeze failed").length, 2);
 });
 
 test("a failed run is logged as an error, leaves the events where they were, throws nowhere, and the next run still happens", async (t) => {
-  t.mock.timers.enable({ apis: ["setInterval"] });
+  t.mock.timers.enable({ apis: ["setTimeout", "setInterval"] });
   const { db, repo } = openRepo();
   const { app, logged } = build(t);
   await app.register(communityPlugin, { ...inertDeps, ...topShelfDeps });
-  await until(() => logged(ARCHIVED).length === 1);
   repo.insertEvent({ id: "fail-1", user_id: "fail-author", type: "book_added", ref_type: "book", ref_id: "fail-1", payload: null, created_at: "2026-08-15T00:00:00.000Z" });
   db.exec("CREATE TRIGGER history_refuses BEFORE INSERT ON events_history BEGIN SELECT RAISE(ABORT, 'history refuses'); END");
   t.after(() => db.exec("DROP TRIGGER IF EXISTS history_refuses"));
 
-  t.mock.timers.tick(DAY_MS);
+  t.mock.timers.tick(100_000);
   await until(() => logged(FAILED).length === 1);
   assert.equal(logged(FAILED)[0]?.level, 50);
   assert.match(logged(FAILED)[0]?.err?.message ?? "", /history refuses/);
@@ -195,9 +210,9 @@ test("a failed run is logged as an error, leaves the events where they were, thr
   assert.equal(countRows(db, "events_history", "id = 'fail-1'"), 0);
 
   db.exec("DROP TRIGGER history_refuses");
-  t.mock.timers.tick(DAY_MS);
-  await until(() => logged(ARCHIVED).length === 2);
-  assert.equal(logged(ARCHIVED)[1]?.moved, 1);
+  t.mock.timers.tick(DAY_MS - 100_000);
+  await until(() => logged(ARCHIVED).length === 1);
+  assert.equal(logged(ARCHIVED)[0]?.moved, 1);
   assert.equal(countRows(db, "events_history", "id = 'fail-1'"), 1);
 });
 

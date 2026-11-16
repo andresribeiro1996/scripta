@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { isValidUsername } from "@scripta/shared";
 import { Pressable, StyleSheet, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useQuery } from "@tanstack/react-query";
@@ -82,7 +83,7 @@ export function ProfileHeader() {
           <Input label={t("shell.username")} value={draft} onChangeText={setDraft} autoCapitalize="none" autoCorrect={false} />
           <View style={styles.actions}>
             <Button label={t("shell.cancel")} variant="secondary" onPress={cancelEdit} />
-            <Button label={t("shell.save")} loading={busy} disabled={draft.trim().length < 3} onPress={() => void run(() => setUsername(draft.trim())).then((saved) => { if (saved) setEditing(false); })} />
+            <Button label={t("shell.save")} loading={busy} disabled={!isValidUsername(draft)} onPress={() => void run(() => setUsername(draft.trim())).then((saved) => { if (saved) setEditing(false); })} />
           </View>
         </View>
       ) : (

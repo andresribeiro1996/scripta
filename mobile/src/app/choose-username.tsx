@@ -1,5 +1,6 @@
 import { authDestination, startAuthNavigation } from "../features/auth/navigation";
 import { useState } from "react";
+import { isValidUsername } from "@scripta/shared";
 import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
 import { Text } from "../ui/Text";
 import { Redirect, useLocalSearchParams } from "expo-router";
@@ -36,7 +37,7 @@ export default function ChooseUsernamePage() {
   if (user.username) return <Redirect href={(continueToAvatar ? "/welcome-avatar" : authDestination()) as never} withAnchor={!continueToAvatar} />;
 
   const trimmed = value.trim();
-  const tooShort = trimmed.length < 3;
+  const invalid = !isValidUsername(value);
   const onSubmit = async () => {
     if (busy) return;
     startAuthNavigation(returnTo ?? authDestination(), true);
@@ -68,11 +69,11 @@ export default function ChooseUsernamePage() {
               autoComplete="username-new"
               textContentType="username"
               returnKeyType="done"
-              onSubmitEditing={() => { if (!tooShort && !busy) void onSubmit(); }}
+              onSubmitEditing={() => { if (!invalid && !busy) void onSubmit(); }}
               placeholder={t("shell.usernamePlaceholder")}
               error={error ?? undefined}
             />
-            <Button label={t("shell.continue")} loading={busy} disabled={tooShort} onPress={() => void onSubmit()} />
+            <Button label={t("shell.continue")} loading={busy} disabled={invalid} onPress={() => void onSubmit()} />
           </View>
         </View>
       </KeyboardAvoidingView>

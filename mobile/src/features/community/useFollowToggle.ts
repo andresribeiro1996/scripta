@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { followFailureMessage, type PersonResult } from "@scripta/shared/community";
+import { AFTER_FOLLOW, followFailureMessage, type PersonResult } from "@scripta/shared/community";
 import { followUser, unfollowUser } from "./api";
 import { useT } from "../../i18n";
 
@@ -19,7 +19,7 @@ export function useFollowToggle() {
       } else {
         await followUser(person.user.userId);
       }
-      await queryClient.invalidateQueries({ queryKey: ["community", "people"] });
+      for (const queryKey of AFTER_FOLLOW) await queryClient.invalidateQueries({ queryKey });
     } catch (reason) {
       setError(followFailureMessage(reason, t("community.followUpdateFailed")));
     } finally {

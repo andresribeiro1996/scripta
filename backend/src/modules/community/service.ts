@@ -4,7 +4,7 @@ import { normalizeWords, type IdentityKey, type PublicReaderCard, type ReaderPro
 import { categoryFor, contentDetail, contentTarget, decodeCursor, encodeCursor, parseRankingPreview, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 import type { ActivityEventType, ActivityItem, CardShare, LiveCardShare, CommunityAuthor, CommunityProfileView, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, OwnProfile, Page, PersonResult, PublishProfileInput, PublishedContent, RankingTierPreview, SavedContentRef, SharedBook, SuggestedReader } from "@scripta/shared/community";
 import type { CompletionItem, DashboardFeedPage, DigestItem, ParticipationItem } from "@scripta/shared/dashboard";
-import type { MuralsPublicApi } from "../murals/publicApi.js";
+import type { MuralsPublicApi } from "../murals/index.js";
 import { currentTrace } from "../../trace.js";
 import { FollowLimitError, InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
 import { ACTIVITY_EVENT_TYPES, ARCHIVE_BATCH, BACKFILL_BATCH, BOOK_EVENTS_PER_DAY, BOOK_EVENTS_WINDOW_MS, DIGEST_EVENT_TYPES, FEED_EVENT_TYPES, FEED_WINDOW_MS, FOLLOW_LIMIT, READING_EVENT_TYPES } from "./domain/feed.js";

@@ -1,6 +1,7 @@
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { env } from "../../config/env.js";
+import { createJobs } from "../../jobs.js";
 import { openCommunityDb } from "./adapters/sqlite/connection.js";
 import { createSqliteCommunityRepository } from "./adapters/sqlite/sqliteCommunityRepository.js";
 import { createRecapRepository } from "./adapters/sqlite/sqliteRecapRepository.js";
@@ -39,29 +40,17 @@ export async function communityPlugin(app: FastifyInstance, opts: Omit<Community
   recapService = recaps;
   const engagement = createEngagementService({ repo: engagementRepo, community: service, resolveProfiles: opts.resolveProfiles });
 
-  const archive = async () => {
-    try {
-      app.log.info(await service.archiveOldEvents(), "moved old community events to history");
-    } catch (err) {
-      app.log.error(err, "community event archive failed");
-    }
+  const jobs = createJobs(app.log);
+  const archive = async (): Promise<void> => {
+    app.log.info(await service.archiveOldEvents(), "moved old community events to history");
   };
-  void archive();
-  const archiveTimer = setInterval(archive, ARCHIVE_INTERVAL_MS);
-  archiveTimer.unref();
-  const freezeRecaps = () => {
-    try {
-      recaps.freezeDue();
-    } catch (err) {
-      app.log.error(err, "top shelf recap freeze failed");
-    }
+  const freezeRecaps = (): void => {
+    recaps.freezeDue();
   };
-  freezeRecaps();
-  const recapTimer = setInterval(freezeRecaps, RECAP_INTERVAL_MS);
-  recapTimer.unref();
+  jobs.every("community event archive", ARCHIVE_INTERVAL_MS, archive, 100_000);
+  jobs.every("top shelf recap freeze", RECAP_INTERVAL_MS, freezeRecaps, 110_000);
   app.addHook("onClose", (_instance, done) => {
-    clearInterval(archiveTimer);
-    clearInterval(recapTimer);
+    jobs.stopAll();
     done();
   });
 

@@ -3,3 +3,4 @@ export * from "./translate.js";
 export * from "./catalogCheck.js";
 export * from "./sharedT.js";
 export * from "./numbers.js";
+export * from "./localeStore.js";
