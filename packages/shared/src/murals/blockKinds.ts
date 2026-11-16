@@ -107,6 +107,19 @@ function statsMinHeight(block: Block<"stats">): number {
   return rowsFor(STATS_BREAKDOWN_CONTENT + breakdown.others.length * STATS_BREAKDOWN_EXTRA_METRIC);
 }
 
+export const PROFILE_STACK_BELOW = 8;
+const PROFILE_STACKED_HEADER = 88;
+const PROFILE_BIO = 64;
+const PROFILE_GENRES_HEADING = 32;
+const PROFILE_GENRE_CHIP = 30;
+const PROFILE_SHELF_THEME = 96;
+
+function profileMinHeight(block: Block<"profile">): number {
+  if (block.layout.w >= PROFILE_STACK_BELOW) return 8;
+  const genres = block.favoriteGenres.length;
+  return rowsFor(PROFILE_STACKED_HEADER + (block.bio ? PROFILE_BIO : 0) + (genres ? PROFILE_GENRES_HEADING + genres * PROFILE_GENRE_CHIP : 0) + PROFILE_SHELF_THEME);
+}
+
 const KINDS: { [T in BlockType]: Kind<T> } = {
   spotlight: { label: "shared.murals.kindSpotlight", size: { w: 3, h: 4 }, minHeight: 0, configurable: true, content: () => ({ bookKey: "" }),
     valid: (b) => typeof b.bookKey === "string",
@@ -147,7 +160,7 @@ const KINDS: { [T in BlockType]: Kind<T> } = {
     rekey: same, scrub: same, draws: noBooks },
   text: { label: "shared.murals.kindText", size: { w: 4, h: 3 }, minHeight: 0, configurable: true, content: () => ({ heading: "", body: "" }),
     valid: always, references: nothing, rekey: same, scrub: same, draws: noBooks },
-  profile: { label: "shared.murals.kindProfile", size: { w: 6, h: 8 }, minHeight: 8, configurable: true, content: () => ({ bio: "", favoriteGenres: [] }),
+  profile: { label: "shared.murals.kindProfile", size: { w: 6, h: 8 }, minHeight: profileMinHeight, configurable: true, content: () => ({ bio: "", favoriteGenres: [] }),
     valid: always, references: (_b, refs) => { refs.needsShelfTheme = true; }, rekey: same, scrub: same, draws: noBooks },
   currentlyReading: { label: "shared.murals.kindCurrentlyReading", size: { w: 4, h: 6 }, minHeight: 6, configurable: false, content: () => ({}),
     valid: always, references: (_b, refs) => { refs.needsCurrentlyReading = true; }, rekey: same, scrub: same,

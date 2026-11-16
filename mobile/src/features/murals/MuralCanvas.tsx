@@ -23,6 +23,7 @@ import {
   muralThemeId,
   moveMuralBlock,
   muralDragScrollSpeed,
+  PROFILE_STACK_BELOW,
   readingPercent,
   resolveBlockColor,
   resolveBlockStyle,
@@ -191,7 +192,7 @@ export function BlockContent({ block, books, images, tierlists, profile, profile
     const theme = shelfThemeOverride ?? calculateShelfTheme(books);
     const initial = (profile?.username || t("community.readerFallback"))[0]?.toUpperCase();
     return <View style={styles.profileBlock}>
-      {profileInHero ? (block.bio ? <Text numberOfLines={3} style={[text.bio, dim]}>{block.bio}</Text> : null) : <View style={styles.profileHeader}>
+      {profileInHero ? (block.bio ? <Text numberOfLines={3} style={[text.bio, dim]}>{block.bio}</Text> : null) : <View style={[styles.profileHeader, block.layout.w < PROFILE_STACK_BELOW && styles.profileHeaderStacked]}>
         {profile?.avatarUrl && failedSource !== profile.avatarUrl ? <Image source={{ uri: profile.avatarUrl }} style={styles.profileAvatar} contentFit="cover" onDisplay={() => onAssetReady?.(`avatar:${block.id}:${profile.avatarUrl}`)} onError={() => { setFailedSource(profile.avatarUrl!); onAssetReady?.(`avatar:${block.id}:${profile.avatarUrl}`); }} /> : <View style={[styles.profileAvatar, styles.profileInitial, { backgroundColor: colors.accentSoft }]}><Text style={[styles.profileInitialText, { color: colors.accent }]}>{initial}</Text></View>}
         <View style={styles.profileCopy}><Text numberOfLines={1} style={text.name}>@{profile?.username || t("community.readerFallback")}</Text>{block.bio ? <Text numberOfLines={3} style={[text.bio, dim]}>{block.bio}</Text> : null}</View>
       </View>}
@@ -578,10 +579,11 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: "row", alignItems: "baseline", gap: spacing.sm },
   profileBlock: { flex: 1, gap: spacing.md },
   profileHeader: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  profileHeaderStacked: { flexDirection: "column", alignItems: "stretch" },
   profileAvatar: { width: 56, height: 56, borderRadius: 28 },
   profileInitial: { alignItems: "center", justifyContent: "center" },
   profileInitialText: { fontSize: 22, fontWeight: "700" },
-  profileCopy: { flex: 1, gap: spacing.xs },
+  profileCopy: { flexShrink: 1, flexGrow: 1, gap: spacing.xs },
   genreSection: { gap: spacing.xs },
   genreRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
   genreChip: { borderRadius: 999, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },

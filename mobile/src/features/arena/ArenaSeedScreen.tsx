@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Stack } from "expo-router";
 import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { booksByWork, filterBooks, parseRoundMinutes, seedCoverLookup, toSeedBook, workIdOf, type SeedBook } from "@scripta/shared";
-import { Button, EmptyState, ErrorState, Input, Screen, Sheet, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, EmptyState, ErrorState, Input, Screen, Sheet, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme, useUnsavedChangesGuard } from "../../ui";
 import { useLibrary, useWorkBooks } from "../library";
 import { createTournament, fetchTournament, randomFillTournament, resolveCover, setTournamentSlots, startTournament, type Tournament } from "./api";
 import { decimalText } from "@scripta/shared/i18n";
 import { useLocale, useT } from "../../i18n";
+import { seedFormUnsaved, slotsAfterServerLoad, slotsUnsaved } from "./seedDraft";
 
 export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tournament; onStarted: (id: string) => void }) {
   const locale = useLocale();
@@ -18,11 +19,14 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
   const [name, setName] = useState(tournament?.name ?? "");
   const [size, setSize] = useState(tournament?.bracketSize ?? 16);
   const [duration, setDuration] = useState(tournament ? String(tournament.roundDurationMinutes / 60) : "");
+  const [initialForm] = useState({ name, size, duration });
   const roundMinutes = parseRoundMinutes(duration.replace(",", "."));
   const durationInvalid = roundMinutes === null;
   const [current, setCurrent] = useState(tournament);
   const [slots, setSlots] = useState<Array<SeedBook | null>>(() => Array.from({ length: tournament?.bracketSize ?? 16 }, () => null));
   const [savedSlots, setSavedSlots] = useState<Array<SeedBook | null> | null>(null);
+  const savedRef = useRef(savedSlots);
+  savedRef.current = savedSlots;
   const [saving, setSaving] = useState(false);
   const [slotToAssign, setSlotToAssign] = useState<number | null>(null);
   const [bookSearch, setBookSearch] = useState("");
@@ -44,7 +48,7 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
     if (!saved.data) return;
     const byIndex = new Map(saved.data.slots.map((slot) => [slot.slotIndex, slot]));
     const loaded = Array.from({ length: saved.data.bracketSize }, (_, index) => byIndex.get(index) ?? null);
-    setSlots(loaded);
+    setSlots((local) => slotsAfterServerLoad(local, savedRef.current, loaded));
     setSavedSlots(loaded);
   }, [saved.data]);
 
@@ -137,10 +141,12 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
     }
   }
 
+  const discardDialog = useUnsavedChangesGuard(slotsUnsaved(slots, savedSlots) || (!current && seedFormUnsaved({ name, size, duration }, initialForm)));
   const pickable = filterBooks(available, bookSearch, "all");
   const isSaved = Boolean(current) && savedSlots !== null && JSON.stringify(slots) === JSON.stringify(savedSlots);
   return (
     <Screen top={false} style={styles.screen}>
+      {discardDialog}
       <Stack.Screen options={{ headerShown: true, title: t("arena.seedTitle") }} />
       {!current ? (
         <View style={styles.form}>
