@@ -149,7 +149,7 @@ export function ArenaViewPage() {
       subtitle={
         <span className="flex flex-wrap items-center gap-1.5">
           {sharedT(locale)(tournament.subject ? "shared.helpers.bracketCharacters" : "shared.helpers.bracketBooks", { size: tournament.bracketSize })}
-          <TournamentStatusBadge status={tournament.status} round={tournament.currentRound} />
+          <TournamentStatusBadge status={tournament.status} currentRound={tournament.currentRound} />
         </span>
       }
       back={back}

@@ -1,5 +1,4 @@
 import { contentStatusBadge } from "@scripta/shared/community";
-import type { Quiz } from "../../api/quizzes";
 import { useLocale } from "../../i18n";
 
 /** A quiz's stage, as a coloured pill — the quiz counterpart to
@@ -29,8 +28,4 @@ export function QuizStatusBadge({ status, className = "" }: { status: "draft" | 
       {contentStatusBadge(status, locale).label}
     </span>
   );
-}
-
-export function quizStatus(quiz: Quiz): "draft" | "open" | "closed" {
-  return quiz.voteCode === null ? "draft" : quiz.playOpen ? "open" : "closed";
 }

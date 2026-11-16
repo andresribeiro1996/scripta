@@ -92,12 +92,12 @@ test("a missing tournament says so in Portuguese", () => {
 });
 
 test("status badges and the character header translate", () => {
-  const badge = (status: "seeding" | "active" | "completed", round?: number) => inPortuguese(() => renderToString(createElement(TournamentStatusBadge, { status, round })));
+  const badge = (status: "seeding" | "active" | "completed", currentRound?: number) => inPortuguese(() => renderToString(createElement(TournamentStatusBadge, { status, currentRound })));
   assert.match(badge("seeding"), />Em preparação</);
   assert.match(badge("active", 3), />Ronda 3</);
-  assert.match(badge("active"), />Ativo</);
+  assert.match(badge("active"), />Em curso</);
   assert.match(badge("completed"), />Concluído</);
-  assert.match(renderToString(createElement(TournamentStatusBadge, { status: "active", round: 3 })), />Round 3</);
+  assert.match(renderToString(createElement(TournamentStatusBadge, { status: "active", currentRound: 3 })), />Round 3</);
   assert.match(inPortuguese(() => renderToString(createElement(CharacterHeader, { subject: characterSubject }))), /aria-label="Personagens de Dune"/);
 });
 

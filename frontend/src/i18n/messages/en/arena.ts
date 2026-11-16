@@ -7,6 +7,8 @@ export const arena = {
   "arena.newQuiz": "New quiz",
   "arena.newTournament": "New tournament",
   "arena.searchTournaments": "Search tournaments by name",
+  "arena.searchTierlists": "Search tier lists",
+  "arena.searchQuizzes": "Search quizzes",
   "arena.loadingTournaments": "Loading tournaments",
   "arena.loadTournamentsFailed": "Couldn't load your tournaments.",
   "arena.noTournaments": "No tournaments yet.",
@@ -56,9 +58,6 @@ export const arena = {
   "arena.addToLibrary": "Add {title} to your library",
   "arena.vs": "VS",
 
-  "arena.statusSeeding": "Seeding",
-  "arena.statusRound": "Round {number}",
-  "arena.statusActive": "Active",
   "arena.statusCompleted": "Completed",
 
   "arena.slotsFilled": "{filled} / {size} slots filled",
