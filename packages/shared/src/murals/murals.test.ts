@@ -41,11 +41,13 @@ test("growing a block leaves no gap in the column beside it", () => {
   assert.deepEqual(second.layout, { x: 6, y: 2, w: 6, h: 3 });
 });
 
-test("a stats strip is not stretched to the breakdown height", () => {
-  const strip: MuralBlock = { id: "st", type: "stats", metrics: ["totalBooks", "booksFinished", "totalHighlights"], layout: { x: 0, y: 0, w: 6, h: 3 } };
-  assert.equal(ensureBookBlockHeights([strip])[0].layout.h, 3);
-  const short = { ...strip, layout: { ...strip.layout, h: 2 } };
-  assert.equal(ensureBookBlockHeights([short])[0].layout.h, 3);
+test("a stats strip stacks one metric per line below full width and two per line at full width", () => {
+  const strip: MuralBlock = { id: "st", type: "stats", metrics: ["totalBooks", "booksFinished", "totalHighlights"], layout: { x: 0, y: 0, w: 6, h: 2 } };
+  assert.equal(ensureBookBlockHeights([strip])[0].layout.h, 6);
+  const wide = { ...strip, layout: { ...strip.layout, w: 12 } };
+  assert.equal(ensureBookBlockHeights([wide])[0].layout.h, 4);
+  const one = { ...strip, metrics: ["totalBooks"] as never, layout: { ...strip.layout, h: 1 } };
+  assert.equal(ensureBookBlockHeights([one])[0].layout.h, 3);
 });
 
 test("a stats breakdown with extra metrics grows a row for each ~39pt of extra content", () => {

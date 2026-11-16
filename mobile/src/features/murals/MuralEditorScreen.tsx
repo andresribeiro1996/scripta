@@ -6,6 +6,7 @@ import {
   blockLabel,
   bookKey,
   compactMuralBlocks,
+  ensureBookBlockHeights,
   createBlockCandidate,
   createDuplicateCandidate,
   isConfigurable,
@@ -141,7 +142,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   }
 
   function changeBlocks(next: MuralBlock[]) {
-    next = compactMuralBlocks(next);
+    next = compactMuralBlocks(ensureBookBlockHeights(next));
     if (next === currentBlocks || JSON.stringify(next) === JSON.stringify(currentBlocks)) return;
     setHistory((items) => [...items.slice(-19), currentBlocks]);
     setBlocks(next);
@@ -197,7 +198,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
     cacheMural(updated);
     setName(updated.name);
     setTheme(updated.theme);
-    setBlocks(updated.blocks);
+    setBlocks(withGrownBlocks(updated).blocks);
     setHistory([]);
     return updated;
   }

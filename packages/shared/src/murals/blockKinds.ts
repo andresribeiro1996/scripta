@@ -89,8 +89,8 @@ interface Kind<T extends BlockType> {
 const MURAL_ROW_PITCH = 36;
 const MURAL_ROW_GAP = 8;
 const STATS_BLOCK_CHROME = 26;
-const STATS_STRIP_CONTENT = 74;
-const STATS_STRIP_EXTRA_METRIC = 36;
+const STATS_STRIP_ITEM = 48;
+const STATS_STRIP_GAP = 12;
 const STATS_BREAKDOWN_CONTENT = 163;
 const STATS_BREAKDOWN_EXTRA_METRIC = 39;
 
@@ -100,7 +100,10 @@ function rowsFor(contentHeight: number): number {
 
 function statsMinHeight(block: Block<"stats">): number {
   const breakdown = libraryBreakdown(block.metrics, () => 0);
-  if (!breakdown) return rowsFor(STATS_STRIP_CONTENT + Math.max(0, block.metrics.length - 3) * STATS_STRIP_EXTRA_METRIC);
+  if (!breakdown) {
+    const lines = Math.max(1, Math.ceil(block.metrics.length / (block.layout.w >= 12 ? 2 : 1)));
+    return rowsFor(lines * STATS_STRIP_ITEM + (lines - 1) * STATS_STRIP_GAP);
+  }
   return rowsFor(STATS_BREAKDOWN_CONTENT + breakdown.others.length * STATS_BREAKDOWN_EXTRA_METRIC);
 }
 
@@ -149,7 +152,7 @@ const KINDS: { [T in BlockType]: Kind<T> } = {
   currentlyReading: { label: "shared.murals.kindCurrentlyReading", size: { w: 4, h: 6 }, minHeight: 6, configurable: false, content: () => ({}),
     valid: always, references: (_b, refs) => { refs.needsCurrentlyReading = true; }, rekey: same, scrub: same,
     draws: (_b, books) => books.filter((book) => book.ReadStatus === 1) },
-  stats: { label: "shared.murals.kindStats", size: { w: 6, h: 3 }, minHeight: statsMinHeight, configurable: true, content: () => ({ metrics: ["totalBooks", "booksFinished", "totalHighlights"] }),
+  stats: { label: "shared.murals.kindStats", size: { w: 6, h: 6 }, minHeight: statsMinHeight, configurable: true, content: () => ({ metrics: ["totalBooks", "booksFinished", "totalHighlights"] }),
     valid: (b) => Array.isArray(b.metrics),
     references: (b, refs) => addStrings(refs.statsMetrics, b.metrics),
     rekey: same, scrub: same, draws: noBooks },
