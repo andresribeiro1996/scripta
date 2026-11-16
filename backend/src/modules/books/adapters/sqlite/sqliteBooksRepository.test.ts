@@ -3454,22 +3454,6 @@ test("bestSeriesOf takes the position from the best-ranked row of the same name 
   assert.deepEqual(repo.bestSeriesOf([book.work_id!]).get(book.work_id!), { name: MALAZAN, position: "3" });
 });
 
-test("wikidata series beats hardcover", () => {
-  const { repo } = freshRepo();
-  const book = seriesBook(repo, "Dune", "9780441013593", "Frank Herbert");
-  repo.addWorkSeries(book.work_id!, [{ name: "Dune", position: "1" }], "hardcover", at(-1));
-  repo.addWorkSeries(book.work_id!, [{ name: "Dune Chronicles", position: "1" }], "wikidata", at(1));
-  assert.deepEqual(repo.bestSeriesOf([book.work_id!]).get(book.work_id!), { name: "Dune Chronicles", position: "1" });
-});
-
-test("hardcover beats ol-subject", () => {
-  const { repo } = freshRepo();
-  const book = seriesBook(repo, "Dune", "9780441013593", "Frank Herbert");
-  repo.addWorkSeries(book.work_id!, [{ name: "Dune Saga", position: "1" }], "ol-subject", at(-1));
-  repo.addWorkSeries(book.work_id!, [{ name: "Dune", position: "1" }], "hardcover", at(1));
-  assert.deepEqual(repo.bestSeriesOf([book.work_id!]).get(book.work_id!), { name: "Dune", position: "1" });
-});
-
 test("edition collection gives a hardcover series its position", () => {
   const { repo } = freshRepo();
   const book = seriesBook(repo, "Memories of Ice", "9780765348807");
@@ -4179,15 +4163,6 @@ test("searchSeries matches whole words, ranks exact before prefix and ignores a 
   ]);
   assert.deepEqual(repo.searchSeries(["war"]).matches, []);
   assert.deepEqual(repo.searchSeries(["warriors"]).matches.map(({ name }) => name), ["Warriors"]);
-});
-
-test("searchSeries breaks a tie in size and exactness by the better source", () => {
-  const { repo } = freshRepo();
-  const subject = seriesBook(repo, "Primeiro", "9780261102354");
-  const listed = seriesBook(repo, "Segundo", "9780261102736");
-  repo.addWorkSeries(subject.work_id!, [{ name: "Sombra Antiga", position: "1" }], "ol-subject", AT);
-  repo.addWorkSeries(listed.work_id!, [{ name: "Sombra Nova", position: "1" }], "wikidata", AT);
-  assert.deepEqual(repo.searchSeries(["sombra"]).matches.map(({ name }) => name), ["Sombra Nova", "Sombra Antiga"]);
 });
 
 test("searchSeries gives a two-character query no prefix matches", () => {

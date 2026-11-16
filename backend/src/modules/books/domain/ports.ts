@@ -1,7 +1,7 @@
 import type { BookMetadata, BookSearchResult, CatalogBookMetadata, WorkAward } from "@scripta/shared";
 import type { KeyedWork } from "./duplicateWorks.js";
 import type { SynopsisJudgment, SynopsisKind } from "./synopsis.js";
-import type { CollectionSource, SeriesEntry, SeriesSource } from "./series.js";
+import type { CollectionSource, SeriesEntry, SeriesMatch, SeriesSource } from "./series.js";
 import type { WorkSignals } from "./searchRank.js";
 import type { OriginalClaim } from "./translation.js";
 import type { RawWorkSubjects, WorkSubjects } from "./workSubjects.js";
@@ -28,8 +28,6 @@ export interface RecentAward {
   nomineeWorkIds: string[];
   honoree: string | null;
 }
-
-export type SeriesMatch = { nameKey: string; name: string; exact: boolean; members: Array<{ workId: string; position: string | null }> };
 
 export interface BooksRepository {
   transaction<T>(write: () => T): T;

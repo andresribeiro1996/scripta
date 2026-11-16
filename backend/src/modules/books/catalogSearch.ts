@@ -1,5 +1,6 @@
 import { CATALOG_SCAN_LIMIT, normalizeWords, SEARCH_LIMIT, WORK_SCAN_LIMIT, WORK_SEARCH_LIMIT } from "./domain/normalize.js";
-import type { BooksRepository, SeriesMatch } from "./domain/ports.js";
+import type { BooksRepository } from "./domain/ports.js";
+import type { SeriesMatch } from "./domain/series.js";
 import { rankWorks, seriesOrder, withoutArticle, type RankCandidate } from "./domain/searchRank.js";
 import type { SeriesEntry } from "./domain/series.js";
 import type { BookRow } from "./domain/types.js";

@@ -8,7 +8,7 @@ import { planTitleFolds, type KeyedWork, type TitleWork } from "../../domain/dup
 import { WorkMergeError } from "../../domain/errors.js";
 import { withoutArticle } from "../../domain/searchRank.js";
 import { wantsRetitle } from "../../domain/lossy.js";
-import { SERIES_SOURCE_RANK, seriesNameKey, type SeriesEntry, type SeriesSource } from "../../domain/series.js";
+import { pickSeries, rankSeriesMatches, seriesNameKey, type SeriesEntry, type SeriesSource } from "../../domain/series.js";
 import { personNameKey, type WorkSubjects } from "../../domain/workSubjects.js";
 import { summaryHashOf, type SynopsisKind } from "../../domain/synopsis.js";
 import { isOriginalTitle, originalKey, originalTitleIn, originalWholeKey } from "../../domain/translation.js";
@@ -121,8 +121,6 @@ function idPage(stmt: StatementSync, after: PageCursor | null, limit: number): I
 function matchExpression(tokens: string[]): string {
   return tokens.map((token, index) => (index === tokens.length - 1 && token.length >= MIN_PREFIX_LENGTH ? `"${token}"*` : `"${token}"`)).join(" ");
 }
-
-type SeriesCandidate = SeriesEntry & { nameKey: string; source: SeriesSource; rank: number; createdAt: string };
 
 export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const byKeyStmt = db.prepare(`SELECT books.* FROM book_keys JOIN books ON books.id = book_keys.book_id WHERE book_keys.key = ?`);
@@ -745,33 +743,17 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   }
 
   function bestSeriesWithKey(workIds: string[]): Map<string, SeriesEntry & { nameKey: string }> {
-    const best = new Map<string, SeriesEntry & { nameKey: string }>();
-    if (workIds.length === 0) return best;
+    if (workIds.length === 0) return new Map();
     const rootOf = new Map(workIds.map((id) => [id, id]));
     for (const [alias, canonical] of canonicalWorkIds(aliasesOf(workIds))) rootOf.set(alias, canonical);
     const members = JSON.stringify([...rootOf.keys()]);
     const stored = workSeriesStmt.all(members) as Array<{ work_id: string; name: string; name_key: string; position: string | null; source: SeriesSource; created_at: string }>;
-    if (stored.length === 0) return best;
-    const candidates = new Map<string, SeriesCandidate[]>();
-    for (const row of stored) {
-      const root = rootOf.get(row.work_id)!;
-      const candidate = { name: row.name, position: row.position, nameKey: row.name_key, source: row.source, rank: SERIES_SOURCE_RANK[row.source], createdAt: row.created_at };
-      const list = candidates.get(root) ?? [];
-      list.push(candidate);
-      candidates.set(root, list);
-    }
-    for (const row of editionCollectionsStmt.all(members) as Array<{ work_id: string; name: string; name_key: string; position: string | null; created_at: string }>) {
-      const named = candidates.get(rootOf.get(row.work_id)!);
-      if (named?.some((candidate) => candidate.nameKey === row.name_key && (candidate.source === "wikidata" || candidate.source === "hardcover" || candidate.source === "ol-subject"))) {
-        named.push({ name: row.name, position: row.position, nameKey: row.name_key, source: "ol-edition", rank: SERIES_SOURCE_RANK["ol-edition"], createdAt: row.created_at });
-      }
-    }
-    for (const [root, list] of candidates) {
-      list.sort((left, right) => left.rank - right.rank || (left.createdAt < right.createdAt ? -1 : left.createdAt > right.createdAt ? 1 : 0));
-      const top = list[0]!;
-      best.set(root, { name: top.name, nameKey: top.nameKey, position: list.find((candidate) => candidate.nameKey === top.nameKey && candidate.position !== null)?.position ?? null });
-    }
-    return best;
+    if (stored.length === 0) return new Map();
+    const collections = editionCollectionsStmt.all(members) as Array<{ work_id: string; name: string; name_key: string; position: string | null; created_at: string }>;
+    return pickSeries(
+      stored.map((row) => ({ root: rootOf.get(row.work_id)!, name: row.name, nameKey: row.name_key, position: row.position, source: row.source, createdAt: row.created_at })),
+      collections.map((row) => ({ root: rootOf.get(row.work_id)!, name: row.name, nameKey: row.name_key, position: row.position, createdAt: row.created_at }))
+    );
   }
 
   function canonicalWorkIds(ids: string[]): Map<string, string> {
@@ -1627,23 +1609,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       if (names.size === 0) return { workIds, matches: [] };
       const rows = seriesMembersStmt.all(JSON.stringify([...names.keys()])) as Array<{ work_id: string; name_key: string; position: string | null; source: SeriesSource }>;
       const canonical = canonicalWorkIds([...new Set(rows.map((row) => row.work_id))]);
-      const bestRank = new Map<string, number>();
-      const members = new Map<string, Map<string, { position: string | null; rank: number }>>();
-      for (const row of rows) {
-        const workId = canonical.get(row.work_id) ?? row.work_id;
-        const own = members.get(row.name_key) ?? new Map<string, { position: string | null; rank: number }>();
-        const rank = SERIES_SOURCE_RANK[row.source];
-        bestRank.set(row.name_key, Math.min(bestRank.get(row.name_key) ?? rank, rank));
-        const seen = own.get(workId);
-        if (!seen || rank < seen.rank) own.set(workId, { position: row.position, rank });
-        members.set(row.name_key, own);
-      }
-      const matches = [...names].map(([nameKey, { name, exact }]) => ({
-        nameKey,
-        name,
-        exact,
-        members: [...(members.get(nameKey) ?? [])].map(([workId, { position }]) => ({ workId, position }))
-      })).sort((a, b) => Number(b.exact) - Number(a.exact) || b.members.length - a.members.length || (bestRank.get(a.nameKey) ?? Infinity) - (bestRank.get(b.nameKey) ?? Infinity));
+      const matches = rankSeriesMatches(names, rows.map((row) => ({ workId: canonical.get(row.work_id) ?? row.work_id, nameKey: row.name_key, position: row.position, source: row.source })));
       return { workIds, matches };
     },
 
