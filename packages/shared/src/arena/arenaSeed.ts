@@ -41,6 +41,5 @@ export function parseRoundMinutes(text: string): number | null {
 }
 
 export function roundMinutesFromHours(text: string): number {
-  const minutes = Math.round(Number(text) * 60);
-  return Number.isFinite(minutes) && minutes > 0 ? minutes : DEFAULT_ROUND_MINUTES;
+  return parseRoundMinutes(text) ?? DEFAULT_ROUND_MINUTES;
 }
