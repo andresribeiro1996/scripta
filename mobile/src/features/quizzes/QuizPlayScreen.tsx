@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { answerExpands, createPlayClock, isLoneViewer, leaderboardPosition, missesFirst, playDurationLabel, playerLabel, resultCovers, scoreRowPrompt, scoreRows, type PlayClock, type PublicQuizQuestion, type ScoreRow } from "@scripta/shared";
+import { answerExpands, buildSubmission, createPlayClock, isComplete, nextIndex, playStage, isLoneViewer, leaderboardPosition, missesFirst, playDurationLabel, playerLabel, resultCovers, scoreRowPrompt, scoreRows, type PlayClock, type PublicQuizQuestion, type ScoreRow } from "@scripta/shared";
 import { useQuery } from "@tanstack/react-query";
 import { router, Stack, useSegments } from "expo-router";
 import { isPermanentError } from "../../core/apiClient";
@@ -16,7 +16,7 @@ import { publicContentUrl } from "../sharing/links";
 import { coverUrlForApi } from "../library/lib/coverUrl";
 import { workPath } from "../works/workPath";
 import { fetchPlay, fetchPlayBoard, fetchPublicResults, submitPlay, type PlayBoard, type PlayResponse } from "./api";
-import { buildSubmission, isComplete, nextIndex, playStage, playStorageKey } from "./quizPlay";
+import { playStorageKey } from "./quizPlay";
 import { useLocale, useT } from "../../i18n";
 
 const uriFor = (url: string): string => coverUrlForApi(url, API_URL);

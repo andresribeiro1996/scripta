@@ -6,6 +6,7 @@ export * from "./api.js";
 export * from "./preview.js";
 export * from "./labels.js";
 export * from "./playClock.js";
+export * from "./play.js";
 
 export * from "./dailyThemes.js";
 export * from "./dailyChapter.js";
