@@ -1,5 +1,5 @@
 import { WorkMergeError } from "./domain/errors.js";
-import type { BooksRepository } from "./domain/ports.js";
+import type { BooksRepository, WorkMerges } from "./domain/ports.js";
 import { seriesNameKey, type SeriesSource } from "./domain/series.js";
 import { hasVolumeMarker, seriesLikeOriginals } from "./domain/translation.js";
 import type { MergeSource } from "./domain/types.js";
@@ -11,10 +11,10 @@ const UNDOABLE: MergeSource[] = ["code", "jev", "ol-duplicate", "title-key"];
 
 type Why = "series-like" | "volume";
 type Edition = ReturnType<BooksRepository["editionsOf"]>[number];
-type Merge = ReturnType<BooksRepository["activeMerges"]>[number] & { source: MergeSource };
-type ListRepo = Pick<BooksRepository, "activeMerges" | "editionsOf" | "originalTitleClaims" | "canonicalWorkIds" | "getWorkView">;
-type UndoRepo = Pick<BooksRepository, "activeMerges" | "transaction" | "undoMerge" | "saveWorkMatchJudgment">;
-type GuardRepo = Pick<BooksRepository, "activeMerges" | "editionsOf" | "canonicalWorkIds" | "getWorkView" | "collectionsOf" | "seriesMemberKind" | "seriesPositionsOf">;
+type Merge = ReturnType<WorkMerges["activeMerges"]>[number] & { source: MergeSource };
+type ListRepo = Pick<WorkMerges, "activeMerges"> & Pick<BooksRepository, "editionsOf" | "originalTitleClaims" | "canonicalWorkIds" | "getWorkView">;
+type UndoRepo = Pick<WorkMerges, "activeMerges" | "undoMerge"> & Pick<BooksRepository, "transaction" | "saveWorkMatchJudgment">;
+type GuardRepo = Pick<WorkMerges, "activeMerges"> & Pick<BooksRepository, "editionsOf" | "canonicalWorkIds" | "getWorkView" | "collectionsOf" | "seriesMemberKind" | "seriesPositionsOf">;
 type Failure = { fromWork: string; reason: string };
 
 export type SeriesCollapse = {
@@ -32,7 +32,7 @@ export type SeriesCollapse = {
   downstream: Array<{ mergeId: number; fromWork: string; intoWork: string; source: MergeSource }>;
 };
 
-function allActiveMerges(repo: Pick<BooksRepository, "activeMerges">): Merge[] {
+function allActiveMerges(repo: Pick<WorkMerges, "activeMerges">): Merge[] {
   return SOURCES.flatMap((source) => repo.activeMerges(source).map((merge) => ({ ...merge, source }))).sort((a, b) => a.id - b.id);
 }
 
