@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseSeriesString, SERIES_SOURCE_RANK, seriesFromSubjects, seriesNameKey } from "./series.js";
+import { parseSeriesString, pickSeries, rankSeriesMatches, SERIES_SOURCE_RANK, seriesFromSubjects, seriesNameKey, type SeriesRow } from "./series.js";
 
 test("a series name key ignores case, accents, punctuation and surrounding space", () => {
   assert.equal(seriesNameKey("  Bang! "), seriesNameKey("bang"));
@@ -155,4 +155,64 @@ test("a year after a name with no position, or after a number that is not a posi
   assert.deepEqual(parseSeriesString("Apollo 13 (1970)"), { name: "Apollo 13", position: null });
   assert.deepEqual(parseSeriesString("Penguin classics, (2004)"), { name: "Penguin classics", position: null });
   assert.equal(parseSeriesString("#3 (1990)"), null);
+});
+
+const row = (over: Partial<SeriesRow>): SeriesRow => ({ root: "w1", name: "Dune", nameKey: "dune", position: null, source: "wikidata", createdAt: "2026-01-01T00:00:00.000Z", ...over });
+
+test("wikidata series beats hardcover", () => {
+  const best = pickSeries([row({ name: "Dune", source: "hardcover", createdAt: "2025-12-31T00:00:00.000Z" }), row({ name: "Dune Chronicles", nameKey: "dune chronicles", source: "wikidata", createdAt: "2026-01-02T00:00:00.000Z" })], []);
+  assert.equal(best.get("w1")!.name, "Dune Chronicles");
+});
+
+test("hardcover beats ol-subject", () => {
+  const best = pickSeries([row({ name: "Dune Saga", nameKey: "dune saga", source: "ol-subject", createdAt: "2025-12-31T00:00:00.000Z" }), row({ name: "Dune", source: "hardcover", createdAt: "2026-01-02T00:00:00.000Z" })], []);
+  assert.equal(best.get("w1")!.name, "Dune");
+});
+
+test("an edition collection that no stored series names is ignored", () => {
+  const best = pickSeries([row({ source: "original-title" })], [{ root: "w1", name: "Dune", nameKey: "dune", position: "1", createdAt: "2026-01-01T00:00:00.000Z" }]);
+  assert.deepEqual(best.get("w1"), { name: "Dune", nameKey: "dune", position: null });
+});
+
+test("an edition collection that a wikidata, hardcover or subject series names counts as ol-edition", () => {
+  const best = pickSeries(
+    [row({ source: "ol-subject", name: "Dune Saga", nameKey: "dune saga" }), row({ source: "original-title", name: "Dune", nameKey: "dune" })],
+    [{ root: "w1", name: "Dune Saga", nameKey: "dune saga", position: "1", createdAt: "2026-01-01T00:00:00.000Z" }]
+  );
+  assert.deepEqual(best.get("w1"), { name: "Dune Saga", nameKey: "dune saga", position: "1" });
+});
+
+test("equal rank goes to the earliest row", () => {
+  const best = pickSeries([row({ name: "Later", nameKey: "later", createdAt: "2026-02-01T00:00:00.000Z" }), row({ name: "Earlier", nameKey: "earlier", createdAt: "2026-01-01T00:00:00.000Z" })], []);
+  assert.equal(best.get("w1")!.name, "Earlier");
+});
+
+test("the position comes from the first same-key row that has one", () => {
+  const best = pickSeries([row({ position: null }), row({ source: "ol-subject", position: "3" }), row({ source: "original-title", position: "9" })], []);
+  assert.equal(best.get("w1")!.position, "3");
+});
+
+test("series matches list exact names first, then more members, then the better source", () => {
+  const names = new Map([
+    ["prefix big", { name: "Prefix Big", exact: false }],
+    ["exact small", { name: "Exact Small", exact: true }],
+    ["prefix subject", { name: "Prefix Subject", exact: false }],
+    ["prefix listed", { name: "Prefix Listed", exact: false }]
+  ]);
+  const matches = rankSeriesMatches(names, [
+    { workId: "a", nameKey: "prefix big", position: null, source: "ol-subject" },
+    { workId: "b", nameKey: "prefix big", position: null, source: "ol-subject" },
+    { workId: "a", nameKey: "exact small", position: null, source: "ol-subject" },
+    { workId: "a", nameKey: "prefix subject", position: null, source: "ol-subject" },
+    { workId: "a", nameKey: "prefix listed", position: null, source: "wikidata" }
+  ]);
+  assert.deepEqual(matches.map(({ name }) => name), ["Exact Small", "Prefix Big", "Prefix Listed", "Prefix Subject"]);
+});
+
+test("a work keeps the position of its lowest-ranked source in a series match", () => {
+  const [match] = rankSeriesMatches(new Map([["malazan", { name: "Malazan", exact: true }]]), [
+    { workId: "a", nameKey: "malazan", position: "9", source: "ol-subject" },
+    { workId: "a", nameKey: "malazan", position: "1", source: "wikidata" }
+  ]);
+  assert.deepEqual(match!.members, [{ workId: "a", position: "1" }]);
 });

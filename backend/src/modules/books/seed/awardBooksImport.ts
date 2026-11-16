@@ -3,7 +3,7 @@ import { realSleep, type Sleep } from "../adapters/typesafe/jevRequest.js";
 import { listOf, type Binding } from "../adapters/wikidata/sparql.js";
 import { SourceUnavailableError } from "../domain/errors.js";
 import { authorMatches, lookupIdentity, normalizeWorkKey, titleMatches, workTitleKey } from "../domain/normalize.js";
-import type { BookCatalog, BooksRepository, CatalogSearchHit } from "../domain/ports.js";
+import type { BookCatalog, BooksRepository, CatalogSearchHit, WorkMerges } from "../domain/ports.js";
 import { saveCatalogHits } from "../saveHits.js";
 import { itemOf, prizeOf } from "./awardsFill.js";
 
@@ -120,7 +120,7 @@ export async function resolveAwardWork(search: BookCatalog["search"], work: Awar
   return null;
 }
 
-function aliasWorkKey(repo: Pick<BooksRepository, "getBook" | "workIdsByWorkKeys" | "addWorkAlias">, bookId: string, olWorkId: string, at: string): boolean {
+function aliasWorkKey(repo: Pick<BooksRepository, "getBook" | "workIdsByWorkKeys"> & Pick<WorkMerges, "addWorkAlias">, bookId: string, olWorkId: string, at: string): boolean {
   if (repo.workIdsByWorkKeys([olWorkId]).has(olWorkId)) return false;
   const workId = repo.getBook(bookId)?.work_id;
   if (!workId) return false;

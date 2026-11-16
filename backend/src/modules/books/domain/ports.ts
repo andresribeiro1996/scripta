@@ -1,7 +1,7 @@
 import type { BookMetadata, BookSearchResult, CatalogBookMetadata, WorkAward } from "@scripta/shared";
 import type { KeyedWork } from "./duplicateWorks.js";
 import type { SynopsisJudgment, SynopsisKind } from "./synopsis.js";
-import type { CollectionSource, SeriesEntry, SeriesSource } from "./series.js";
+import type { CollectionSource, SeriesEntry, SeriesMatch, SeriesSource } from "./series.js";
 import type { WorkSignals } from "./searchRank.js";
 import type { OriginalClaim } from "./translation.js";
 import type { RawWorkSubjects, WorkSubjects } from "./workSubjects.js";
@@ -29,9 +29,21 @@ export interface RecentAward {
   honoree: string | null;
 }
 
-export type SeriesMatch = { nameKey: string; name: string; exact: boolean; members: Array<{ workId: string; position: string | null }> };
+export interface WorkMerges {
+  mergeWorks(fromId: string, intoId: string, at?: string): string;
+  mergeDuplicateWork(fromId: string, intoId: string, at: string): string;
+  addWorkAlias(key: string, intoId: string, at: string): void;
+  mergeTranslation(fromId: string, intoId: string, source: "code" | "jev" | "manual", confidence: number | null, at: string): string;
+  undoMerge(fromId: string, at: string): { into: string; editions: number };
+  groupTitleKeys(keys: string[], limit: number, at?: string, skip?: (from: string, into: string) => boolean): number;
+  undoneMergeAmong(workIds: string[]): boolean;
+  activeMerges(source: MergeSource): Array<{ id: number; fromWork: string; intoWork: string; movedBookIds: string[]; mergedAt: string; confidence: number | null }>;
+  groupableTitleKeys(after: string, limit: number): string[];
+  keyedWorksWithTitleKeys(keys: string[]): KeyedWork[];
+  isSeriesName(nameKey: string): boolean;
+}
 
-export interface BooksRepository {
+export interface BooksRepository extends WorkMerges {
   transaction<T>(write: () => T): T;
   findBookByKey(key: string): BookRow | undefined;
   findBooksByKeys(keys: string[]): Map<string, BookRow>;
@@ -69,20 +81,12 @@ export interface BooksRepository {
   setWorkKey(id: string, key: string | null | undefined): void;
   assignMissingWorks(limit: number): number;
   fillTitleKeys(limit: number): number;
-  groupTitleKeys(keys: string[], limit: number, at?: string, skip?: (from: string, into: string) => boolean): number;
-  groupableTitleKeys(after: string, limit: number): string[];
-  keyedWorksWithTitleKeys(keys: string[]): KeyedWork[];
-  isSeriesName(nameKey: string): boolean;
-  undoneMergeAmong(workIds: string[]): boolean;
   listWorkLookupIds(limit: number, recheckBefore: string): string[];
   markWorkChecked(id: string, at: string): void;
   listEditionYearIds(limit: number, recheckBefore: string): string[];
   setEditionYear(id: string, year: number | null, checkedAt: string): void;
   fillFirstPublishedYear(id: string, year: number): void;
   replaceLanguage(id: string, tag: string): void;
-  mergeWorks(fromId: string, intoId: string, at?: string): string;
-  mergeDuplicateWork(fromId: string, intoId: string, at: string): string;
-  addWorkAlias(key: string, intoId: string, at: string): void;
   detachEdition(bookId: string, at: string): string;
   getWorkView(id: string): WorkView | undefined;
   workPageRows(id: string): WorkPageRows | undefined;
@@ -119,8 +123,6 @@ export interface BooksRepository {
   synopsisTexts(): Array<{ hash: string; source: string; title: string; author: string; text: string }>;
   fillOriginalTitle(bookId: string, title: string): void;
   fillOriginalTitlesFromSummaries(workId?: string): number;
-  mergeTranslation(fromId: string, intoId: string, source: "code" | "jev" | "manual", confidence: number | null, at: string): string;
-  undoMerge(fromId: string, at: string): { into: string; editions: number };
   workMatchJudgments(workIds: string[]): Map<string, WorkMatchJudgment>;
   saveWorkMatchJudgment(workId: string, judgment: WorkMatchJudgment): void;
   portugueseWorksNeedingMatch(workIds: string[] | null, limit: number, rejectionLimit: number, recheckBefore: string | null): string[];
@@ -130,7 +132,6 @@ export interface BooksRepository {
   originalKeysOf(wholeKey: string): string[];
   originalArrivals(limit: number): string[];
   dropOriginalArrival(titleKey: string): void;
-  activeMerges(source: MergeSource): Array<{ id: number; fromWork: string; intoWork: string; movedBookIds: string[]; mergedAt: string; confidence: number | null }>;
   editionsOf(workIds: string[]): Array<{ id: string; workId: string; title: string; author: string; language: string | null; isbn: string | null; originalTitle: string | null; hasCover: boolean }>;
   titleCandidates(pattern: string): Array<{ id: string; title: string }>;
   authorCandidates(pattern: string): string[];

@@ -1,11 +1,11 @@
 import { planDuplicateSets } from "./domain/duplicateWorks.js";
 import { WorkMergeError } from "./domain/errors.js";
-import type { BooksRepository } from "./domain/ports.js";
+import type { WorkMerges } from "./domain/ports.js";
 
 const DEFAULT_PAGE_SIZE = 500;
 
 export interface DuplicateDeps {
-  repo: Pick<BooksRepository, "keyedWorksWithTitleKeys" | "groupableTitleKeys" | "isSeriesName" | "undoneMergeAmong" | "mergeDuplicateWork">;
+  repo: Pick<WorkMerges, "keyedWorksWithTitleKeys" | "groupableTitleKeys" | "isSeriesName" | "undoneMergeAmong" | "mergeDuplicateWork">;
   sharesArena: (from: string, into: string) => boolean;
   now: () => number;
 }
@@ -78,7 +78,7 @@ export async function walkDuplicateWorks(deps: DuplicateDeps, options: { dryRun:
 }
 
 export async function groupKeylessWorks(
-  repo: Pick<BooksRepository, "groupableTitleKeys" | "groupTitleKeys">,
+  repo: Pick<WorkMerges, "groupableTitleKeys" | "groupTitleKeys">,
   limit: number,
   options: { at?: string; skip?: (from: string, into: string) => boolean; signal?: AbortSignal; pageSize?: number } = {}
 ): Promise<number> {

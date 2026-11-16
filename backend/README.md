@@ -950,6 +950,8 @@ modules/<name>/
       schema.sql         ← this module's own tables
       sqlite<Name>Repository.ts   ← implements the port using node:sqlite. The ONLY
                                       file in the module that contains SQL.
+      sqliteWorkMerges.ts         ← books only: the merge rules (the WorkMerges port).
+                                      domain/series.ts holds series ranking.
   routes.ts            ← HTTP layer. Takes the already-built service as a plain argument
                           too — knows nothing about SQLite either.
   plugin.ts             ← the composition root: the ONE place that creates the concrete
