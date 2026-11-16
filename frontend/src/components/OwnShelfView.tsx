@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ownProfileCard, readerCardInputOf } from "@scripta/shared";
 import type { FeedCategory, FeedSettings } from "@scripta/shared/community";
-import { DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
+import { AFTER_SHELF_PUBLISH_FAILED, afterShelfPublish, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 import { fetchCardShare, fetchOwnProfile, publishProfile, setShelfMural, shareCard, unpublishProfile, unshareCard, updateFeedSettings } from "../api/community";
 import { useAuth } from "../auth/AuthContext";
 import { Avatar, avatarUrlFor } from "./Avatar";
@@ -81,12 +81,11 @@ export function OwnShelfView({ username }: { username: string }) {
     setError(null);
     try {
       await action();
-      await queryClient.invalidateQueries({ queryKey: ["community", "own-profile"] });
-      await queryClient.invalidateQueries({ queryKey: ["community", "profile", username] });
-      await queryClient.invalidateQueries({ queryKey: ["community", "activity", username] });
+      for (const queryKey of afterShelfPublish(username)) await queryClient.invalidateQueries({ queryKey });
       return true;
     } catch {
       setError(t("library.shelfActionFailed"));
+      for (const queryKey of AFTER_SHELF_PUBLISH_FAILED) await queryClient.invalidateQueries({ queryKey });
       return false;
     } finally {
       setBusy(false);

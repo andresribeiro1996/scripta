@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { CIRCLE_DIGEST_KINDS, PERSONAL_DIGEST_KINDS } from "@scripta/shared";
+import { AFTER_FOLLOW } from "@scripta/shared/community";
 import { ApiError } from "../../core/api";
 import { fetchDashboard, followUser } from "../community/api";
 import { useT } from "../../i18n";
@@ -35,20 +36,16 @@ export function useSkipEmptyPages({ hasNextPage, isFetchingNextPage, isFetchNext
   }, [rows, hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage]);
 }
 
-export function useFollowBack(refetch: () => Promise<unknown>) {
+export function useFollowBack() {
   const t = useT();
   const queryClient = useQueryClient();
   const [followingId, setFollowingId] = useState<string | null>(null);
   const [followError, setFollowError] = useState<string | null>(null);
-  // Refetches rather than patching the row in place: the follow lands as an
-  // event of its own, so the feed has more to say afterwards than just this
-  // row's new state.
   async function followBack(userId: string) {
     setFollowingId(userId);
     try {
       await followUser(userId);
-      await queryClient.invalidateQueries({ queryKey: ["community", "people"] });
-      await refetch();
+      for (const queryKey of AFTER_FOLLOW) await queryClient.invalidateQueries({ queryKey });
     } catch (reason) {
       setFollowError(reason instanceof ApiError ? reason.message : t("community.followFailed"));
     } finally {

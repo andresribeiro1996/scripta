@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
 import { StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text } from "../../ui/Text";
+import { AFTER_SHELF_PUBLISH_FAILED, afterShelfPublish } from "@scripta/shared/community";
 import { buildMuralPreset, ensureBookBlockHeights, orderLibraryBooks, ownProfileCard, readerCardInputOf, shelfPresetSummary, type Mural } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { API_URL } from "../../core/config";
@@ -106,14 +107,11 @@ export function MyShelfScreen() {
     setError(null);
     try {
       await action();
-      await queryClient.invalidateQueries({ queryKey: ["community", "own-profile"] });
-      await queryClient.invalidateQueries({ queryKey: ["community", "profile", username] });
-      await queryClient.invalidateQueries({ queryKey: ["community", "activity", username] });
+      for (const queryKey of afterShelfPublish(user?.username ?? null)) await queryClient.invalidateQueries({ queryKey });
       return true;
     } catch {
       setError(t("community.somethingWentWrongRetry"));
-      await queryClient.invalidateQueries({ queryKey: ["community", "own-profile"] });
-      await queryClient.invalidateQueries({ queryKey: ["murals"] });
+      for (const queryKey of AFTER_SHELF_PUBLISH_FAILED) await queryClient.invalidateQueries({ queryKey });
       return false;
     } finally {
       setBusy(false);

@@ -254,7 +254,7 @@ test("SwipeTabs: a 44px nav from lg with the current tab marked, the swipe tabli
 test("following refreshes the people lists and Home's circle, from all four places", async () => {
   const keys: unknown[] = [];
   await invalidateAfterFollow({ invalidateQueries: async ({ queryKey }: { queryKey: unknown }) => { keys.push(queryKey); } } as never);
-  assert.deepEqual(keys, [["community", "people"], ["community", "dashboard", "circle"]]);
+  assert.deepEqual(keys, [["community", "people"], ["community", "dashboard"]]);
   for (const f of ["pages/PeoplePage", "pages/CommunityProfilePage", "components/home/SuggestedReaders", "components/home/ForYouPanel"]) {
     const s = src(f);
     assert.match(s, /await invalidateAfterFollow\(queryClient\)/, f);

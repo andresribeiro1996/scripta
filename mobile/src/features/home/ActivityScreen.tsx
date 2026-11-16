@@ -22,7 +22,7 @@ export function ActivityScreen() {
   const feed = useActivityFeed();
   const items = (feed.data?.pages.flatMap((page) => page.items) ?? []).filter(isPersonalItem);
   const seenAt = feed.data?.pages[0]?.seenAt ?? null;
-  const { followingId, followError, followBack } = useFollowBack(feed.refetch);
+  const { followingId, followError, followBack } = useFollowBack();
   const seenSent = useRef(false);
   const rowVisible = useRef(false);
   useSkipEmptyPages(feed, items.length);

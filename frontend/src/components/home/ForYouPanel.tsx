@@ -101,7 +101,6 @@ export function ForYouPanel() {
     try {
       await followUser(userId);
       await invalidateAfterFollow(queryClient);
-      await feed.refetch();
     } catch (failure) {
       setError(followFailureMessage(failure, t("book.followFailedTryAgain")));
     } finally {
