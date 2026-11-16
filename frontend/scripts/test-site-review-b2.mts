@@ -126,7 +126,7 @@ test("expected-empty lookups are not requested when the board says nothing exist
   assert.equal(canHoldBallot("", 3, "id", true), false);
   assert.equal(canHoldBallot("abc", 3, null, true), true);
   assert.equal(canHoldBallot("abc", 3, "id", false), true);
-  assert.match(src("hooks/useQuizPlay.ts"), /enabled: \(board\.data\?\.playCount \?\? 0\) > 0/);
+  assert.match(src("hooks/useQuizPlay.ts"), /lookupEnabled = \(board\.data\?\.playCount \?\? 0\) > 0/);
 });
 
 test("both Discover pages and People say what they are", () => {

@@ -7,7 +7,6 @@ export const arena = {
   "arena.votingIn": "Voting in",
   "arena.filterAll": "All",
   "arena.sectionHeader": "{title} · {count}",
-  "arena.seeding": "Seeding",
   "arena.deleteEffectTournament": "Its matches and every vote on them are deleted, and its link stops working. This can't be undone.",
   "arena.deleteEffectTierlist": "Its ballots are deleted, and its voting link stops working. This can't be undone.",
   "arena.deleteEffectQuiz": "Its plays and leaderboard are deleted, and its link stops working. This can't be undone.",

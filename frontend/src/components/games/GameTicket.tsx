@@ -22,7 +22,7 @@ const KINDS = {
 } as const;
 
 export function StatusBadge({ label, tone }: { label: string; tone: ContentTone }) {
-  return <span className={`rounded-full border px-2 py-0.5 text-sm font-semibold ${STATUS_TONES[tone]}`}>{label}</span>;
+  return <span className={`shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-sm font-semibold ${STATUS_TONES[tone]}`}>{label}</span>;
 }
 
 export function GameTicket({

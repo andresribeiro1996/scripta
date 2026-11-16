@@ -223,6 +223,8 @@ export const ptPT: CatalogOf<typeof en> = {
   "shared.arenaBracket.semis": "Meias-finais",
   "shared.arenaBracket.quarters": "Quartos de final",
   "shared.arenaBracket.round": "Ronda {number}",
+  "shared.gamesList.seeding": "Em preparação",
+  "shared.gamesList.round": "Ronda {number}",
 
   "shared.countdown.closing": "A fechar…",
   "shared.countdown.daysHours": "faltam {days} d {hours} h",

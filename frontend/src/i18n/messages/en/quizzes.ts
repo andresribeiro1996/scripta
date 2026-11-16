@@ -2,6 +2,7 @@ import type { Messages } from "@scripta/shared/i18n";
 
 export const quizzes = {
   "quizzes.title": "Quiz",
+  "quizzes.playLookupFailed": "Couldn't check your previous plays.",
   "quizzes.typeCoverTitle": "Guess the title from a blurred cover",
   "quizzes.typeTitleCover": "Guess the cover from the title",
   "quizzes.typeQuoteTitle": "Guess the book from a quote",

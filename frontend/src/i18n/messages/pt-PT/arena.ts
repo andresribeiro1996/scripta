@@ -8,6 +8,8 @@ export const arena: CatalogOf<typeof en> = {
   "arena.newQuiz": "Novo quiz",
   "arena.newTournament": "Novo torneio",
   "arena.searchTournaments": "Pesquisar torneios por nome",
+  "arena.searchTierlists": "Pesquisar tabelas de níveis",
+  "arena.searchQuizzes": "Pesquisar quizzes",
   "arena.loadingTournaments": "A carregar torneios",
   "arena.loadTournamentsFailed": "Não foi possível carregar os seus torneios.",
   "arena.noTournaments": "Ainda não tem torneios.",
@@ -56,11 +58,6 @@ export const arena: CatalogOf<typeof en> = {
   "arena.about": "Sobre",
   "arena.addToLibrary": "Adicionar {title} à sua biblioteca",
   "arena.vs": "VS",
-
-  "arena.statusSeeding": "Em preparação",
-  "arena.statusRound": "Ronda {number}",
-  "arena.statusActive": "Ativo",
-  "arena.statusCompleted": "Concluído",
 
   "arena.slotsFilled": "{filled} / {size} posições preenchidas",
   "arena.randomFillNeeds": "A sua biblioteca precisa de pelo menos {size} livros para o preenchimento aleatório.",

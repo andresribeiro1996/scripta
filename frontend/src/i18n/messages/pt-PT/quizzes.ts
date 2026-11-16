@@ -3,6 +3,7 @@ import type { quizzes as en } from "../en/quizzes";
 
 export const quizzes: CatalogOf<typeof en> = {
   "quizzes.title": "Quiz",
+  "quizzes.playLookupFailed": "Não foi possível verificar as suas participações anteriores.",
   "quizzes.typeCoverTitle": "Adivinhar o título a partir de uma capa desfocada",
   "quizzes.typeTitleCover": "Adivinhar a capa a partir do título",
   "quizzes.typeQuoteTitle": "Adivinhar o livro a partir de uma citação",

@@ -60,6 +60,8 @@
 - Delete: `frontend/src/lib/quizPlayStage.ts`
 - Delete: `frontend/scripts/test-quiz-play-stage.mts`
 - Test: `packages/shared/src/quizzes/play.test.ts`
+- Test: `frontend/scripts/test-site-review-b2.mts`
+- Test: `frontend/scripts/test-page-frame.mts`
 - Modify: `frontend/src/i18n/messages/en/quizzes.ts`
 - Modify: `frontend/src/i18n/messages/pt-PT/quizzes.ts`
 

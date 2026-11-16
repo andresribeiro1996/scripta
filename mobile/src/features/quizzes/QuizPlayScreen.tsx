@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { answerExpands, createPlayClock, isLoneViewer, leaderboardPosition, missesFirst, playDurationLabel, playerLabel, resultCovers, scoreRowPrompt, scoreRows, type PlayClock, type PublicQuizQuestion, type ScoreRow } from "@scripta/shared";
+import { answerExpands, buildSubmission, createPlayClock, isComplete, nextIndex, playStage, isLoneViewer, leaderboardPosition, missesFirst, playDurationLabel, playerLabel, resultCovers, scoreRowPrompt, scoreRows, type PlayClock, type PublicQuizQuestion, type ScoreRow } from "@scripta/shared";
 import { useQuery } from "@tanstack/react-query";
 import { router, Stack, useSegments } from "expo-router";
 import { isPermanentError } from "../../core/apiClient";
@@ -16,7 +16,7 @@ import { publicContentUrl } from "../sharing/links";
 import { coverUrlForApi } from "../library/lib/coverUrl";
 import { workPath } from "../works/workPath";
 import { fetchPlay, fetchPlayBoard, fetchPublicResults, submitPlay, type PlayBoard, type PlayResponse } from "./api";
-import { buildSubmission, isComplete, nextIndex, playStage, playStorageKey } from "./quizPlay";
+import { playStorageKey } from "./quizPlay";
 import { useLocale, useT } from "../../i18n";
 
 const uriFor = (url: string): string => coverUrlForApi(url, API_URL);
@@ -98,9 +98,9 @@ export function QuizPlayScreen({ code }: { code: string }) {
     {leaveDialog}
     <Stack.Screen options={{ headerShown: true, title: board.data?.name ?? t("quizzes.quizTitle") }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
-    {stage === "loading" || board.isPending ? <Screen bottom style={styles.screen}><Skeleton height={180} /></Screen>
+    {recoverError && board.isSuccess ? <ErrorState title={t("quizzes.recoverFailedTitle")} body={recoverError} actionLabel={t("shell.retry")} onAction={() => { setRecoverError(null); loadOwnPlay(); }} />
+    : stage === "loading" || board.isPending ? <Screen bottom style={styles.screen}><Skeleton height={180} /></Screen>
     : stage === "unavailable" ? <ErrorState title={t("quizzes.noQuizAtLink")} body={t("quizzes.checkCode")} actionLabel={isPermanentError(board.error) ? t("shell.notFoundAction") : t("shell.retry")} onAction={isPermanentError(board.error) ? () => router.replace("/") : () => void board.refetch()} />
-    : recoverError ? <ErrorState title={t("quizzes.recoverFailedTitle")} body={recoverError} actionLabel={t("shell.retry")} onAction={() => { setRecoverError(null); loadOwnPlay(); }} />
     : stage === "leaderboard" ? <View style={styles.closed}>
       <Text {...dynamicType} style={[typography.body, styles.center, { color: colors.textDim }]}>{t("quizzes.quizClosed")}</Text>
       <Leaderboard code={code} playId={null} />
