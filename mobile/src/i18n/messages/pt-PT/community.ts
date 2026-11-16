@@ -10,7 +10,6 @@ export const community: CatalogOf<typeof en> = {
   "community.circleStartsTitle": "O seu círculo começa aqui",
   "community.circleStartsBody": "Siga leitores para ver os livros, os jogos e os murais que partilham.",
   "community.startLibraryBody": "Traga os seus livros para o seu mundo de leitura.",
-  "community.openDailyStats": "Abrir as estatísticas do Capítulo do Dia",
   "community.openActivity": "Abrir atividade",
   "community.openSaved": "Abrir jogos e murais guardados",
   "community.activity": "Atividade",
@@ -132,4 +131,9 @@ export const community: CatalogOf<typeof en> = {
   "community.unpublish": "Anular publicação",
   "community.keepShelf": "Manter esta estante",
   "community.startBlank": "Começar em branco",
+  "community.homeGameBy": "de @{username}",
+  "community.homeNewGames": "Jogos novos",
+  "community.homeSeeAllGames": "Ver todos ›",
+  "community.homeReading": "A ler agora",
+  "community.homeReadingPercent": "A ler agora · {percent}%",
 };

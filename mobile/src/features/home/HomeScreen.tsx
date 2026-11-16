@@ -1,26 +1,26 @@
 import { DailyChapterCard } from "../dailyChapter/daily-chapter-card";
 import { useCallback, useState } from "react";
-import { Pressable, RefreshControl, SectionList, StyleSheet, View } from "react-native";
+import { RefreshControl, SectionList, StyleSheet, View } from "react-native";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { newCountLabel, type DigestItem } from "@scripta/shared";
 import { feedRowModel } from "@scripta/shared/community";
-import { Text } from "../../ui/Text";
-import { BrandMark, EmptyState, ErrorState, HeaderActions, IconButton, Screen, Skeleton, Toast, dynamicType, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
+import { BrandMark, EmptyState, ErrorState, HeaderActions, IconButton, Screen, Skeleton, Toast, spacing } from "../../ui";
 import { FeedRow, useActivityFeed, useDashboardFeed, useSkipEmptyPages } from "./FeedRow";
 import { digestRoute } from "./feedRowModel";
 import { CommentsSheet } from "./CommentsSheet";
 import { SavedContentSheet } from "./SavedContentSheet";
-import { useDailyHistory } from "../dailyChapter/use-daily-history";
 import { RecapHomeCard } from "../topShelf/RecapHomeCard";
 import { AwardHomeCard, RECENT_AWARDS_QUERY_KEY } from "../awards/AwardHomeCard";
 import { ENGAGEMENT_QUERY_KEY, SAVED_STATE_QUERY_KEY, useHomeActions } from "./useHomeActions";
+import { HomeNewGames, NEW_GAMES_QUERY_KEY } from "./HomeNewGames";
+import { HomeReadingRow } from "./HomeReadingRow";
+import { HomeSectionHeader } from "./HomeSectionHeader";
 import { useLocale, useT } from "../../i18n";
 
 export function HomeScreen() {
   const locale = useLocale();
   const t = useT();
-  const { colors } = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [pulling, setPulling] = useState(false);
@@ -30,7 +30,6 @@ export function HomeScreen() {
   const items = dashboard.data?.pages.flatMap((page) => page.items) ?? [];
   const actions = useHomeActions(items);
   const activity = useActivityFeed();
-  const hasChapters = Boolean(useDailyHistory().data?.results.length);
   const activityBadge = newCountLabel(activity.data?.pages[0]?.personalNewCount ?? 0);
   const sections = [{ title: t("community.yourReadingCircle"), data: items }];
   useSkipEmptyPages(dashboard, items.length);
@@ -42,11 +41,12 @@ export function HomeScreen() {
     void queryClient.invalidateQueries({ queryKey: ENGAGEMENT_QUERY_KEY });
     void queryClient.invalidateQueries({ queryKey: SAVED_STATE_QUERY_KEY });
     void queryClient.invalidateQueries({ queryKey: RECENT_AWARDS_QUERY_KEY });
+    void queryClient.invalidateQueries({ queryKey: NEW_GAMES_QUERY_KEY });
   }, [actions.library.refetch, dashboard.refetch, activity.refetch, queryClient]));
 
   async function onRefresh() {
     setPulling(true);
-    try { await Promise.all([actions.library.refetch(), dashboard.refetch(), activity.refetch(), queryClient.invalidateQueries({ queryKey: ENGAGEMENT_QUERY_KEY }), queryClient.invalidateQueries({ queryKey: SAVED_STATE_QUERY_KEY }), queryClient.invalidateQueries({ queryKey: RECENT_AWARDS_QUERY_KEY })]); }
+    try { await Promise.all([actions.library.refetch(), dashboard.refetch(), activity.refetch(), queryClient.invalidateQueries({ queryKey: ENGAGEMENT_QUERY_KEY }), queryClient.invalidateQueries({ queryKey: SAVED_STATE_QUERY_KEY }), queryClient.invalidateQueries({ queryKey: RECENT_AWARDS_QUERY_KEY }), queryClient.invalidateQueries({ queryKey: NEW_GAMES_QUERY_KEY })]); }
     finally { setPulling(false); }
   }
   const findReaders = () => router.push("/people" as never);
@@ -54,7 +54,7 @@ export function HomeScreen() {
   const empty = dashboard.isPending || (dashboard.hasNextPage && !dashboard.isError && !items.length) ? <Skeleton height={80} /> : dashboard.isError && !dashboard.data ? <ErrorState body={t("community.activityLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void dashboard.refetch()} /> : dashboard.hasNextPage ? null : <EmptyState title={t("community.circleStartsTitle")} body={t("community.circleStartsBody")} secondaryActionLabel={t("community.findPeople")} onSecondaryAction={findReaders} />;
   const noLibrary = actions.library.data === null || actions.library.data?.data.books.length === 0;
   return <Screen top={false}>
-    <Stack.Screen options={{ title: t("shell.tabHome"), headerShown: true, headerLeft: () => <View style={styles.mark}><BrandMark size={24} /></View>, headerRight: () => <HeaderActions>{hasChapters ? <IconButton name="stats" accessibilityLabel={t("community.openDailyStats")} onPress={() => router.push("/daily-chapters" as never)} /> : null}<IconButton name="bell" accessibilityLabel={t("community.openActivity")} badge={activityBadge} onPress={() => router.push("/activity" as never)} /><IconButton name="bookmark" accessibilityLabel={t("community.openSaved")} onPress={() => setSavedOpen(true)} /></HeaderActions> }} />
+    <Stack.Screen options={{ title: t("shell.tabHome"), headerShown: true, headerLeft: () => <View style={styles.mark}><BrandMark size={24} /></View>, headerRight: () => <HeaderActions><IconButton name="bell" accessibilityLabel={t("community.openActivity")} badge={activityBadge} onPress={() => router.push("/activity" as never)} /><IconButton name="bookmark" accessibilityLabel={t("community.openSaved")} onPress={() => setSavedOpen(true)} /></HeaderActions> }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     <SectionList sections={sections} keyExtractor={(item) => `${item.kind}:${item.id}`} stickySectionHeadersEnabled={false} maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 10 }} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.list}
       ListHeaderComponent={<>
@@ -62,11 +62,10 @@ export function HomeScreen() {
         <RecapHomeCard />
         <AwardHomeCard />
         {noLibrary ? <View style={styles.onboarding}><EmptyState title={t("library.startTitle")} body={t("community.startLibraryBody")} actionLabel={t("shell.importLibrary")} onAction={() => router.push("/import" as never)} secondaryActionLabel={t("shell.addBook")} onSecondaryAction={() => router.push("/add-book" as never)} /></View> : null}
+        <HomeNewGames />
+        <HomeReadingRow books={actions.library.data?.data.books} />
       </>}
-      renderSectionHeader={({ section }) => <View style={styles.sectionHeader}>
-        <Text accessibilityRole="header" {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{section.title}</Text>
-        <Pressable accessibilityRole="link" onPress={findReaders} style={styles.sectionAction}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>{t("community.findPeopleArrow")}</Text></Pressable>
-      </View>}
+      renderSectionHeader={({ section }) => <HomeSectionHeader title={section.title} linkLabel={t("community.findPeopleArrow")} onLink={findReaders} />}
       renderItem={({ item }) => <FeedRow item={item} actions={actions} onOpen={() => router.push(digestRoute(item) as never)} onComments={() => setComments(item)} />}
       renderSectionFooter={({ section }) => !section.data.length ? <View style={styles.onboarding}>{empty}</View> : null}
       ListFooterComponent={dashboard.isFetchingNextPage && items.length ? <View style={styles.onboarding}><Skeleton height={80} /></View> : dashboard.isFetchNextPageError ? <View style={styles.onboarding}><ErrorState body={t("book.loadMoreFailed")} actionLabel={t("shell.retry")} onAction={() => void dashboard.fetchNextPage()} /></View> : undefined}
@@ -79,9 +78,5 @@ export function HomeScreen() {
 const styles = StyleSheet.create({
   mark: { marginRight: spacing.sm },
   list: { paddingBottom: spacing.huge },
-  onboarding: { paddingHorizontal: spacing.md, paddingVertical: spacing.lg },
-  sectionHeader: { marginHorizontal: spacing.md, paddingTop: spacing.xl, paddingBottom: spacing.sm, flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  sectionAction: { minHeight: minimumTouchTarget, justifyContent: "center" },
-  strong: { fontWeight: "700" },
-  grow: { flex: 1, minWidth: 0 }
+  onboarding: { paddingHorizontal: spacing.md, paddingVertical: spacing.lg }
 });

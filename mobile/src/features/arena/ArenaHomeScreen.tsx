@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
 import { booksByWork } from "@scripta/shared";
@@ -35,12 +35,15 @@ const noVoted = { data: [], isPending: false, isRefetching: false, isError: fals
 
 const OWNER_FILTER_ICONS: Record<OwnerFilter, IconName> = { all: "filter", mine: "profile", voted: "vote" };
 
-export function ArenaHomeScreen() {
+export function ArenaHomeScreen({ pane, t: nonce }: { pane?: string; t?: string }) {
   const t = useT();
   const locale = useLocale();
   const { colors } = useTheme();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<GamesTab>(GAMES_TABS[0].value);
+  useEffect(() => {
+    if (pane === "browse") setTab("browse");
+  }, [pane, nonce]);
   const [choosing, setChoosing] = useState(false);
   const [deleting, setDeleting] = useState<Doomed | null>(null);
   const [busy, setBusy] = useState(false);

@@ -11,7 +11,7 @@ import { addBookToLibrary } from "../library/api/client";
 import { publicContentUrl } from "../sharing/links";
 import { dailyChapterApi } from "./api";
 import { DailyChapterArt } from "./daily-chapter-art";
-import { useDeviceIdentity } from "./use-daily-history";
+import { useChapterHistory, useDeviceIdentity } from "./use-daily-history";
 import { useLocale, useT } from "../../i18n";
 
 export function DailyChapterScreen() {
@@ -22,7 +22,7 @@ export function DailyChapterScreen() {
   const { ready, user, unreachable, retry } = useAuth();
   const identity = useDeviceIdentity();
   const daily = useQuery({ queryKey: ["daily-chapter", "today"], queryFn: dailyChapterApi.today, refetchInterval: 60_000 });
-  const history = useQuery({ queryKey: ["daily-chapter", "history", user?.id ?? "guest", identity.data, daily.data?.date], queryFn: () => dailyChapterApi.history(identity.data!, Boolean(user)), enabled: ready && !unreachable && Boolean(identity.data && daily.data?.date) });
+  const history = useChapterHistory(daily.data?.date);
   const result = history.data?.results.find((item) => item.editionId === daily.data?.board?.id);
   return <Screen top={false} bottom><Stack.Screen options={{ title: t("quizzes.theDailyChapter"), headerShown: true }} /><ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.huge }}>
     <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{t("quizzes.dailyIntro")}</Text>
