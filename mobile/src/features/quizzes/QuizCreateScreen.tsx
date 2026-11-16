@@ -5,9 +5,10 @@ import { QUIZ_POOL, QUIZ_QUESTION_TYPES, bookKey, booksByWork, booksInGroup, eli
 import { FlatList, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { useLibrary, useWorkBooks } from "../library";
-import { Button, Input, Screen, Segmented, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Input, Screen, Segmented, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme, useUnsavedChangesGuard } from "../../ui";
 import { resolveCover } from "../library/api/covers";
 import { createQuiz, type Quiz } from "./api";
+import { INITIAL_QUESTION_COUNT, INITIAL_SOURCE, quizCreateDirty } from "./quizCreateDraft";
 import { quizTypeLabel } from "./quizTypeLabel";
 import { useWorkCharacters } from "./useWorkCharacters";
 import { useLocale, useT } from "../../i18n";
@@ -35,13 +36,16 @@ export function QuizCreateScreen() {
   const queryClient = useQueryClient();
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
-  const [source, setSource] = useState<Source>("shelf");
+  const [source, setSource] = useState<Source>(INITIAL_SOURCE);
   const [collectionId, setCollectionId] = useState("");
   const [poolIds, setPoolIds] = useState<string[]>([]);
-  const [questionCount, setQuestionCount] = useState(10);
+  const [questionCount, setQuestionCount] = useState(INITIAL_QUESTION_COUNT);
   const [allowedTypes, setAllowedTypes] = useState<QuizQuestionType[]>([...QUIZ_QUESTION_TYPES]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  const discardDialog = useUnsavedChangesGuard(createdId === null && quizCreateDirty({ name, source, collectionId, poolIds, questionCount, allowedTypes }));
+  useEffect(() => { if (createdId) router.replace(`/quiz/${createdId}` as never); }, [createdId]);
   const library = useLibrary();
   const libraryBooks = useWorkBooks(library.data);
   const collections = (library.data?.data?.groups ?? []).filter((group) => group.type === "collection");
@@ -120,7 +124,7 @@ export function QuizCreateScreen() {
       };
       const created = await createQuiz(name.trim() || t("quizzes.untitledQuiz"), data);
       queryClient.setQueryData<Quiz[]>(["quizzes"], (items = []) => [created, ...items]);
-      router.replace(`/quiz/${created.id}` as never);
+      setCreatedId(created.id);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : t("quizzes.createFailed"));
     } finally {
@@ -129,6 +133,7 @@ export function QuizCreateScreen() {
   }
 
   return <Screen top={false} style={styles.screen}>
+    {discardDialog}
     <Stack.Screen options={{ headerShown: true, title: t("arena.createQuiz") }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.createStep", { step: step + 1 })}</Text>
