@@ -10,7 +10,7 @@ import { isPermanentError } from "../../core/apiClient";
 import { ActionSheet, Button, ConfirmDialog, Dialog, EmptyState, ErrorState, HeaderActions, IconButton, Input, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { CharacterHeader } from "../characters/CharacterHeader";
 import { AddBookSheet } from "../community/AddBookSheet";
-import { fetchTournament, renameTournament, resolveTiebreak, settleDuelEarly, voteOnDuel } from "./api";
+import { deleteTournament, fetchTournament, renameTournament, resolveTiebreak, settleDuelEarly, voteOnDuel } from "./api";
 import { arenaViewTabs, matchEmptyCopy, tournamentChampion, votableDuels, type ArenaViewTab } from "./arenaView";
 import { ArenaVoteDeck } from "./ArenaVoteDeck";
 import { ArenaBooksSheet } from "./ArenaBooksSheet";
@@ -36,6 +36,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
   const [settling, setSettling] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [name, setName] = useState("");
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [booksOpen, setBooksOpen] = useState(false);
@@ -79,6 +80,22 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
       await queryClient.invalidateQueries({ queryKey: ["arena"] });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : t("arena.actionFailed"));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function remove() {
+    setBusy("delete");
+    setError(null);
+    try {
+      await deleteTournament(id);
+      setConfirmingDelete(false);
+      if (router.canGoBack()) router.back(); else router.replace("/my-arena" as never);
+      void queryClient.invalidateQueries({ queryKey: ["arena", "mine"] });
+    } catch (reason) {
+      setConfirmingDelete(false);
+      setError(reason instanceof Error ? reason.message : t("arena.deleteFailed"));
     } finally {
       setBusy(null);
     }
@@ -194,7 +211,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
               title={data.name}
               groups={[
                 [{ label: data.slots.length ? t("arena.seeAllItems", { count: data.slots.length, noun: itemNoun(data.subject, data.slots.length, locale) }) : t(data.subject ? "arena.viewCharacters" : "arena.viewBookPool"), icon: "book", onPress: () => setBooksOpen(true) }],
-                ...(isOwner ? [[{ label: t("arena.rename"), icon: "edit" as const, onPress: () => { setName(data.name); setRenaming(true); } }]] : []),
+                ...(isOwner ? [[{ label: t("arena.rename"), icon: "edit" as const, onPress: () => { setName(data.name); setRenaming(true); } }], [{ label: t("library.delete"), icon: "delete" as const, destructive: true, onPress: () => setConfirmingDelete(true) }]] : []),
               ]}
             >
               {(open) => <IconButton accessibilityLabel={t("arena.actionsFor", { name: data.name })} name="more" onPress={open} />}
@@ -216,6 +233,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
       <ArenaBooksSheet id={booksOpen ? id : null} name={data.name} character={Boolean(data.subject)} onAddBook={openAddBook} onClose={() => setBooksOpen(false)} />
       {addBook ? <AddBookSheet book={addBook} onClose={() => setAddBook(null)} /> : null}
       <Dialog visible={renaming} title={t("arena.renameTournament")} onClose={() => setRenaming(false)}><View style={styles.dialog}><Input label={t("arena.tournamentName")} value={name} onChangeText={setName} maxLength={200} /><Button label={t("arena.saveName")} disabled={!name.trim()} loading={busy === "rename"} onPress={() => void action("rename", async () => { await renameTournament(id, name.trim()); setRenaming(false); })} /></View></Dialog>
+      <ConfirmDialog visible={confirmingDelete} title={t("arena.deleteTitle", { name: data.name })} body={t("arena.deleteEffectTournament")} confirmLabel={t("library.delete")} destructive loading={busy === "delete"} onConfirm={() => void remove()} onCancel={() => setConfirmingDelete(false)} />
       <ConfirmDialog visible={settling !== null} title={t("arena.settleTitle")} body={t("arena.settleBody")} confirmLabel={t("arena.settle")} destructive loading={settling !== null && busy === settling} onConfirm={() => settling && void settle(settling)} onCancel={() => setSettling(null)} />
     </Screen>
   );
