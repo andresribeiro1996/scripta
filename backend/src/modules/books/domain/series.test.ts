@@ -164,12 +164,17 @@ test("wikidata series beats hardcover", () => {
   assert.equal(best.get("w1")!.name, "Dune Chronicles");
 });
 
-test("an edition collection no stored series names is ignored", () => {
+test("hardcover beats ol-subject", () => {
+  const best = pickSeries([row({ name: "Dune Saga", nameKey: "dune saga", source: "ol-subject", createdAt: "2025-12-31T00:00:00.000Z" }), row({ name: "Dune", source: "hardcover", createdAt: "2026-01-02T00:00:00.000Z" })], []);
+  assert.equal(best.get("w1")!.name, "Dune");
+});
+
+test("an edition collection that no stored series names is ignored", () => {
   const best = pickSeries([row({ source: "original-title" })], [{ root: "w1", name: "Dune", nameKey: "dune", position: "1", createdAt: "2026-01-01T00:00:00.000Z" }]);
   assert.deepEqual(best.get("w1"), { name: "Dune", nameKey: "dune", position: null });
 });
 
-test("an edition collection a wikidata, hardcover or subject series names counts as ol-edition", () => {
+test("an edition collection that a wikidata, hardcover or subject series names counts as ol-edition", () => {
   const best = pickSeries(
     [row({ source: "ol-subject", name: "Dune Saga", nameKey: "dune saga" }), row({ source: "original-title", name: "Dune", nameKey: "dune" })],
     [{ root: "w1", name: "Dune Saga", nameKey: "dune saga", position: "1", createdAt: "2026-01-01T00:00:00.000Z" }]
