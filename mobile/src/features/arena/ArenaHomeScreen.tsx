@@ -72,6 +72,7 @@ export function ArenaHomeScreen({ pane, t: nonce }: { pane?: string; t?: string 
         await deleteTierlist(deleting.id);
         queryClient.setQueryData<Tierlist[]>(["tierlists"], (items = []) => items.filter((item) => item.id !== deleting.id));
       }
+      void queryClient.invalidateQueries({ queryKey: ["community", "discover"] });
       setDeleting(null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : t("arena.deleteFailed"));
