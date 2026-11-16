@@ -50,7 +50,8 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
 
   async function materialize() {
     if (current) return current;
-    const created = await createTournament({ name: name.trim() || t("arena.untitledTournament"), bracketSize: size, roundDurationMinutes: roundMinutes! });
+    if (roundMinutes === null) throw new Error(t("arena.roundDurationRange"));
+    const created = await createTournament({ name: name.trim() || t("arena.untitledTournament"), bracketSize: size, roundDurationMinutes: roundMinutes });
     setCurrent(created);
     await queryClient.invalidateQueries({ queryKey: ["arena", "mine"] });
     return created;
@@ -166,7 +167,7 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
           contentContainerStyle={styles.list}
           ListEmptyComponent={<EmptyState title={t("arena.noSlots")} />}
           renderItem={({ item, index }) => (
-            <Pressable accessibilityRole="button" accessibilityLabel={item ? t("arena.slotChange", { number: index + 1, title: item.title }) : t("arena.slotAssign", { number: index + 1 })} onPress={() => setSlotToAssign(index)} style={[styles.slot, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Pressable accessibilityRole="button" accessibilityState={{ disabled: !current && durationInvalid }} disabled={!current && durationInvalid} accessibilityLabel={item ? t("arena.slotChange", { number: index + 1, title: item.title }) : t("arena.slotAssign", { number: index + 1 })} onPress={() => setSlotToAssign(index)} style={[styles.slot, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("arena.slotNumber", { number: index + 1 })}</Text>
               <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{item?.title ?? t("arena.slotEmpty")}</Text>
             </Pressable>
