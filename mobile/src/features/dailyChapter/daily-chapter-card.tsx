@@ -5,11 +5,11 @@ import { Text } from "../../ui/Text";
 import { Button, Icon, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { dailyChapterApi } from "./api";
 import { DailyChapterArt } from "./daily-chapter-art";
-import { dailyCardAction } from "./dailyCardModel";
+import { dailyCardAction, dailyPlayVariant } from "./dailyCardModel";
 import { useChapterHistory } from "./use-daily-history";
 import { useT } from "../../i18n";
 
-export function DailyChapterCard() {
+export function DailyChapterCard({ emptyLibrary = false }: { emptyLibrary?: boolean }) {
   const t = useT();
   const { colors } = useTheme();
   const daily = useQuery({ queryKey: ["daily-chapter", "today"], queryFn: dailyChapterApi.today, refetchInterval: 60_000 });
@@ -38,7 +38,7 @@ export function DailyChapterCard() {
       </View>
       <DailyChapterArt motif={board.theme.motif} />
     </View>
-    <Button label={t("quizzes.dailyCardPlay")} accessibilityLabel={t("quizzes.dailyCardLabel", { title: board.title })} variant="primary" onPress={() => router.push("/daily")} />
+    <Button label={t("quizzes.dailyCardPlay")} accessibilityLabel={t("quizzes.dailyCardLabel", { title: board.title })} variant={dailyPlayVariant(emptyLibrary)} onPress={() => router.push("/daily")} />
   </View>;
 }
 

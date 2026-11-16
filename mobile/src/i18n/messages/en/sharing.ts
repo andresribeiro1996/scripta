@@ -102,7 +102,7 @@ export const sharing = {
   "sharing.valueTiered": { one: "{count} list", other: "{count} lists" },
   "sharing.valueQuizzed": { one: "{count} quiz", other: "{count} quizzes" },
   "sharing.valueRisingStar": { one: "{count} game", other: "{count} games" },
-  "sharing.valueChampions": "{count} pts",
+  "sharing.valueChampions": { one: "{count} pt", other: "{count} pts" },
   "sharing.interactions": { one: "{count} interaction", other: "{count} interactions" },
   "sharing.recapName": "{month} recap",
   "sharing.recapReady": "{month} recap is ready",

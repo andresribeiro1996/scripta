@@ -103,7 +103,7 @@ export const sharing: CatalogOf<typeof en> = {
   "sharing.valueTiered": { one: "{count} lista", other: "{count} listas" },
   "sharing.valueQuizzed": { one: "{count} quiz", other: "{count} quizzes" },
   "sharing.valueRisingStar": { one: "{count} jogo", other: "{count} jogos" },
-  "sharing.valueChampions": "{count} pts",
+  "sharing.valueChampions": { one: "{count} pt", other: "{count} pts" },
   "sharing.interactions": { one: "{count} interação", other: "{count} interações" },
   "sharing.recapName": "Resumo de {month}",
   "sharing.recapReady": "O resumo de {month} está pronto",

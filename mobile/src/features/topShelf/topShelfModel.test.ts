@@ -9,6 +9,7 @@ const data = (overrides: Partial<TopShelf> = {}): TopShelf => ({ period: "month"
 test("valueLabel uses titles and tier bands", () => {
   assert.equal(valueLabel("crowned", 5, "en"), "5 titles");
   assert.equal(valueLabel("crowned", 1, "en"), "1 title");
+  assert.equal(valueLabel("champions", 1, "en"), "1 pt");
   assert.equal(valueLabel("tiered", 12, "en"), "12 lists");
   assert.equal(valueLabel("highestTier", 0.05, "en"), "Top tier");
   assert.equal(valueLabel("highestTier", 0.95, "en"), "Bottom tier");
