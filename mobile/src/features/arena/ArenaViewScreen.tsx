@@ -93,6 +93,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
       setConfirmingDelete(false);
       if (router.canGoBack()) router.back(); else router.replace("/my-arena" as never);
       void queryClient.invalidateQueries({ queryKey: ["arena", "mine"] });
+      void queryClient.invalidateQueries({ queryKey: ["community", "discover"] });
     } catch (reason) {
       setConfirmingDelete(false);
       setError(reason instanceof Error ? reason.message : t("arena.deleteFailed"));

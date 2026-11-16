@@ -92,6 +92,7 @@ export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz;
     try {
       await deleteQuiz(current.id);
       queryClient.setQueryData<Quiz[]>(["quizzes"], (items = []) => items.filter((item) => item.id !== current.id));
+      void queryClient.invalidateQueries({ queryKey: ["community", "discover"] });
       setConfirmingDelete(false);
       setDeleted(true);
     } catch (reason) {
