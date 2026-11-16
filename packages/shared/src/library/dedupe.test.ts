@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { combineBooks, findDuplicates, markDistinct, mergeDuplicateBooks, rekeyKeys } from "./dedupe.js";
+import { combineBooks, findDuplicates, markDistinct, mergeDuplicateBooks, possibleDuplicates, rekeyKeys } from "./dedupe.js";
 import { bookKey } from "./merge.js";
 import type { LibraryData } from "./types.js";
 
@@ -113,4 +113,12 @@ test("combineBooks fills format and pages from the other copy", () => {
   const combined = combineBooks({ ...kobo, _format: "ebook" }, { ...goodreads, _format: "hardcopy", _pages: 120 });
   assert.equal(combined._format, "ebook");
   assert.equal(combined._pages, 120);
+});
+
+test("possibleDuplicates lists certain groups before likely ones and is empty without data", () => {
+  const data = { books: [kobo, goodreads, series] } as LibraryData;
+  const { certain, likely } = findDuplicates(data);
+  assert.deepEqual(possibleDuplicates(data), [...certain, ...likely]);
+  assert.equal(possibleDuplicates(data).length, certain.length + likely.length);
+  assert.deepEqual(possibleDuplicates(undefined), []);
 });

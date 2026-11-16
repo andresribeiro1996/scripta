@@ -191,3 +191,11 @@ export function deriveSeriesGroups(books: Array<Record<string, unknown>>, groups
   }
   return result;
 }
+
+export function searchGroups(groups: Group[], books: Array<Record<string, unknown>>, search: string): Group[] {
+  const needle = search.trim().toLowerCase();
+  if (!needle) return groups;
+  return groups.filter(
+    (group) => group.name.toLowerCase().includes(needle) || orderedGroupBooks(group, books).some((book) => String(book.Title ?? "").toLowerCase().includes(needle)),
+  );
+}

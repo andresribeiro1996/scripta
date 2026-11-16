@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 process.env.TZ = "America/Sao_Paulo";
-const { finishFeelings, addReaderNote, formatFinishDay, readSnapshot, removeReaderNote, restoreReadState, setRating } = await import("./finish.js");
+const { finishFeelings, addReaderNote, formatFinishDay, readSnapshot, promptsFinish, removeReaderNote, restoreReadState, setRating } = await import("./finish.js");
 
 test("the five feelings map to ratings 1 through 5", () => {
   assert.deepEqual(finishFeelings("en").map(({ rating, label }) => [rating, label]), [
@@ -55,4 +55,13 @@ test("removeReaderNote removes a reader note by id, and is a no-op when absent",
 test("removeReaderNote refuses to remove anything that isn't a reader note", () => {
   const book = { highlights: [{ BookmarkID: "h1", Type: "highlight", Text: "A" }] };
   assert.equal(removeReaderNote(book, "h1"), book);
+});
+
+test("promptsFinish is true only when moving to finished from another status", () => {
+  assert.equal(promptsFinish({ ReadStatus: 1 }, 2), true);
+  assert.equal(promptsFinish({ ReadStatus: 0 }, 2), true);
+  assert.equal(promptsFinish({}, 2), true);
+  assert.equal(promptsFinish({ ReadStatus: 2 }, 2), false);
+  assert.equal(promptsFinish({ ReadStatus: 2 }, 1), false);
+  assert.equal(promptsFinish({ ReadStatus: 1 }, 0), false);
 });
