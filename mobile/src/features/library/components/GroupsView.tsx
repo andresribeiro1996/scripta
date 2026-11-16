@@ -19,7 +19,7 @@ import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "reac
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../../ui/Text";
 import { router } from "expo-router";
-import { bookKey, makeGroup, orderedGroupBooks, saveFailureMessage, type GroupType } from "@scripta/shared";
+import { bookKey, makeGroup, orderedGroupBooks, saveFailureMessage, searchGroups, type GroupType } from "@scripta/shared";
 import { EmptyState, Input } from "../../../ui/components";
 import { Icon, type IconName } from "../../../ui/icon";
 import type { SearchDockScrollProps } from "../../../ui/SearchDock";
@@ -75,13 +75,7 @@ export const GroupsView = forwardRef<GroupsViewHandle, GroupsViewProps>(function
     () => (library?.data.groups ?? []).filter((g) => typeFilter === "all" || g.type === typeFilter).sort((a, b) => a.name.localeCompare(b.name)),
     [library, typeFilter],
   );
-  const groups = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    if (!needle) return allGroups;
-    return allGroups.filter(
-      (group) => group.name.toLowerCase().includes(needle) || orderedGroupBooks(group, books).some((b) => String(b.Title ?? "").toLowerCase().includes(needle)),
-    );
-  }, [allGroups, books, search]);
+  const groups = useMemo(() => searchGroups(allGroups, books, search), [allGroups, books, search]);
 
   async function handleCommitDraft() {
     if (!draftOpen.current) return;

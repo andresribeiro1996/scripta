@@ -23,9 +23,9 @@ import {
   bookKey,
   effectiveCardStyle,
   filterBooks,
-  findDuplicates,
   libraryStatusTabs,
   orderLibraryBooks,
+  possibleDuplicates,
   resolveLibraryStyle,
   seriesGroupByBookKey,
   sortBooks,
@@ -97,11 +97,7 @@ export function LibraryScreen() {
   const style = useMemo(() => resolveLibraryStyle(library?.data.style), [library?.data.style]);
   const ordered = useMemo(() => orderLibraryBooks(library?.data.books ?? [], library?.data.groups ?? []), [library]);
   const bookSeriesGroup = useMemo(() => seriesGroupByBookKey(library?.data.books ?? [], library?.data.groups ?? []), [library]);
-  const possibleDuplicates = useMemo(() => {
-    if (!library) return [];
-    const { certain, likely } = findDuplicates(library.data);
-    return [...certain, ...likely];
-  }, [library]);
+  const duplicates = useMemo(() => possibleDuplicates(library?.data), [library]);
   // The status shown is a shelf (one of the three tabs), not a clearable
   // filter — only search and sort get reset here.
   function clearSearchAndFilters() {
@@ -296,7 +292,7 @@ export function LibraryScreen() {
                     {...scrollProps}
                     refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => void refetch()} />}
                     ListHeaderComponent={
-                      possibleDuplicates.length > 0 ? (
+                      duplicates.length > 0 ? (
                         <View style={styles.shelfHead}>
                           <Pressable
                             accessibilityRole="button"
@@ -304,7 +300,7 @@ export function LibraryScreen() {
                             style={({ pressed }) => [styles.sortPill, { borderColor: colors.border }, pressed ? { backgroundColor: colors.surfacePressed } : null]}
                           >
                             <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.text }]}>
-                              {t("library.possibleDuplicates", { count: possibleDuplicates.length })}
+                              {t("library.possibleDuplicates", { count: duplicates.length })}
                             </Text>
                           </Pressable>
                         </View>
@@ -350,8 +346,8 @@ export function LibraryScreen() {
         <Input label={t("library.libraryName")} autoFocus value={nameDraft} maxLength={200} onChangeText={setNameDraft} onSubmitEditing={() => void handleRenameLibrary()} onBlur={() => void handleRenameLibrary()} />
       </Sheet>
 
-      <Sheet visible={reviewingDuplicates && possibleDuplicates.length > 0} title={t("library.possibleDuplicatesTitle")} onClose={() => setReviewingDuplicates(false)}>
-        {library ? <DuplicatesSheetBody groups={possibleDuplicates} library={library} /> : null}
+      <Sheet visible={reviewingDuplicates && duplicates.length > 0} title={t("library.possibleDuplicatesTitle")} onClose={() => setReviewingDuplicates(false)}>
+        {library ? <DuplicatesSheetBody groups={duplicates} library={library} /> : null}
       </Sheet>
 
       <ContentShareSheet

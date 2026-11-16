@@ -7,6 +7,7 @@ import {
   bookStatsModel,
   coverWash,
   editionLabel,
+  promptsFinish,
   readSnapshot,
   seriesGroupByBookKey,
   seriesLabel,
@@ -119,8 +120,8 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
   async function pickStatus(value: 0 | 1 | 2) {
     if (!book) return;
     const before = readSnapshot(book);
-    const wasFinished = book.ReadStatus === 2;
-    if ((await actions.setStatus(book, value)) && value === 2 && !wasFinished) setFinishing(before);
+    const prompts = promptsFinish(book, value);
+    if ((await actions.setStatus(book, value)) && prompts) setFinishing(before);
   }
 
   async function handleDeleteNote(bookmarkId: string) {

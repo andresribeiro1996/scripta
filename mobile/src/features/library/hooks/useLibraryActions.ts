@@ -18,8 +18,8 @@ import {
   saveFailureMessage,
   setBookCover,
   setBookCoverUrl,
-  setReadStatus,
   setRating as rateBook,
+  statusChange,
   type FinishRating,
   type LibraryChange,
   type LibraryData,
@@ -74,9 +74,9 @@ export function useLibraryActions(onError?: (message: string) => void) {
       }, t("library.reorderFailed")),
 
     setStatus: (book: Record<string, unknown>, status: ReadStatus) => {
-      const day = localDay();
-      if (setReadStatus(book, status, day) === book) return;
-      return runChange({ kind: "book", bookKey: bookKey(book), readStatus: status, day }, t("library.statusFailed"));
+      const change = statusChange(book, status, localDay());
+      if (!change) return Promise.resolve(false);
+      return runChange(change, t("library.statusFailed"));
     },
 
     setRating: (book: Record<string, unknown>, rating: FinishRating) => {
