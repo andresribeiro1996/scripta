@@ -34,3 +34,23 @@ test("playStage walks loading → leaderboard → playing → played", () => {
   assert.equal(playStage({ ...base, boardReady: true, playOpen: false, resolved: true, alreadyPlayed: true }), "played");
   assert.equal(playStage({ ...base, boardMissing: true }), "unavailable");
 });
+
+const stageBase = { boardReady: true, boardMissing: false, playOpen: true, resolved: true, alreadyPlayed: false };
+
+test("an open quiz with no play is playable", () => {
+  assert.equal(playStage(stageBase), "playing");
+});
+
+test("an open quiz waits for the lookup before it starts", () => {
+  assert.equal(playStage({ ...stageBase, resolved: false }), "loading");
+});
+
+test("a play always shows, open or closed", () => {
+  assert.equal(playStage({ ...stageBase, alreadyPlayed: true }), "played");
+  assert.equal(playStage({ ...stageBase, playOpen: false, alreadyPlayed: true }), "played");
+});
+
+test("a closed quiz waits for the lookup, then shows the leaderboard", () => {
+  assert.equal(playStage({ ...stageBase, playOpen: false, resolved: false }), "loading");
+  assert.equal(playStage({ ...stageBase, playOpen: false }), "leaderboard");
+});

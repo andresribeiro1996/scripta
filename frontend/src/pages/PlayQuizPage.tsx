@@ -7,16 +7,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { createPlayClock, type PublicQuizQuestion } from "@scripta/shared";
+import { buildSubmission, createPlayClock, isComplete, nextIndex, playStage, type PublicQuizQuestion } from "@scripta/shared";
 import { useAuth } from "../auth/AuthContext";
 import { CoverImage } from "../components/BookCard";
 import { Page } from "../components/page/Page";
-import { BUTTON_PRIMARY, FIELD_CLASS } from "../components/page/buttonClasses";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
 import { QuizPrompt } from "../components/quiz/QuizPrompt";
+import { ApiError } from "../api/client";
 import { submitPlayApi, type PlayResponse } from "../api/quizzes";
 import { QuizLeaderboard, QuizResults } from "../components/quiz/QuizResults";
 import { backTo } from "../lib/areas";
-import { quizPlayStage } from "../lib/quizPlayStage";
 import { storePlayId, useQuizPlay } from "../hooks/useQuizPlay";
 import { useT } from "../i18n";
 
@@ -74,7 +74,7 @@ export function PlayQuizPage() {
   const { code } = useParams();
   const { session } = useAuth();
   const back = session?.user.username ? backTo("quiz") : undefined;
-  const { board, ownPlay } = useQuizPlay(code ?? "");
+  const { board, ownPlay, lookupEnabled } = useQuizPlay(code ?? "");
   const [index, setIndex] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -84,10 +84,18 @@ export function PlayQuizPage() {
   const [busy, setBusy] = useState(false);
   const clock = useRef(createPlayClock()).current;
   const [elapsed, setElapsed] = useState(0);
-  const complete = Boolean(board.data) && Object.keys(answers).length === board.data!.questions.length;
+  const complete = Boolean(board.data) && isComplete(board.data!.questions, answers);
   const completeRef = useRef(complete);
   completeRef.current = complete;
-  const playing = quizPlayStage({ playOpen: board.data?.playOpen ?? false, hasResult: Boolean(submitted ?? ownPlay.data), ownPlayPending: ownPlay.isLoading }) === "playing";
+  const lookupMissing = ownPlay.error instanceof ApiError && ownPlay.error.status === 404;
+  const stage = playStage({
+    boardReady: board.isSuccess,
+    boardMissing: board.isError,
+    playOpen: board.data?.playOpen ?? false,
+    resolved: !lookupEnabled || ownPlay.isSuccess || lookupMissing,
+    alreadyPlayed: (submitted ?? ownPlay.data ?? null) !== null
+  });
+  const playing = stage === "playing";
 
   useEffect(() => {
     if (playing) clock.start(Date.now());
@@ -98,14 +106,21 @@ export function PlayQuizPage() {
     return () => window.clearInterval(timer);
   }, [clock]);
 
-  if (board.isPending) return <InfoScreen message={t("library.loadingEllipsis")} back={back} />;
-  if (board.isError) return <InfoScreen message={board.error instanceof Error ? board.error.message : t("quizzes.noQuizAtLink")} back={back} />;
+  if (stage === "unavailable") return <InfoScreen message={board.error instanceof Error ? board.error.message : t("quizzes.noQuizAtLink")} back={back} />;
+  if (ownPlay.isError && !lookupMissing) {
+    return (
+      <Page width="narrow" back={back} title={t("quizzes.title")}>
+        <div role="alert" className="space-y-3">
+          <p className="text-sm text-(--color-text-dim)">{t("quizzes.playLookupFailed")}</p>
+          <button type="button" className={BUTTON_SECONDARY} onClick={() => void ownPlay.refetch()}>{t("library.retry")}</button>
+        </div>
+      </Page>
+    );
+  }
+  if (stage === "loading" || !board.data) return <InfoScreen message={t("library.loadingEllipsis")} back={back} />;
   const playBoard = board.data;
-
-  const result = submitted ?? (ownPlay.data ?? null);
+  const result = submitted ?? ownPlay.data ?? null;
   const questions = playBoard.questions;
-  const stage = quizPlayStage({ playOpen: playBoard.playOpen, hasResult: result !== null, ownPlayPending: ownPlay.isLoading });
-  if (stage === "loading") return <InfoScreen message={t("library.loadingEllipsis")} back={back} />;
   if (stage === "leaderboard") {
     return (
       <Page width="narrow" back={back} title={playBoard.name}>
@@ -117,7 +132,7 @@ export function PlayQuizPage() {
     );
   }
 
-  if (result) {
+  if (stage === "played" && result) {
     return <QuizResults code={code ?? ""} name={playBoard.name} result={result} questions={questions} back={back} />;
   }
 
@@ -130,17 +145,17 @@ export function PlayQuizPage() {
     setAnswers((value) => ({ ...value, [question!.id]: choiceIndex }));
     window.setTimeout(() => {
       setPicked(null);
-      setIndex((value) => Math.min(value + 1, questions.length - 1));
+      setIndex((value) => nextIndex(questions, value));
     }, 220);
   }
 
   async function submit() {
-    if (Object.keys(answers).length !== questions.length) return;
+    if (!isComplete(questions, answers)) return;
     setBusy(true);
     setSubmitError(null);
     try {
       const response = await submitPlayApi(code ?? "", {
-        answers: questions.map((q) => ({ questionId: q.id, choiceIndex: answers[q.id] ?? 0 })),
+        answers: buildSubmission(questions, answers),
         durationMs: clock.durationMs(Date.now()),
         ...(playerName.trim() ? { playerName: playerName.trim() } : {})
       });
