@@ -31,6 +31,16 @@ test("a stats block shorter than 6 rows and a profile shorter than 8 grow and pu
   assert.deepEqual(shifted.layout, { x: 0, y: 14, w: 12, h: 3 });
 });
 
+test("growing a block leaves no gap in the column beside it", () => {
+  const stats: MuralBlock = { id: "st", type: "stats", metrics: ["totalBooks"], layout: { x: 0, y: 0, w: 6, h: 2 } };
+  const side: MuralBlock = { ...text("side", 0, 2), layout: { x: 6, y: 0, w: 6, h: 2 } };
+  const sideBelow: MuralBlock = { ...text("sideBelow", 2, 3), layout: { x: 6, y: 2, w: 6, h: 3 } };
+  const [grown, first, second] = ensureBookBlockHeights([stats, side, sideBelow]);
+  assert.deepEqual(grown.layout, { x: 0, y: 0, w: 6, h: 6 });
+  assert.deepEqual(first.layout, { x: 6, y: 0, w: 6, h: 2 });
+  assert.deepEqual(second.layout, { x: 6, y: 2, w: 6, h: 3 });
+});
+
 test("blocks already tall enough come back untouched", () => {
   const blocks = [text("above", 0, 3), reading(3, 6)];
   assert.equal(ensureBookBlockHeights(blocks), blocks);

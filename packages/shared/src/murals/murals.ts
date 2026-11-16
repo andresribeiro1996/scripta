@@ -175,11 +175,11 @@ export function ensureBookBlockHeights(allBlocks: MuralBlock[]): MuralBlock[] {
     }
   }
   if (boundaries.size === 0) return blocks;
-  return blocks.map((block) => {
+  return compactMuralBlocks(blocks.map((block) => {
     const minimum = minBlockHeight(block.type);
     const shift = [...boundaries].reduce((total, [boundary, amount]) => total + (block.layout.y >= boundary ? amount : 0), 0);
     return withMuralBlockLayout(block, { ...block.layout, y: block.layout.y + shift, h: Math.max(block.layout.h, minimum) });
-  });
+  }));
 }
 
 export function layoutsOverlap(a: BlockLayout, b: BlockLayout): boolean {
