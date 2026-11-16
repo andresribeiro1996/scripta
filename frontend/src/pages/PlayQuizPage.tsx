@@ -92,7 +92,7 @@ export function PlayQuizPage() {
     boardReady: board.isSuccess,
     boardMissing: board.isError,
     playOpen: board.data?.playOpen ?? false,
-    resolved: !lookupEnabled || ownPlay.isSuccess || lookupMissing,
+    resolved: submitted !== null || !lookupEnabled || ownPlay.isSuccess || lookupMissing,
     alreadyPlayed: (submitted ?? ownPlay.data ?? null) !== null
   });
   const playing = stage === "playing";
@@ -107,7 +107,7 @@ export function PlayQuizPage() {
   }, [clock]);
 
   if (stage === "unavailable") return <InfoScreen message={board.error instanceof Error ? board.error.message : t("quizzes.noQuizAtLink")} back={back} />;
-  if (ownPlay.isError && !lookupMissing) {
+  if (submitted === null && ownPlay.isError && !lookupMissing) {
     return (
       <Page width="narrow" back={back} title={t("quizzes.title")}>
         <div role="alert" className="space-y-3">

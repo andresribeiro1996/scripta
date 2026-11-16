@@ -8,7 +8,7 @@ const playStorageKey = (code: string) => `quiz-play-${code}`;
 
 export function useQuizPlay(code: string) {
   const { session } = useAuth();
-  const signedIn = Boolean(session?.user.username);
+  const signedIn = session !== null;
   const board = useQuery({ queryKey: ["quizBoard", code], queryFn: () => fetchPlayBoard(code), retry: false });
   const playId = board.isSuccess ? localStorage.getItem(playStorageKey(code)) : null;
   const lookupEnabled = (board.data?.playCount ?? 0) > 0 && (signedIn || playId !== null);

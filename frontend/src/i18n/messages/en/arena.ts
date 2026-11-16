@@ -58,7 +58,6 @@ export const arena = {
   "arena.addToLibrary": "Add {title} to your library",
   "arena.vs": "VS",
 
-
   "arena.slotsFilled": "{filled} / {size} slots filled",
   "arena.randomFillNeeds": "Your library needs at least {size} books to random-fill.",
   "arena.randomFill": "Random fill",

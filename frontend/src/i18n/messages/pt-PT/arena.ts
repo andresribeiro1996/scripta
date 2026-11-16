@@ -59,7 +59,6 @@ export const arena: CatalogOf<typeof en> = {
   "arena.addToLibrary": "Adicionar {title} à sua biblioteca",
   "arena.vs": "VS",
 
-
   "arena.slotsFilled": "{filled} / {size} posições preenchidas",
   "arena.randomFillNeeds": "A sua biblioteca precisa de pelo menos {size} livros para o preenchimento aleatório.",
   "arena.randomFill": "Preenchimento aleatório",
