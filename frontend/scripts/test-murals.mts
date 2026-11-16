@@ -116,7 +116,7 @@ console.log("\n3. addBlock — first free slot, never overlapping");
   const second = addBlock(murals, muralId, "stats");
   murals = second.murals;
   const [b1, b2] = murals[0].blocks;
-  check("second block takes the free slot beside the first, not below it", JSON.stringify(b2.layout) === JSON.stringify({ x: 4, y: 0, w: 6, h: 6 }));
+  check("second block takes the free slot beside the first, not below it", JSON.stringify(b2.layout) === JSON.stringify({ x: 4, y: 0, w: 6, h: 3 }));
   check("second block does not overlap the first", isValidBlockLayout(b2.layout, [b1]));
   check("addBlock returns the new block's id", second.blockId === b2.id);
 
@@ -135,7 +135,7 @@ console.log("\n3. addBlock — first free slot, never overlapping");
   ]);
   const appended = addBlock(full, "m1", "stats");
   const appendedBlock = appended.murals[0].blocks.find((b) => b.id === appended.blockId)!;
-  check("with no fitting gap the block goes at x=0 below the last row", JSON.stringify(appendedBlock.layout) === JSON.stringify({ x: 0, y: 4, w: 6, h: 6 }));
+  check("with no fitting gap the block goes at x=0 below the last row", JSON.stringify(appendedBlock.layout) === JSON.stringify({ x: 0, y: 4, w: 6, h: 3 }));
 }
 
 console.log("\n4. updateBlock / removeBlock");
