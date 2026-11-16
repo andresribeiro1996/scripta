@@ -34,6 +34,8 @@ Files:
 - Test: `packages/shared/src/murals/blockKinds.test.ts`
 - Modify: `packages/shared/src/murals/murals.ts`
 - Test: `packages/shared/src/murals/murals.test.ts`
+- Test: `packages/shared/src/murals/presets.test.ts`
+- Test: `frontend/scripts/test-murals.mts`
 - Modify: `mobile/src/features/murals/MuralCanvas.tsx`
 - Create: `mobile/src/features/murals/canvasText.ts`
 - Test: `mobile/src/features/murals/canvasText.test.ts`
