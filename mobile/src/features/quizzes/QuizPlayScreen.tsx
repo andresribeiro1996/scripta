@@ -98,9 +98,9 @@ export function QuizPlayScreen({ code }: { code: string }) {
     {leaveDialog}
     <Stack.Screen options={{ headerShown: true, title: board.data?.name ?? t("quizzes.quizTitle") }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
-    {stage === "loading" || board.isPending ? <Screen bottom style={styles.screen}><Skeleton height={180} /></Screen>
+    {recoverError && board.isSuccess ? <ErrorState title={t("quizzes.recoverFailedTitle")} body={recoverError} actionLabel={t("shell.retry")} onAction={() => { setRecoverError(null); loadOwnPlay(); }} />
+    : stage === "loading" || board.isPending ? <Screen bottom style={styles.screen}><Skeleton height={180} /></Screen>
     : stage === "unavailable" ? <ErrorState title={t("quizzes.noQuizAtLink")} body={t("quizzes.checkCode")} actionLabel={isPermanentError(board.error) ? t("shell.notFoundAction") : t("shell.retry")} onAction={isPermanentError(board.error) ? () => router.replace("/") : () => void board.refetch()} />
-    : recoverError ? <ErrorState title={t("quizzes.recoverFailedTitle")} body={recoverError} actionLabel={t("shell.retry")} onAction={() => { setRecoverError(null); loadOwnPlay(); }} />
     : stage === "leaderboard" ? <View style={styles.closed}>
       <Text {...dynamicType} style={[typography.body, styles.center, { color: colors.textDim }]}>{t("quizzes.quizClosed")}</Text>
       <Leaderboard code={code} playId={null} />
