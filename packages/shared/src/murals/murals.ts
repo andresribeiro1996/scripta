@@ -167,7 +167,7 @@ export function ensureBookBlockHeights(allBlocks: MuralBlock[]): MuralBlock[] {
   const blocks = dropRetiredBlocks(allBlocks);
   const boundaries = new Map<number, number>();
   for (const block of blocks) {
-    const minimum = minBlockHeight(block.type);
+    const minimum = minBlockHeight(block);
     const increase = Math.max(0, minimum - block.layout.h);
     if (increase > 0) {
       const boundary = block.layout.y + block.layout.h;
@@ -176,7 +176,7 @@ export function ensureBookBlockHeights(allBlocks: MuralBlock[]): MuralBlock[] {
   }
   if (boundaries.size === 0) return blocks;
   return compactMuralBlocks(blocks.map((block) => {
-    const minimum = minBlockHeight(block.type);
+    const minimum = minBlockHeight(block);
     const shift = [...boundaries].reduce((total, [boundary, amount]) => total + (block.layout.y >= boundary ? amount : 0), 0);
     return withMuralBlockLayout(block, { ...block.layout, y: block.layout.y + shift, h: Math.max(block.layout.h, minimum) });
   }));

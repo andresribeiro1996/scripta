@@ -32,13 +32,29 @@ test("a stats block shorter than 6 rows and a profile shorter than 8 grow and pu
 });
 
 test("growing a block leaves no gap in the column beside it", () => {
-  const stats: MuralBlock = { id: "st", type: "stats", metrics: ["totalBooks"], layout: { x: 0, y: 0, w: 6, h: 2 } };
+  const stats: MuralBlock = { id: "st", type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"], layout: { x: 0, y: 0, w: 6, h: 2 } };
   const side: MuralBlock = { ...text("side", 0, 2), layout: { x: 6, y: 0, w: 6, h: 2 } };
   const sideBelow: MuralBlock = { ...text("sideBelow", 2, 3), layout: { x: 6, y: 2, w: 6, h: 3 } };
   const [grown, first, second] = ensureBookBlockHeights([stats, side, sideBelow]);
   assert.deepEqual(grown.layout, { x: 0, y: 0, w: 6, h: 6 });
   assert.deepEqual(first.layout, { x: 6, y: 0, w: 6, h: 2 });
   assert.deepEqual(second.layout, { x: 6, y: 2, w: 6, h: 3 });
+});
+
+test("a stats strip is not stretched to the breakdown height", () => {
+  const strip: MuralBlock = { id: "st", type: "stats", metrics: ["totalBooks", "booksFinished", "totalHighlights"], layout: { x: 0, y: 0, w: 6, h: 3 } };
+  assert.equal(ensureBookBlockHeights([strip])[0].layout.h, 3);
+  const short = { ...strip, layout: { ...strip.layout, h: 2 } };
+  assert.equal(ensureBookBlockHeights([short])[0].layout.h, 3);
+});
+
+test("a stats breakdown with extra metrics grows a row for each ~39pt of extra content", () => {
+  const base = ["totalBooks", "booksFinished", "booksInProgress"];
+  const heights = [[], ["totalHighlights"], ["totalHighlights", "booksFinishedThisYear"]].map((extra, index) => {
+    const block: MuralBlock = { id: `st${index}`, type: "stats", metrics: [...base, ...extra] as never, layout: { x: 0, y: 0, w: 6, h: 3 } };
+    return ensureBookBlockHeights([block])[0].layout.h;
+  });
+  assert.deepEqual(heights, [6, 7, 8]);
 });
 
 test("blocks already tall enough come back untouched", () => {

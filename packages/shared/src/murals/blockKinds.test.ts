@@ -26,7 +26,7 @@ test("a new currentlyReading block already meets its minimum height", () => {
 
 test("a new stats or profile block already meets its minimum height", () => {
   const blocks = [createBlockCandidate("stats", []), createBlockCandidate("profile", [])];
-  assert.deepEqual(blocks.map((block) => block.layout.h), [6, 8]);
+  assert.deepEqual(blocks.map((block) => block.layout.h), [3, 8]);
   assert.equal(ensureBookBlockHeights(blocks), blocks);
 });
 
