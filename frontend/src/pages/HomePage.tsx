@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchDiscover } from "../api/community";
 import { fetchTopShelf } from "../api/topShelf";
 import { fetchRecentAwards } from "../api/works";
+import { readingNow } from "@scripta/shared/community";
 import { useAuth } from "../auth/AuthContext";
 import { DailyChapterCard } from "../components/dailyChapter/DailyChapterCard";
 import { EmptyState } from "../components/EmptyState";
@@ -45,7 +46,7 @@ export function HomePage() {
   const noGames = games.followed.length === 0 && games.others.length === 0;
   const gamesFailed = noGames && (circle.isError || shelf.isError || newest.isError);
   const books = library.data?.data.books ?? [];
-  const reading = books.filter((book) => book.ReadStatus === 1);
+  const reading = readingNow(books);
   const circleItems = circle.items;
   const actions = useFeedActions(circleItems);
   const { fetchNextPage } = circle;

@@ -6,6 +6,7 @@ import { Icon, Skeleton, dynamicType, minimumTouchTarget, radii, spacing, typogr
 import { CoverFan, SLOT_HEIGHT, fanWidth } from "../community/CoverFan";
 import { FAN_SIZE } from "../community/communityHome";
 import { fetchDiscover } from "../community/api";
+import { useAuth } from "../../core/auth";
 import { useLocale, useT } from "../../i18n";
 import { HomeSectionHeader } from "./HomeSectionHeader";
 import { gamesBrowseHref, newGameRows } from "./homeModel";
@@ -17,8 +18,9 @@ export function HomeNewGames() {
   const t = useT();
   const { colors } = useTheme();
   const router = useRouter();
+  const { user } = useAuth();
   const { data, isPending } = useQuery({ queryKey: NEW_GAMES_QUERY_KEY, queryFn: () => fetchDiscover("all", "", 0), retry: false });
-  const rows = newGameRows(data?.items ?? [], locale);
+  const rows = newGameRows(data?.items ?? [], locale, user?.id ?? null);
   if (isPending) return <View style={styles.pending}><Skeleton height={64} /></View>;
   if (!rows.length) return null;
   return <View>
