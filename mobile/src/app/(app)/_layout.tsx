@@ -57,6 +57,7 @@ function AppTabs() {
           name="(home)"
           options={{
             title: t("shell.tabHome"),
+            popToTopOnBlur: true,
             tabBarBadge: newCountLabel(newCount) ?? undefined,
             tabBarBadgeStyle: { backgroundColor: colors.accent, color: colors.onAccent },
             tabBarIcon: ({ color, focused, size }) => <Icon name="home" filled={focused} color={color} size={size} />,

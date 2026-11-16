@@ -3,7 +3,7 @@ import { Stack } from "expo-router";
 import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { booksByWork, filterBooks, roundMinutesFromHours, seedCoverLookup, toSeedBook, workIdOf, type SeedBook } from "@scripta/shared";
+import { booksByWork, filterBooks, parseRoundMinutes, seedCoverLookup, toSeedBook, workIdOf, type SeedBook } from "@scripta/shared";
 import { Button, EmptyState, ErrorState, Input, Screen, Sheet, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { useLibrary, useWorkBooks } from "../library";
 import { createTournament, fetchTournament, randomFillTournament, resolveCover, setTournamentSlots, startTournament, type Tournament } from "./api";
@@ -15,9 +15,11 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
   const t = useT();
   const { colors } = useTheme();
   const queryClient = useQueryClient();
-  const [name, setName] = useState(tournament?.name ?? t("arena.untitledTournament"));
+  const [name, setName] = useState(tournament?.name ?? "");
   const [size, setSize] = useState(tournament?.bracketSize ?? 16);
-  const [duration, setDuration] = useState(String((tournament?.roundDurationMinutes ?? 1440) / 60));
+  const [duration, setDuration] = useState(tournament ? String(tournament.roundDurationMinutes / 60) : "");
+  const roundMinutes = parseRoundMinutes(duration.replace(",", "."));
+  const durationInvalid = roundMinutes === null;
   const [current, setCurrent] = useState(tournament);
   const [slots, setSlots] = useState<Array<SeedBook | null>>(() => Array.from({ length: tournament?.bracketSize ?? 16 }, () => null));
   const [savedSlots, setSavedSlots] = useState<Array<SeedBook | null> | null>(null);
@@ -48,7 +50,7 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
 
   async function materialize() {
     if (current) return current;
-    const created = await createTournament({ name: name.trim() || t("arena.untitledTournament"), bracketSize: size, roundDurationMinutes: roundMinutesFromHours(duration.replace(",", ".")) });
+    const created = await createTournament({ name: name.trim() || t("arena.untitledTournament"), bracketSize: size, roundDurationMinutes: roundMinutes! });
     setCurrent(created);
     await queryClient.invalidateQueries({ queryKey: ["arena", "mine"] });
     return created;
@@ -141,19 +143,19 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
       <Stack.Screen options={{ headerShown: true, title: t("arena.seedTitle") }} />
       {!current ? (
         <View style={styles.form}>
-          <Input label={t("arena.tournamentName")} value={name} onChangeText={setName} maxLength={200} />
+          <Input label={t("arena.tournamentName")} value={name} onChangeText={setName} placeholder={t("arena.untitledTournament")} maxLength={200} />
           <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>{t("book.bracketSize")}</Text>
           <View style={styles.row}>{[4, 8, 16, 32, 64].map((value) => <Button key={value} label={String(value)} variant={size === value ? "primary" : "secondary"} onPress={() => { setSize(value); setSlots(Array.from({ length: value }, () => null)); }} />)}</View>
-          <Input label={t("book.roundDurationHours")} keyboardType="decimal-pad" value={duration} onChangeText={setDuration} />
+          <Input label={t("book.roundDurationHours")} keyboardType="decimal-pad" value={duration} onChangeText={setDuration} placeholder="24" error={!current && durationInvalid ? t("arena.roundDurationRange") : undefined} />
         </View>
       ) : (
         <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("arena.seedSummary", { name: current.name, size: current.bracketSize, hours: decimalText(current.roundDurationMinutes / 60, locale) })}</Text>
       )}
       {error ? <Toast visible message={error} tone="error" /> : null}
       <View style={styles.actions}>
-        <Button label={t("arena.randomFill")} variant="secondary" loading={busy} disabled={!books.length} onPress={randomFill} />
-        <Button label={saving ? t("shell.saving") : isSaved ? t("shell.saved") : t("arena.saveProgress")} variant="secondary" disabled={busy || isSaved} onPress={() => void saveProgress()} />
-        <Button label={t("arena.start")} loading={busy} disabled={slots.some((slot) => !slot)} onPress={start} />
+        <Button label={t("arena.randomFill")} variant="secondary" loading={busy} disabled={!books.length || (!current && durationInvalid)} onPress={randomFill} />
+        <Button label={saving ? t("shell.saving") : isSaved ? t("shell.saved") : t("arena.saveProgress")} variant="secondary" disabled={busy || isSaved || (!current && durationInvalid)} onPress={() => void saveProgress()} />
+        <Button label={t("arena.start")} loading={busy} disabled={slots.some((slot) => !slot) || (!current && durationInvalid)} onPress={start} />
       </View>
       {slots.some((slot) => !slot) ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("arena.fillEverySlot")}</Text> : null}
       {library.isSuccess && !books.length ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("arena.randomFillNeedsBooks")}</Text> : null}

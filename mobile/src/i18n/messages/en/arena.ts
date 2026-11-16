@@ -49,6 +49,7 @@ export const arena = {
   "arena.seedTitle": "Seed tournament",
   "arena.tournamentName": "Tournament name",
   "arena.untitledTournament": "Untitled tournament",
+  "arena.roundDurationRange": "Enter 1 minute to 720 hours.",
   "arena.seedSummary": "{name} · {size} slots · {hours} h rounds",
   "arena.randomFill": "Random fill",
   "arena.saveProgress": "Save progress",

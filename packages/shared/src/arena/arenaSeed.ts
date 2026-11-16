@@ -32,6 +32,14 @@ export function toSeedBook(book: Record<string, unknown>, cover: string | null, 
 
 const DEFAULT_ROUND_MINUTES = 1440;
 
+const MAX_ROUND_MINUTES = 720 * 60;
+
+export function parseRoundMinutes(text: string): number | null {
+  if (!text.trim()) return DEFAULT_ROUND_MINUTES;
+  const minutes = Math.round(Number(text) * 60);
+  return Number.isFinite(minutes) && minutes >= 1 && minutes <= MAX_ROUND_MINUTES ? minutes : null;
+}
+
 export function roundMinutesFromHours(text: string): number {
   const minutes = Math.round(Number(text) * 60);
   return Number.isFinite(minutes) && minutes > 0 ? minutes : DEFAULT_ROUND_MINUTES;
