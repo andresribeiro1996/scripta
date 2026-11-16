@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
-import { deleteBooks, restoreDeletedBooks, saveFailureMessage, setBookCoverUrl, type ResolvedCoverResponse } from "@scripta/shared";
+import { deleteBooks, restoreDeletedBooks, saveFailureMessage, searchGroups, setBookCoverUrl, type ResolvedCoverResponse } from "@scripta/shared";
 import { fetchIsAdmin } from "../api/books";
 import { rememberResolvedCover } from "../api/covers";
 import type { GalleryImage } from "../api/gallery";
@@ -100,20 +100,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
     () => (library?.data.groups ?? []).filter((g) => g.type === type && (!selectedGroupId || g.id === selectedGroupId)).sort((a, b) => a.name.localeCompare(b.name)),
     [library, type, selectedGroupId]
   );
-  // Matches a group's own name OR any book title inside it — "which
-  // collection did I put Dune in?" is at least as common a question here
-  // as "where's my sci-fi collection", and the second is unanswerable if
-  // only names are searched. Kept out of `allGroups` so the
-  // empty-state copy can still reason about how many groups exist at
-  // all, rather than how many currently match.
-  const groups = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    if (!needle) return allGroups;
-    return allGroups.filter((group) => {
-      if (group.name.toLowerCase().includes(needle)) return true;
-      return orderedGroupBooks(group, books).some((book) => String(book.Title ?? "").toLowerCase().includes(needle));
-    });
-  }, [allGroups, books, search]);
+  const groups = useMemo(() => searchGroups(allGroups, books, search), [allGroups, books, search]);
   // Which series (if any) each book actually belongs to, regardless of
   // which page this is (Series or Collections) — `groups` above is
   // filtered to just this page's type, so on Collections it never

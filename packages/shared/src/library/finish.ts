@@ -1,5 +1,6 @@
 import type { Locale } from "../i18n/locale.js";
 import { sharedT } from "../i18n/sharedT.js";
+import type { ReadStatus } from "./libraryView.js";
 
 export type FinishRating = 1 | 2 | 3 | 4 | 5;
 
@@ -48,4 +49,8 @@ export function removeReaderNote(book: Book, bookmarkId: string): Book {
   const highlights = book.highlights as Array<Record<string, unknown>>;
   const next = highlights.filter((h) => h.BookmarkID !== bookmarkId);
   return next.length === highlights.length ? book : { ...book, highlights: next };
+}
+
+export function promptsFinish(book: Book, status: ReadStatus): boolean {
+  return status === 2 && book.ReadStatus !== 2;
 }

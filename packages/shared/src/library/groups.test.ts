@@ -8,6 +8,7 @@ import {
   normalizeGroupName,
   removeBookFromGroup,
   removeKeyFromGroup,
+  searchGroups,
   type Group
 } from "./groups.js";
 import { bookKey } from "./merge.js";
@@ -323,3 +324,18 @@ for (const [shape, seriesCount] of [
     assert.ok(rederiving.ms < 1000, `re-deriving took ${rederiving.ms.toFixed(0)} ms`);
   });
 }
+
+test("searchGroups matches group names and member titles, ignoring case, keeping order", () => {
+  const dune = { Title: "Dune", Attribution: "Frank Herbert" };
+  const emma = { Title: "Emma", Attribution: "Jane Austen" };
+  const sci: Group = { id: "g1", type: "series", name: "Sci-Fi", bookKeys: [bookKey(dune)], createdAt: "", updatedAt: "" };
+  const classics: Group = { id: "g2", type: "collection", name: "Classics", bookKeys: [bookKey(emma)], createdAt: "", updatedAt: "" };
+  const groups = [sci, classics];
+  const books = [dune, emma];
+  assert.equal(searchGroups(groups, books, ""), groups);
+  assert.equal(searchGroups(groups, books, "   "), groups);
+  assert.deepEqual(searchGroups(groups, books, " CLASS "), [classics]);
+  assert.deepEqual(searchGroups(groups, books, "dUnE"), [sci]);
+  assert.deepEqual(searchGroups(groups, books, "s"), [sci, classics]);
+  assert.deepEqual(searchGroups(groups, books, "zzz"), []);
+});

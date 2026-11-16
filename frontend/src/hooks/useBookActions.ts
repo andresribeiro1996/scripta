@@ -7,6 +7,7 @@ import {
   saveFailureMessage,
   setBookCoverUrl,
   setRating,
+  statusChange,
   type FinishRating,
   type ReadSnapshot,
   type ResolvedCoverResponse
@@ -45,9 +46,9 @@ export function useBookActions() {
   async function setStatus(book: Book, status: ReadStatus): Promise<boolean> {
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
     if (!current) return false;
-    const key = bookKey(book);
-    const day = localDay();
-    const result = await saver.submit(status === 2 ? { kind: "book", bookKey: key, readStatus: 2, day } : { kind: "book", bookKey: key, readStatus: status });
+    const change = statusChange(book, status, localDay());
+    if (!change) return false;
+    const result = await saver.submit(change);
     if (!result.ok) toast({ message: saveFailureMessage(result.error, t("addBook.statusSaveFailed"), getLocale()), kind: "error" });
     return result.ok;
   }

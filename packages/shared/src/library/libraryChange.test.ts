@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildMergedLibrary } from "./addPipeline.js";
 import type { Group } from "./groups.js";
-import { applyLibraryChange } from "./libraryChange.js";
+import { applyLibraryChange, statusChange } from "./libraryChange.js";
 import { bookKey } from "./merge.js";
 import type { LibraryData } from "./types.js";
 
@@ -214,4 +214,17 @@ test("a groups that is not an array is passed through untouched, and a membershi
     assert.equal(added.data.groups, groups);
     assert.equal(added.data.books.length, 3);
   }
+});
+
+test("statusChange is null when the status is unchanged, treating a missing one as 0", () => {
+  assert.equal(statusChange(emma, 1, "2026-01-01"), null);
+  assert.equal(statusChange({ Title: "X" }, 0, "2026-01-01"), null);
+});
+
+test("statusChange carries the day only for finished", () => {
+  assert.deepEqual(statusChange(emma, 2, "2026-01-01"), { kind: "book", bookKey: emmaKey, readStatus: 2, day: "2026-01-01" });
+  const toZero = statusChange(emma, 0, "2026-01-01");
+  assert.deepEqual(toZero, { kind: "book", bookKey: emmaKey, readStatus: 0 });
+  assert.equal("day" in toZero!, false);
+  assert.deepEqual(statusChange(dune, 1, "2026-01-01"), { kind: "book", bookKey: duneKey, readStatus: 1 });
 });

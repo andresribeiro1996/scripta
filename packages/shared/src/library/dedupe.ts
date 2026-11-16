@@ -143,3 +143,9 @@ export function mergeDuplicateBooks(library: LibraryData, keep: string, merge: s
     ...(library.distinctBooks ? { distinctBooks: rekeyPairs(library.distinctBooks, from, keep) } : {})
   };
 }
+
+export function possibleDuplicates(data: LibraryData | undefined): string[][] {
+  if (!data) return [];
+  const { certain, likely } = findDuplicates(data);
+  return [...certain, ...likely];
+}

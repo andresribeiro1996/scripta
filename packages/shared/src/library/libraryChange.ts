@@ -1,7 +1,7 @@
 import { buildMergedLibrary } from "./addPipeline.js";
 import { setRating, type FinishRating } from "./finish.js";
 import { addKeyToGroup, isGroup, removeKeyFromGroup } from "./groups.js";
-import { setReadStatus } from "./libraryView.js";
+import { setReadStatus, type LibraryBook, type ReadStatus } from "./libraryView.js";
 import { bookKey } from "./merge.js";
 import type { LibraryData } from "./types.js";
 
@@ -10,6 +10,12 @@ export type LibraryChange =
   | { kind: "book"; bookKey: string; rating?: FinishRating; readStatus: 2; day: string }
   | { kind: "book"; bookKey: string; rating?: FinishRating; readStatus?: 0 | 1; day?: string }
   | { kind: "add"; book: Record<string, unknown> };
+
+export function statusChange(book: LibraryBook, status: ReadStatus, day: string): LibraryChange | null {
+  if (setReadStatus(book, status, day) === book) return null;
+  if (status === 2) return { kind: "book", bookKey: bookKey(book), readStatus: 2, day };
+  return { kind: "book", bookKey: bookKey(book), readStatus: status };
+}
 
 export type ApplyLibraryChangeResult = { data: LibraryData; changed: boolean } | { error: "no-group" | "no-book" };
 

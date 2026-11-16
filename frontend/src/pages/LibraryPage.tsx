@@ -5,8 +5,8 @@ import { useLocation, useNavigate, useNavigationType, useSearchParams } from "re
 import {
   buildMergedLibrary,
   deleteBooks,
-  findDuplicates,
   LIBRARY_CSV_TEMPLATE,
+  possibleDuplicates,
   restoreDeletedBooks,
   saveFailureMessage,
   statusCounts
@@ -67,11 +67,7 @@ export function LibraryPage() {
   const { scrubBooks } = useMurals();
   const saver = useLibrarySaver();
   const { data: library, isLoading, updateLibrary, share: shareLibraryDoc, unshare: unshareLibraryDoc } = useLibrary();
-  const possibleDuplicates = useMemo(() => {
-    if (!library) return [];
-    const { certain, likely } = findDuplicates(library.data);
-    return [...certain, ...likely];
-  }, [library]);
+  const duplicates = useMemo(() => possibleDuplicates(library?.data), [library]);
   const toast = useToast();
   const bookActions = useBookActions();
   const { data: isAdmin = false } = useQuery({ queryKey: ["books-admin"], queryFn: fetchIsAdmin, staleTime: Infinity });
@@ -489,13 +485,13 @@ export function LibraryPage() {
         />
       )}
 
-      {possibleDuplicates.length > 0 && (
+      {duplicates.length > 0 && (
         <button
           type="button"
           onClick={() => setReviewingDuplicates(true)}
           className="mb-3 flex min-h-11 w-full items-center justify-between rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
         >
-          <span>{t("library.possibleDuplicates", { count: possibleDuplicates.length })}</span>
+          <span>{t("library.possibleDuplicates", { count: duplicates.length })}</span>
           <span className="font-semibold">{t("library.review")}</span>
         </button>
       )}
@@ -576,8 +572,8 @@ export function LibraryPage() {
 
       {addingBook && <AddBookModal onAdd={(book) => handleAddBook(book)} onClose={() => setAddingBook(false)} />}
 
-      {reviewingDuplicates && library && possibleDuplicates.length > 0 && (
-        <DuplicatesSheet groups={possibleDuplicates} library={library} onClose={() => setReviewingDuplicates(false)} />
+      {reviewingDuplicates && library && duplicates.length > 0 && (
+        <DuplicatesSheet groups={duplicates} library={library} onClose={() => setReviewingDuplicates(false)} />
       )}
 
       {syncingGoodreads && (
