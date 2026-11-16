@@ -23,6 +23,7 @@ import {
   muralThemeId,
   moveMuralBlock,
   muralDragScrollSpeed,
+  PROFILE_STACK_BELOW,
   readingPercent,
   resolveBlockColor,
   resolveBlockStyle,
@@ -61,7 +62,6 @@ export const NO_GROUPS: Group[] = [];
 const LIFT_SPRING = { duration: 300, dampingRatio: 0.8 } as const;
 const MOVE_SPRING = { duration: 220, dampingRatio: 1, overshootClamping: true } as const;
 const ROW_HEIGHT = MURAL_ROW_HEIGHT;
-const PROFILE_STACK_BELOW = 8;
 const GAP = 8;
 const ROW_GAP = GAP;
 const gridColumnWidth = (width: number) => (width + GAP) / GRID_COLUMNS;

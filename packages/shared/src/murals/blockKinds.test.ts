@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import type { BookGenre } from "../library/bookGenres.js";
 import { bookKey } from "../library/merge.js";
-import { BLOCK_TYPES, blockBooks, blockLabel, blockReferences, createBlockCandidate, ensureBookBlockHeights, isConfigurable, muralBlockTitle, rekeyBlocks, scrubBooksFromMurals, type BlockType, type Mural, type MuralBlock } from "./murals.js";
+import { BLOCK_TYPES, blockBooks, blockLabel, blockReferences, createBlockCandidate, ensureBookBlockHeights, isConfigurable, minBlockHeight, muralBlockTitle, rekeyBlocks, scrubBooksFromMurals, type BlockType, type Mural, type MuralBlock } from "./murals.js";
 
 const make = (type: BlockType, extra: Record<string, unknown> = {}) => ({ ...createBlockCandidate(type, []), ...extra }) as MuralBlock;
 
@@ -28,6 +29,13 @@ test("a new stats or profile block already meets its minimum height", () => {
   const blocks = [createBlockCandidate("stats", []), createBlockCandidate("profile", [])];
   assert.deepEqual(blocks.map((block) => block.layout.h), [6, 8]);
   assert.equal(ensureBookBlockHeights(blocks), blocks);
+});
+
+test("a narrow profile block's minimum grows with its bio and favourite genres; a wide one stays at 8", () => {
+  const profile = (w: number, bio: string, favoriteGenres: BookGenre[]): MuralBlock => ({ id: "p", type: "profile", bio, favoriteGenres, layout: { x: 0, y: 0, w, h: 1 } });
+  assert.equal(minBlockHeight(profile(6, "", [])), 7);
+  assert.equal(minBlockHeight(profile(6, "Reads late at night with tea", ["Fantasy", "Romance"])), 11);
+  assert.equal(minBlockHeight(profile(12, "Reads late at night with tea", ["Fantasy", "Romance"])), 8);
 });
 
 test("muralBlockTitle names a block by its content and falls back to its label", () => {
