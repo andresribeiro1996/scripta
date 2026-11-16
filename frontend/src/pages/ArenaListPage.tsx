@@ -54,6 +54,7 @@ export function ArenaListPage() {
   const tab = searchParams.get("tab") === "tierlists" ? "tierlists" : searchParams.get("tab") === "quizzes" ? "quizzes" : "tournaments";
   const [createError, setCreateError] = useState<string | null>(null);
   const [searchState, setSearchState] = useState({ tab, text: "" });
+  if (searchState.tab !== tab) setSearchState({ tab, text: "" });
   const search = searchState.tab === tab ? searchState.text : "";
   const setSearch = (text: string) => setSearchState({ tab, text });
   const [renamingTierlistId, setRenamingTierlistId] = useState<string | null>(null);
