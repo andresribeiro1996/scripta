@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import { Image } from "expo-image";
 import { QUIZ_QUESTION_TYPES, eligibleTypes, playerLabel, quizOptionLabel, quizQuestionLabel, type QuizData } from "@scripta/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { API_URL } from "../../core/config";
-import { ActionSheet, type ActionItem, Button, Dialog, EditorHeading, EmptyState, ErrorState, FormScroll, HeaderActions, IconButton, Input, SaveStateButton, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme, useUnsavedChangesGuard } from "../../ui";
+import { ActionSheet, type ActionItem, Button, ConfirmDialog, Dialog, EditorHeading, EmptyState, ErrorState, FormScroll, HeaderActions, IconButton, Input, SaveStateButton, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme, useUnsavedChangesGuard } from "../../ui";
 import { coverUrlForApi } from "../library/lib/coverUrl";
 import { publicContentUrl } from "../sharing/links";
-import { fetchQuizResults, publishQuiz, setPlayState, updateQuiz, type Quiz } from "./api";
+import { deleteQuiz, fetchQuizResults, publishQuiz, setPlayState, updateQuiz, type Quiz } from "./api";
 import { useWorkCharacters } from "./useWorkCharacters";
 import { quizTypeLabel } from "./quizTypeLabel";
 import { useLocale, useT } from "../../i18n";
@@ -35,6 +35,9 @@ export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz;
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingPublish, setConfirmingPublish] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleted, setDeleted] = useState(false);
   const results = useQuery({ queryKey: ["quizzes", "results", current.id], queryFn: () => fetchQuizResults(current.id), enabled: current.voteCode !== null, retry: false });
 
   // Keyed on the server's own version — a refetch hands back an
@@ -83,6 +86,22 @@ export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz;
     }
   }
 
+  async function remove() {
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteQuiz(current.id);
+      queryClient.setQueryData<Quiz[]>(["quizzes"], (items = []) => items.filter((item) => item.id !== current.id));
+      setConfirmingDelete(false);
+      setDeleted(true);
+    } catch (reason) {
+      setConfirmingDelete(false);
+      setError(reason instanceof Error ? reason.message : t("arena.deleteFailed"));
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   async function shareChallengeLink() {
     setError(null);
     try {
@@ -94,14 +113,17 @@ export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz;
 
   const frozen = current.voteCode !== null;
   const dirty = !frozen && JSON.stringify(data) !== JSON.stringify(current.data);
-  const discardDialog = useUnsavedChangesGuard(dirty);
+  const discardDialog = useUnsavedChangesGuard(dirty && !deleted);
+  useEffect(() => { if (deleted) { if (router.canGoBack()) router.back(); else router.replace("/my-arena" as never); } }, [deleted]);
   const lockEdits = publishing;
+  const deleteGroup: ActionItem[] = [{ label: t("library.delete"), icon: "delete", destructive: true, onPress: () => setConfirmingDelete(true) }];
   const actionGroups: ActionItem[][] = frozen
     ? [
       [{ label: t("quizzes.shareChallengeLink"), icon: "share", onPress: () => void shareChallengeLink() }],
       [{ label: current.playOpen ? t("quizzes.closeForPlay") : t("quizzes.openForPlay"), icon: current.playOpen ? "lock" : "public", onPress: () => void run(() => setPlayState(current.id, !current.playOpen)) }],
+      deleteGroup,
     ]
-    : [[{ label: t("quizzes.publish"), icon: "public", onPress: () => setConfirmingPublish(true) }]];
+    : [[{ label: t("quizzes.publish"), icon: "public", onPress: () => setConfirmingPublish(true) }], deleteGroup];
 
   return <Screen top={false}>
     {discardDialog}
@@ -171,6 +193,7 @@ export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz;
         <Button label={t("quizzes.publish")} loading={publishing} onPress={() => void publish()} />
       </View>
     </Dialog>
+    <ConfirmDialog visible={confirmingDelete} title={t("arena.deleteTitle", { name: current.name })} body={t("arena.deleteEffectQuiz")} confirmLabel={t("library.delete")} destructive loading={deleting} onConfirm={() => void remove()} onCancel={() => setConfirmingDelete(false)} />
   </Screen>;
 }
 
