@@ -220,6 +220,10 @@ export function compactMuralBlocks(allBlocks: MuralBlock[]): MuralBlock[] {
   return blocks.map((block) => placed.get(block.id) === block.layout ? block : withMuralBlockLayout(block, placed.get(block.id)!));
 }
 
+export function withoutUnfilledImages(blocks: MuralBlock[]): MuralBlock[] {
+  return compactMuralBlocks(blocks.filter((block) => block.type !== "image" || block.imageId !== ""));
+}
+
 export function toggleMuralBlockExpansion(blocks: MuralBlock[], blockId: string, axis: "w" | "h", bottom: number, top = 0): MuralBlock[] {
   const block = blocks.find((item) => item.id === blockId);
   if (!block || !Object.values(block.layout).every(Number.isSafeInteger) || !isValidBlockLayout(block.layout, blocks, blockId)) return blocks;

@@ -21,7 +21,6 @@ import {
   muralBlockStyle,
   muralColors,
   muralThemeId,
-  compactMuralBlocks,
   moveMuralBlock,
   muralDragScrollSpeed,
   readingPercent,
@@ -29,6 +28,7 @@ import {
   resolveBlockStyle,
   resolveQuote,
   resolveQuoteCollection,
+  withoutUnfilledImages,
   statMetricLabels,
   type BlockLayout,
   type BlockStyle,
@@ -490,7 +490,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, profileI
     onLayoutChange?.(id, { ...original.layout, x: original.layout.x + dx, y: original.layout.y + dy });
   }, [mural.blocks, onLayoutChange]);
   const onAssetReady = useCallback((key: string) => setReadyAssets((current) => current.has(key) ? current : new Set(current).add(key)), []);
-  const shownBlocks = useMemo(() => editable ? mural.blocks : compactMuralBlocks(mural.blocks.filter((block) => block.type !== "image" || images.some((image) => image.id === block.imageId))), [editable, mural.blocks, images]);
+  const shownBlocks = useMemo(() => editable ? mural.blocks : withoutUnfilledImages(mural.blocks), [editable, mural.blocks]);
   const resolvedBlocks = useMemo(() => shownBlocks.map((block) => resolveHomeBlock(block, books, groups, day, locale)), [shownBlocks, books, groups, day, locale]);
   const assetKeys = resolvedBlocks.flatMap((block) => {
     if (block.type === "profile" && profile?.avatarUrl) return [`avatar:${block.id}:${profile.avatarUrl}`];

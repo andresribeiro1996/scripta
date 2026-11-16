@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { compactMuralBlocks, createDuplicateCandidate, dropRetiredBlocks, duplicateBlock, ensureBookBlockHeights, layoutsOverlap, moveMuralBlock, muralDragScrollSpeed, muralThemeId, toggleMuralBlockExpansion, withMuralBlockLayout, type MuralBlock } from "./murals.js";
+import { compactMuralBlocks, createDuplicateCandidate, dropRetiredBlocks, duplicateBlock, ensureBookBlockHeights, layoutsOverlap, moveMuralBlock, muralDragScrollSpeed, muralThemeId, toggleMuralBlockExpansion, withMuralBlockLayout, withoutUnfilledImages, type MuralBlock } from "./murals.js";
 
 const reading = (y: number, h: number): MuralBlock => ({ id: "r", type: "currentlyReading", layout: { x: 0, y, w: 12, h } });
 const text = (id: string, y: number, h: number): MuralBlock => ({ id, type: "text", heading: id, layout: { x: 0, y, w: 12, h } });
@@ -318,4 +318,10 @@ test("ensureBookBlockHeights drops a stale readerCard block instead of throwing"
 test("compactMuralBlocks drops a stale readerCard block", () => {
   const card = { id: "c", type: "readerCard", layout: { x: 0, y: 0, w: 6, h: 6 } } as unknown as MuralBlock;
   assert.deepEqual(compactMuralBlocks([card, text("below", 6, 2)]).map((block) => [block.id, block.layout.y]), [["below", 0]]);
+});
+
+test("withoutUnfilledImages drops image blocks with no image and closes the gap, keeping any filled one", () => {
+  const image = (id: string, y: number, imageId: string): MuralBlock => ({ id, type: "image", imageId, layout: { x: 0, y, w: 12, h: 3 } });
+  const shown = withoutUnfilledImages([image("empty", 0, ""), image("filled", 3, "img-1"), text("below", 6, 3)]);
+  assert.deepEqual(shown.map((block) => [block.id, block.layout.y]), [["filled", 0], ["below", 3]]);
 });
