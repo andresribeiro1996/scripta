@@ -82,6 +82,7 @@ export function TierlistCreateScreen() {
       <Text accessible={false} {...dynamicType} style={[typography.body, { color: colors.text }]}>{t("tierlists.topTierMeans")}</Text>
       <Segmented accessibilityLabel={t("tierlists.topTierMeans")} options={DIRECTION.map((option) => ({ value: option.value, label: t(option.label) }))} value={direction} onChange={setDirection} />
       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("tierlists.cantChangeLater")}</Text>
+      <Text accessible={false} {...dynamicType} style={[typography.body, { color: colors.text }]}>{t("tierlists.visibility")}</Text>
       <Segmented accessibilityLabel={t("tierlists.visibility")} options={VISIBILITY.map((option) => ({ value: option.value, label: t(option.label) }))} value={visibility} onChange={setVisibility} />
       {visibility === "public" ? <>
         <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>{t("tierlists.openForVoting")}</Text>

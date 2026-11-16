@@ -47,6 +47,7 @@ test("an edition has five distinct books, four options each with the answer in p
   for (let index = 0; index < 60; index += 1) {
     const edition = buildEdition("2026-10-01", index);
     assert(DEV_THEMES.some((theme) => theme.id === edition.themeId));
+    assert.equal(edition.title, DEV_THEMES.find((theme) => theme.id === edition.themeId).name);
     assert.equal(edition.snapshot.length, 5);
     assert.equal(new Set(edition.snapshot.map((question) => question.bookId)).size, 5);
     assert.deepEqual(edition.questionIds, edition.snapshot.map((question) => question.id));

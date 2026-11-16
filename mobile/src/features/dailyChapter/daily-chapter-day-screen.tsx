@@ -1,6 +1,7 @@
 import { Pressable, ScrollView, View } from "react-native";
 import { Stack } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
+import { dailyChapterDayLabel } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { EmptyState, Screen, Skeleton, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { AuthorAvatar } from "../community/AuthorAvatar";
@@ -8,10 +9,11 @@ import { ApiError } from "../../core/api";
 import { dailyChapterApi } from "./api";
 import { DailyChapterSquares } from "./daily-chapter-squares";
 import { useDailyHistory, useDeviceIdentity } from "./use-daily-history";
-import { useT } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 
 export function DailyChapterDayScreen({ id }: { id: string }) {
   const t = useT();
+  const locale = useLocale();
   const { colors } = useTheme();
   const identity = useDeviceIdentity();
   const history = useDailyHistory();
@@ -30,7 +32,7 @@ export function DailyChapterDayScreen({ id }: { id: string }) {
   });
   const shown = result ?? review.data;
   const people = useQuery({ queryKey: ["daily-chapter", "people", id], queryFn: () => dailyChapterApi.people(id), enabled: Boolean(shown) });
-  const title = shown ? `${shown.date} · ${shown.title}` : t("quizzes.dailyChapter");
+  const title = shown ? dailyChapterDayLabel(shown.date, locale) : t("quizzes.dailyChapter");
   let body;
   if (identity.isError || history.isLoadingError || (!result && review.isLoadingError)) body = <EmptyState title={t("quizzes.dayLoadFailed")} actionLabel={t("shell.retry")} onAction={() => { void identity.refetch(); void history.refetch(); if (!result && review.isLoadingError) void review.refetch(); }} />;
   else if (!history.data || (!result && review.isPending)) body = <View style={{ gap: spacing.md }}><Skeleton height={48} /><Skeleton height={120} /><Skeleton height={120} /></View>;
@@ -48,6 +50,7 @@ export function DailyChapterDayScreen({ id }: { id: string }) {
       <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.textDim, fontWeight: "700" }]}>{person.score}/5</Text>
     </View>);
     body = <>
+      <Text accessibilityRole="header" {...dynamicType} style={[typography.heading, { color: colors.text }]}>{shown.title}</Text>
       {result ? <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
         <Text {...dynamicType} style={[typography.heading, { color: colors.text, fontWeight: "700" }]}>{result.score}/5</Text>
         <DailyChapterSquares marks={result.answers.map((answer) => answer.choiceIndex === answer.answerIndex)} size={14} />

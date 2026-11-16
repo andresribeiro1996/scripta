@@ -86,6 +86,7 @@ export const quizzes = {
   "quizzes.cover": "Cover",
   "quizzes.leaderboardFailed": "Couldn't load the leaderboard.",
   "quizzes.noPlays": "No plays yet.",
+  "quizzes.noPlaysBody": "Plays appear here once people take the challenge.",
   "quizzes.youPicked": "You picked {value}",
   "quizzes.openBook": "Open book",
   "quizzes.rankOf": "#{rank} of {total} players",

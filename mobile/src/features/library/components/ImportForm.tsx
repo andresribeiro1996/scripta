@@ -103,13 +103,13 @@ export function ImportForm({
   return (
     <>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xl }}>
+        <Button label={busy ? t("library.readingFile") : t("library.chooseFile")} loading={busy} disabled={merging || savingTemplate} onPress={() => void handleChoose()} />
         <Text style={[typography.body, { color: colors.textDim }]}>
           {t("library.importIntro").split("**").map((part, index) => (index % 2 ? <Text key={index} style={{ fontWeight: "700" }}>{part}</Text> : part))}
         </Text>
         <Text style={[typography.caption, { color: colors.textDim }]}>{t("library.importSourcesNote")}</Text>
         <Text style={[typography.caption, { color: colors.textDim }]}>{t("library.importSpreadsheetNote")}</Text>
         <Button label={t("library.saveCsvTemplate")} variant="secondary" loading={savingTemplate} disabled={busy || merging} onPress={() => void saveTemplate()} />
-        <Button label={busy ? t("library.readingFile") : t("library.chooseFile")} loading={busy} disabled={merging || savingTemplate} onPress={() => void handleChoose()} />
         {busy && (
           <View style={{ gap: spacing.sm }}>
             <Skeleton height={18} />

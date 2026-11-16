@@ -103,7 +103,7 @@ export function buildEdition(date, index) {
     id: `dev-daily-${date}`,
     date,
     themeId: theme.id,
-    title: `${theme.name}, ${date}`,
+    title: theme.name,
     intro: "A dev fixture chapter.",
     questionIds: questions.map((question) => question.id),
     snapshot: questions,
