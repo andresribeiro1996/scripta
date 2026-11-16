@@ -5,12 +5,14 @@ export const passwordHint = (locale: Locale): string => sharedT(locale)("shared.
 export const usernameHint = (locale: Locale): string => sharedT(locale)("shared.auth.usernameHint");
 export const recoveryMessage = (locale: Locale): string => sharedT(locale)("shared.auth.recoveryMessage");
 
+export const isValidUsername = (username: string): boolean => /^[a-zA-Z0-9_.]{3,30}$/.test(username.trim());
+
 export function authFieldErrors(mode: "login" | "signup", identifier: string, username: string, password: string, locale: Locale): Record<string, string> {
   const t = sharedT(locale);
   const errors: Record<string, string> = {};
   if (!identifier.trim()) errors.identifier = t(mode === "signup" ? "shared.auth.enterEmail" : "shared.auth.enterEmailOrUsername");
   else if (mode === "signup" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier.trim())) errors.identifier = t("shared.auth.invalidEmail");
-  if (mode === "signup" && !/^[a-zA-Z0-9_.]{3,30}$/.test(username.trim())) errors.username = usernameHint(locale);
+  if (mode === "signup" && !isValidUsername(username)) errors.username = usernameHint(locale);
   if (!password) errors.password = t("shared.auth.enterPassword");
   else if (mode === "signup" && (password.length < 8 || password.length > 128)) errors.password = t("shared.auth.passwordLength");
   return errors;
