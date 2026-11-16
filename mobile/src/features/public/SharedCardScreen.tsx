@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { router, Stack } from "expo-router";
+import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { readerCardInputOf } from "@scripta/shared";
@@ -10,6 +10,7 @@ import { useLocale, useT } from "../../i18n";
 import { openProfile } from "../community/AuthorAvatar";
 import { ProfileCardHero } from "../readerCard/ProfileCardHero";
 import { fetchSharedCard } from "./api";
+import { SharedHeader } from "./SharedHeader";
 
 export function SharedCardScreen({ token }: { token: string }) {
   const t = useT();
@@ -19,18 +20,19 @@ export function SharedCardScreen({ token }: { token: string }) {
   const query = useQuery({ queryKey: ["shared-card", token], queryFn: () => fetchSharedCard(token), enabled: Boolean(token), retry: false });
   const input = useMemo(() => (query.data ? readerCardInputOf([], [], query.data.username, locale, query.data.readerCard) : null), [query.data, locale]);
 
-  if (query.isPending) return <View style={[styles.center, { backgroundColor: colors.background }]}><Skeleton height={180} /></View>;
+  if (query.isPending) return <View style={[styles.center, { backgroundColor: colors.background }]}><SharedHeader title={t("readerCard.title")} /><Skeleton height={180} /></View>;
   if (query.isError || !input) {
     const invalid = query.error instanceof ApiError && query.error.status === 404;
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <SharedHeader title={t("readerCard.title")} />
         <ErrorState body={t(invalid ? "readerCard.sharedInvalid" : "readerCard.sharedLoadFailed")} actionLabel={invalid ? t("shell.notFoundAction") : t("shell.retry")} onAction={invalid ? () => router.replace("/") : () => void query.refetch()} />
       </View>
     );
   }
   return (
     <Screen top={false} bottom>
-      <Stack.Screen options={{ headerShown: true, title: t("readerCard.title") }} />
+      <SharedHeader title={t("readerCard.title")} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <ProfileCardHero input={input} width={width}>
           <Text {...dynamicType} style={[typography.heading, styles.strong, { color: colors.text }]}>{query.data!.username}</Text>
