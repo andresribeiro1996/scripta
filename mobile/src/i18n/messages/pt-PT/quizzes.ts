@@ -87,6 +87,7 @@ export const quizzes: CatalogOf<typeof en> = {
   "quizzes.cover": "Capa",
   "quizzes.leaderboardFailed": "Não foi possível carregar a tabela de classificação.",
   "quizzes.noPlays": "Ainda não há participações.",
+  "quizzes.noPlaysBody": "As participações aparecem aqui quando alguém fizer o desafio.",
   "quizzes.youPicked": "Escolheu {value}",
   "quizzes.openBook": "Abrir livro",
   "quizzes.rankOf": "{rank}.º de {total} jogadores",

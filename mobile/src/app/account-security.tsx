@@ -59,15 +59,15 @@ export default function AccountSecurityPage() {
     finally { setBusy(false); }
   }
 
-  return <Screen top={false} bottom><Stack.Screen options={{ headerShown: true, title: t("shell.account") }} />
+  return <Screen top={false} bottom><Stack.Screen options={{ headerShown: true, title: t("shell.youAccountSecurity") }} />
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: spacing.xl, gap: spacing.lg }}>
         {account.isPending ? <Text style={{ color: colors.text }}>{t("shell.accountLoading")}</Text> : account.isError ? <Button label={t("shell.accountLoadFailed")} onPress={() => void account.refetch()} /> : <>
           <Text selectable style={[typography.body, { color: colors.text }]}>{t(account.data.emailVerified ? "shell.accountEmailVerified" : "shell.accountEmailNotVerified", { email: account.data.email })}</Text>
           {!account.data.emailEnabled && <Text style={{ color: colors.textDim }}>{t("shell.emailDeliveryUnavailable")}</Text>}
           {!mode && !account.data.emailVerified && <Button label={t("shell.sendVerificationEmail")} variant="secondary" disabled={busy || !account.data.emailEnabled} onPress={() => void run("verify")} />}
-          {account.data.hasPassword ? <Button label={t("shell.changePassword")} variant="secondary" disabled={busy} onPress={() => { setMode("password"); setError(""); setConfirmError(""); }} /> : <Text style={{ color: colors.textDim }}>{t("shell.passwordManagedByGoogle")}</Text>}
           {account.data.canChangeEmail && <Button label={t("shell.correctEmail")} variant="secondary" disabled={busy || !account.data.emailEnabled} onPress={() => { setEmail(account.data.email); setMode("email"); setError(""); setConfirmError(""); }} />}
+          {account.data.hasPassword ? <Button label={t("shell.changePassword")} variant="secondary" disabled={busy} onPress={() => { setMode("password"); setError(""); setConfirmError(""); }} /> : <Text style={{ color: colors.textDim }}>{t("shell.passwordManagedByGoogle")}</Text>}
         </>}
         {message ? <Text accessibilityLiveRegion="polite" style={{ color: colors.text }}>{message}</Text> : null}
         {!mode && error ? <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>{error}</Text> : null}

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { compactMuralBlocks, createDuplicateCandidate, dropRetiredBlocks, duplicateBlock, ensureBookBlockHeights, layoutsOverlap, moveMuralBlock, muralDragScrollSpeed, muralThemeId, toggleMuralBlockExpansion, withMuralBlockLayout, type MuralBlock } from "./murals.js";
+import { compactMuralBlocks, createDuplicateCandidate, dropRetiredBlocks, duplicateBlock, ensureBookBlockHeights, layoutsOverlap, moveMuralBlock, muralDragScrollSpeed, muralThemeId, toggleMuralBlockExpansion, withMuralBlockLayout, withoutUnfilledImages, type MuralBlock } from "./murals.js";
 
 const reading = (y: number, h: number): MuralBlock => ({ id: "r", type: "currentlyReading", layout: { x: 0, y, w: 12, h } });
 const text = (id: string, y: number, h: number): MuralBlock => ({ id, type: "text", heading: id, layout: { x: 0, y, w: 12, h } });
@@ -19,6 +19,44 @@ test("a shelf keeps its 4 row minimum and a tierlist its 8", () => {
   const [grownShelf, grownTierlist] = ensureBookBlockHeights([shelf, tierlist]);
   assert.equal(grownShelf.layout.h, 4);
   assert.deepEqual(grownTierlist.layout, { x: 0, y: 4, w: 12, h: 8 });
+});
+
+test("a stats block shorter than 6 rows and a profile shorter than 8 grow and push the blocks below them down", () => {
+  const stats: MuralBlock = { id: "st", type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"], layout: { x: 0, y: 3, w: 12, h: 4 } };
+  const profile: MuralBlock = { id: "pr", type: "profile", bio: "", favoriteGenres: [], layout: { x: 0, y: 0, w: 12, h: 3 } };
+  const below = text("below", 7, 3);
+  const [grownProfile, grownStats, shifted] = ensureBookBlockHeights([profile, stats, below]);
+  assert.equal(grownProfile.layout.h, 8);
+  assert.deepEqual(grownStats.layout, { x: 0, y: 8, w: 12, h: 6 });
+  assert.deepEqual(shifted.layout, { x: 0, y: 14, w: 12, h: 3 });
+});
+
+test("growing a block leaves no gap in the column beside it", () => {
+  const stats: MuralBlock = { id: "st", type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"], layout: { x: 0, y: 0, w: 6, h: 2 } };
+  const side: MuralBlock = { ...text("side", 0, 2), layout: { x: 6, y: 0, w: 6, h: 2 } };
+  const sideBelow: MuralBlock = { ...text("sideBelow", 2, 3), layout: { x: 6, y: 2, w: 6, h: 3 } };
+  const [grown, first, second] = ensureBookBlockHeights([stats, side, sideBelow]);
+  assert.deepEqual(grown.layout, { x: 0, y: 0, w: 6, h: 6 });
+  assert.deepEqual(first.layout, { x: 6, y: 0, w: 6, h: 2 });
+  assert.deepEqual(second.layout, { x: 6, y: 2, w: 6, h: 3 });
+});
+
+test("a stats strip stacks one metric per line below full width and two per line at full width", () => {
+  const strip: MuralBlock = { id: "st", type: "stats", metrics: ["totalBooks", "booksFinished", "totalHighlights"], layout: { x: 0, y: 0, w: 6, h: 2 } };
+  assert.equal(ensureBookBlockHeights([strip])[0].layout.h, 6);
+  const wide = { ...strip, layout: { ...strip.layout, w: 12 } };
+  assert.equal(ensureBookBlockHeights([wide])[0].layout.h, 4);
+  const one = { ...strip, metrics: ["totalBooks"] as never, layout: { ...strip.layout, h: 1 } };
+  assert.equal(ensureBookBlockHeights([one])[0].layout.h, 3);
+});
+
+test("a stats breakdown with extra metrics grows a row for each ~39pt of extra content", () => {
+  const base = ["totalBooks", "booksFinished", "booksInProgress"];
+  const heights = [[], ["totalHighlights"], ["totalHighlights", "booksFinishedThisYear"]].map((extra, index) => {
+    const block: MuralBlock = { id: `st${index}`, type: "stats", metrics: [...base, ...extra] as never, layout: { x: 0, y: 0, w: 6, h: 3 } };
+    return ensureBookBlockHeights([block])[0].layout.h;
+  });
+  assert.deepEqual(heights, [6, 7, 8]);
 });
 
 test("blocks already tall enough come back untouched", () => {
@@ -282,4 +320,10 @@ test("ensureBookBlockHeights drops a stale readerCard block instead of throwing"
 test("compactMuralBlocks drops a stale readerCard block", () => {
   const card = { id: "c", type: "readerCard", layout: { x: 0, y: 0, w: 6, h: 6 } } as unknown as MuralBlock;
   assert.deepEqual(compactMuralBlocks([card, text("below", 6, 2)]).map((block) => [block.id, block.layout.y]), [["below", 0]]);
+});
+
+test("withoutUnfilledImages drops image blocks with no image and closes the gap, keeping any filled one", () => {
+  const image = (id: string, y: number, imageId: string): MuralBlock => ({ id, type: "image", imageId, layout: { x: 0, y, w: 12, h: 3 } });
+  const shown = withoutUnfilledImages([image("empty", 0, ""), image("filled", 3, "img-1"), text("below", 6, 3)]);
+  assert.deepEqual(shown.map((block) => [block.id, block.layout.y]), [["filled", 0], ["below", 3]]);
 });

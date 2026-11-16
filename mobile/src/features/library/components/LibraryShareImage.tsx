@@ -7,6 +7,7 @@ import { TierCover } from "../../tierlists/TierBoard";
 import { libraryGridColumns } from "../lib/gridColumns";
 import { newestFinished, readingNow, summaryCoverBooks, wallColumns, type LibraryShareLayout } from "../lib/libraryShareBooks";
 import { BookCard } from "./BookCard";
+import { shareImageReady } from "./shareImageReady";
 import { useLocale, useT } from "../../../i18n";
 
 const WALL_GAP = 2;
@@ -71,11 +72,10 @@ export function LibraryShareImage({ layout, name, ordered, shelf, style, seriesG
     ...finished.map((book, index) => coverKey("finished", book, index)),
     ...shelfBooks.map((book, index) => coverKey("shelf", book, index)),
   ];
-  const needsCover = layout === "wall" || layout === "shelf";
   const renderable = layout !== "shelf" || shelf !== null;
   useEffect(() => {
-    onReadyChange(renderable && (!needsCover || expected.length > 0) && expected.every((key) => loaded.has(key)));
-  }, [loaded, onReadyChange, renderable, needsCover, expected.join("|")]);
+    onReadyChange(shareImageReady(renderable, expected, loaded));
+  }, [loaded, onReadyChange, renderable, expected.join("|")]);
 
   const markLoaded = useCallback((key: string) => setLoaded((current) => current.has(key) ? current : new Set(current).add(key)), []);
 

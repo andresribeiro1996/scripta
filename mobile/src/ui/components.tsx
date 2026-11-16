@@ -381,12 +381,21 @@ function Overlay({ visible, title, children, onClose, onDismiss, closeAccessibil
   const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
   const t = useT();
+  const keyboardHiddenAt = useRef(0);
+  useEffect(() => {
+    const subscription = Keyboard.addListener("keyboardDidHide", () => { keyboardHiddenAt.current = Date.now(); });
+    return () => subscription.remove();
+  }, []);
+  const requestClose = useCallback(() => {
+    if (Keyboard.isVisible() || Date.now() - keyboardHiddenAt.current < 300) return;
+    onClose();
+  }, [onClose]);
 
   return (
     <Modal
       animationType={reducedMotion ? "none" : sheet ? "slide" : "fade"}
       onDismiss={onDismiss}
-      onRequestClose={onClose}
+      onRequestClose={requestClose}
       transparent
       visible={visible}
     >

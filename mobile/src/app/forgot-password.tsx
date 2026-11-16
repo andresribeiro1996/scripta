@@ -32,7 +32,7 @@ export default function ForgotPassword() {
     } catch (reason) { setError(reason instanceof TypeError ? t("shell.connectFailedShort") : reason instanceof Error ? reason.message : t("shell.connectFailedShort")); }
     finally { setBusy(false); }
   }
-  return <Screen top={false} bottom><Stack.Screen options={{ headerShown: true, title: t("shell.recoverAccount") }} />
+  return <Screen top={false} bottom><Stack.Screen options={{ headerShown: true, title: t("shell.resetPassword") }} />
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: spacing.xl, gap: spacing.lg }}>
         <Text style={[typography.body, { color: colors.textDim }]}>{t("shell.recoverIntro")}</Text>

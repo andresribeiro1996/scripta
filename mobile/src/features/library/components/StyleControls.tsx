@@ -2,8 +2,8 @@ import { useState, type ReactNode } from "react";
 import { normalizeHexColor } from "@scripta/shared";
 import { ColorEditor } from "../../murals/ColorEditor";
 import { matchPreset, type Preset } from "../../murals/blockStyleOptions";
-import { Icon, type IconName } from "../../../ui";
-import { Pressable, StyleSheet, Switch, View, type DimensionValue } from "react-native";
+import { Icon, ToggleSwitch, type IconName } from "../../../ui";
+import { Pressable, StyleSheet, View, type DimensionValue } from "react-native";
 import { Text } from "../../../ui/Text";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../../ui/theme";
 import { useT } from "../../../i18n";
@@ -100,12 +100,12 @@ export function StepperRow({
 export function ToggleRow({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (checked: boolean) => void }) {
   const { colors } = useTheme();
   return (
-    <View style={styles.row}>
+    <View style={styles.toggleRow}>
       <View style={styles.toggleLabel}>
         <Text style={[typography.body, { color: colors.text, fontWeight: "600" }]}>{label}</Text>
         {hint && <Text style={[typography.caption, { color: colors.textDim, marginTop: 2 }]}>{hint}</Text>}
       </View>
-      <Switch accessibilityLabel={label} onValueChange={onChange} trackColor={{ true: colors.accent }} value={checked} />
+      <ToggleSwitch accessibilityLabel={label} onValueChange={() => onChange(!checked)} value={checked} />
     </View>
   );
 }
@@ -212,7 +212,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   stepValue: { minWidth: 56, textAlign: "center" },
-  toggleLabel: { flex: 1, paddingRight: spacing.md },
+  toggleRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: minimumTouchTarget },
+  toggleLabel: { flex: 1 },
   selectBlock: { gap: spacing.xs },
   selectOptions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   selectOption: { minHeight: minimumTouchTarget, justifyContent: "center", borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },

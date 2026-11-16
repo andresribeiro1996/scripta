@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Link, Stack, useRouter } from "expo-router";
 import { Linking, Pressable, ScrollView, Share, View } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { dailyChapterDraftKey, dailyThemeName, dailyChapterShare, dailyChapterSubmission, readDailyChapterDraft, type DailyChapterBoard, type DailyChapterResult } from "@scripta/shared";
+import { dailyChapterDayLabel, dailyChapterDraftKey, dailyThemeName, dailyChapterShare, dailyChapterSubmission, readDailyChapterDraft, type DailyChapterBoard, type DailyChapterResult } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { Text } from "../../ui/Text";
 import { Button, ErrorState, Screen, Skeleton, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
@@ -79,7 +79,7 @@ function DailyGame({ board, guestId, playerId, recovered }: { board: DailyChapte
   }
   const question = questions[index]!;
   return <View style={{ gap: spacing.lg }}>
-    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}><DailyChapterArt motif={board.theme.motif} /><View style={{ flex: 1, minWidth: 0, gap: spacing.sm }}><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.themeDate", { theme: dailyThemeName(board.theme.id, locale), date: board.date })}</Text><Text accessibilityRole="header" {...dynamicType} style={[typography.heading, { color: colors.text }]}>{board.title}</Text></View></View>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}><DailyChapterArt motif={board.theme.motif} /><View style={{ flex: 1, minWidth: 0, gap: spacing.sm }}><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.themeDate", { theme: dailyThemeName(board.theme.id, locale), date: dailyChapterDayLabel(board.date, locale) })}</Text><Text accessibilityRole="header" {...dynamicType} style={[typography.heading, { color: colors.text }]}>{board.title}</Text></View></View>
     <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{board.intro}</Text>
     {error ? <Text selectable accessibilityRole="alert" {...dynamicType} style={[typography.body, { color: colors.danger }]}>{error}</Text> : null}
     {result ? <>

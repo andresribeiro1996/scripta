@@ -1,8 +1,8 @@
 import { pathWithQuery } from "../../features/auth/navigation";
 import { usePathname, useGlobalSearchParams } from "expo-router";
-import { useState } from "react";
-import { ActivityIndicator, View } from "react-native";
-import { Redirect, Tabs } from "expo-router";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, BackHandler, View } from "react-native";
+import { Redirect, Tabs, useNavigationContainerRef } from "expo-router";
 import { newCountLabel } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { useT } from "../../i18n";
@@ -13,6 +13,7 @@ import { useLibrary } from "../../features/library/hooks/useLibrary";
 import { ErrorState } from "../../ui/components";
 import { fontStyleFor } from "../../ui/fontStyle";
 import { Icon } from "../../ui/icon";
+import { backGoesHome, HOME_TAB } from "../../ui/tabBack";
 import { TabThemeContext } from "../../ui/tabTheme";
 import { useTheme, type Theme } from "../../ui/theme";
 
@@ -24,6 +25,34 @@ function GenreEnrichment() {
 
 function AppearanceSync() {
   useAccountAppearanceSync();
+  return null;
+}
+
+type NavState = { key?: string; type?: string; index?: number; routes: Array<{ name: string; state?: NavState }> };
+
+function findTabs(state: NavState): NavState | null {
+  if (state.type === "tab") return state;
+  for (const route of state.routes) {
+    const found = route.state ? findTabs(route.state) : null;
+    if (found) return found;
+  }
+  return null;
+}
+
+function HomeOnBack() {
+  const root = useNavigationContainerRef();
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      const tabs = root.isReady() ? findTabs(root.getRootState() as NavState) : null;
+      const focused = tabs?.routes[tabs.index ?? 0];
+      if (!tabs || !focused || !backGoesHome(focused.name, focused.state?.index ?? 0)) return false;
+      const home = tabs.routes.find((route) => route.name === HOME_TAB);
+      root.dispatch({ type: "JUMP_TO", payload: { name: HOME_TAB }, target: tabs.key });
+      if (home?.state?.key && (home.state.index ?? 0) > 0) root.dispatch({ type: "POP_TO_TOP", target: home.state.key });
+      return true;
+    });
+    return () => subscription.remove();
+  }, [root]);
   return null;
 }
 
@@ -44,6 +73,7 @@ function AppTabs() {
     <TabThemeContext.Provider value={setTabTheme}>
       <GenreEnrichment />
       <AppearanceSync />
+      <HomeOnBack />
       <Tabs
         screenOptions={{
           headerShown: false,

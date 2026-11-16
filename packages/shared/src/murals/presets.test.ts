@@ -71,9 +71,9 @@ test("the My shelf preset stacks profile, stats, reading, finished, then passage
   assert.equal(quote.layout.w + favourites.layout.w, 12);
   const stats = blocks.find((block) => block.type === "stats")!;
   assert.deepEqual(stats.type === "stats" ? stats.metrics : [], ["totalBooks", "booksFinished", "booksInProgress"]);
-  assert.equal(stats.layout.h, 4);
+  assert.equal(stats.layout.h, 6);
   const profile = blocks.find((block) => block.type === "profile")!;
-  assert.equal(profile.layout.h, 5);
+  assert.equal(profile.layout.h, 8);
   const reading = blocks.find((block) => block.type === "currentlyReading")!;
   assert.equal(reading.layout.h, 6);
   assert.equal(finished.layout.y, reading.layout.y + 6);
@@ -131,7 +131,7 @@ test("the My shelf preset has no reader card block", () => {
   assert.equal(blocks.some((block) => (block.type as string) === "readerCard"), false);
   const stats = blocks.find((block) => block.type === "stats")!;
   const profile = blocks.find((block) => block.type === "profile")!;
-  assert.deepEqual(stats.layout, { x: 0, y: profile.layout.y + profile.layout.h, w: 12, h: 4 });
+  assert.deepEqual(stats.layout, { x: 0, y: profile.layout.y + profile.layout.h, w: 12, h: 6 });
 });
 
 test("a Portuguese preset writes its names and block titles in Portuguese", () => {

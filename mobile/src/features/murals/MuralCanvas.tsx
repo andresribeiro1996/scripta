@@ -28,6 +28,7 @@ import {
   resolveBlockStyle,
   resolveQuote,
   resolveQuoteCollection,
+  withoutUnfilledImages,
   statMetricLabels,
   type BlockLayout,
   type BlockStyle,
@@ -52,6 +53,7 @@ import { minimumTouchTarget, MuralThemeScope, radii, spacing, useTheme, type The
 import type { GalleryImage } from "../gallery/api";
 import type { Tierlist } from "../tierlists/api";
 import { selectionBorderColor } from "./blockStyleOptions";
+import { quoteText } from "./canvasText";
 import { MURAL_ROW_HEIGHT, muralCanvasHeight, muralDragCell, muralDragPosition, muralPreviewScale } from "./layout";
 import { useLocale, useT } from "../../i18n";
 
@@ -219,7 +221,7 @@ export function BlockContent({ block, books, images, tierlists, profile, profile
       {block.caption ? <Text style={text.caption}>{block.caption}</Text> : null}
     </View>;
   }
-  if (block.type === "quote") { const value = resolveQuote(block, books); return <><Text numberOfLines={6} style={text.body}>“{String(value?.highlight.Text ?? t("murals.noEligiblePassage"))}”</Text>{value ? <Text style={[text.caption, dim]}>{String(value.book.Title)} · {String(value.book.Attribution ?? "")}</Text> : null}</>; }
+  if (block.type === "quote") { const value = resolveQuote(block, books); return <><Text numberOfLines={6} style={text.body}>{quoteText(value ? String(value.highlight.Text) : undefined, t("murals.noEligiblePassage"))}</Text>{value ? <Text style={[text.caption, dim]}>{String(value.book.Title)} · {String(value.book.Attribution ?? "")}</Text> : null}</>; }
   if (block.type === "quoteCollection") return <>{eyebrow(block.title || t("murals.quotes"))}{resolveQuoteCollection(block, books).map(({ highlight }, index) => <Text key={index} style={text.body}>“{String(highlight.Text ?? highlight.Annotation ?? "")}”</Text>)}</>;
   if (block.type === "image") { const image = images.find((item) => item.id === block.imageId); return image && failedSource !== image.url ? <><Image source={{ uri: image.url }} style={styles.fill} contentFit="cover" onDisplay={() => onAssetReady?.(`image:${block.id}:${image.url}`)} onError={() => { setFailedSource(image.url); onAssetReady?.(`image:${block.id}:${image.url}`); }} />{block.caption ? <Text style={[text.caption, dim]}>{block.caption}</Text> : null}</> : <EmptyBlock message={t("murals.imageUnavailable")} style={[text.caption, dim]} />; }
 
@@ -488,7 +490,8 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, profileI
     onLayoutChange?.(id, { ...original.layout, x: original.layout.x + dx, y: original.layout.y + dy });
   }, [mural.blocks, onLayoutChange]);
   const onAssetReady = useCallback((key: string) => setReadyAssets((current) => current.has(key) ? current : new Set(current).add(key)), []);
-  const resolvedBlocks = useMemo(() => mural.blocks.map((block) => resolveHomeBlock(block, books, groups, day, locale)), [mural.blocks, books, groups, day, locale]);
+  const shownBlocks = useMemo(() => editable ? mural.blocks : withoutUnfilledImages(mural.blocks), [editable, mural.blocks]);
+  const resolvedBlocks = useMemo(() => shownBlocks.map((block) => resolveHomeBlock(block, books, groups, day, locale)), [shownBlocks, books, groups, day, locale]);
   const assetKeys = resolvedBlocks.flatMap((block) => {
     if (block.type === "profile" && profile?.avatarUrl) return [`avatar:${block.id}:${profile.avatarUrl}`];
     if (block.type === "image") { const image = images.find((item) => item.id === block.imageId); return image ? [`image:${block.id}:${image.url}`] : []; }
@@ -498,7 +501,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, profileI
   });
   const imageReady = width > 0 && assetKeys.every((key) => readyAssets.has(key));
   useEffect(() => { onImageReadyChange?.(imageReady); }, [imageReady, onImageReadyChange]);
-  const height = muralCanvasHeight(mural.blocks, ROW_HEIGHT, !editable && mural.blocks.length ? 0 : undefined) + (editable ? ROW_HEIGHT * 6 : 0);
+  const height = muralCanvasHeight(shownBlocks, ROW_HEIGHT, !editable && shownBlocks.length ? 0 : undefined) + (editable ? ROW_HEIGHT * 6 : 0);
   const canvasStyle = useAnimatedStyle(() => {
     const current = drag.get();
     const movingBottom = current && !current.drop ? (current.layout.y + current.layout.h + 6) * ROW_HEIGHT + current.dy + (dragScroll?.offset.get() ?? 0) - current.startScroll : 0;

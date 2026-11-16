@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DailyChapterHistory } from "@scripta/shared";
-import { dailyCardAction } from "./dailyCardModel.js";
+import { dailyCardAction, dailyPlayVariant } from "./dailyCardModel.js";
 
 const history = (results: Array<{ editionId: string; score: number; date: string }>) => ({ results, today: "2026-11-15" }) as unknown as DailyChapterHistory;
 
@@ -17,4 +17,9 @@ test("today's result shows its score", () => {
 
 test("yesterday's result is not today's", () => {
   assert.deepEqual(dailyCardAction("ed-15", history([{ editionId: "ed-14", score: 5, date: "2026-11-14" }])), { kind: "play" });
+});
+
+test("an empty library leaves the primary button to import", () => {
+  assert.equal(dailyPlayVariant(true), "secondary");
+  assert.equal(dailyPlayVariant(false), "primary");
 });

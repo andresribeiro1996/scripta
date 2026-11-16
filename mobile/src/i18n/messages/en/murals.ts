@@ -119,6 +119,7 @@ export const murals = {
   "murals.looksLoadFailed": "Could not load saved looks.",
   "murals.looksSaveFailed": "Could not save looks. Try again.",
   "murals.more": "More",
+  "murals.muralActions": "Mural actions",
   "murals.moreBlockActions": "More block actions",
   "murals.moveDown": "Move down",
   "murals.moveHint": "To move this block, close this sheet, then long-press and drag it on the mural.",

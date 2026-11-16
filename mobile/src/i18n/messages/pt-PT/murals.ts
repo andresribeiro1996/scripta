@@ -120,6 +120,7 @@ export const murals: CatalogOf<typeof en> = {
   "murals.looksLoadFailed": "Não foi possível carregar os aspetos guardados.",
   "murals.looksSaveFailed": "Não foi possível guardar os aspetos. Tente novamente.",
   "murals.more": "Mais",
+  "murals.muralActions": "Ações do mural",
   "murals.moreBlockActions": "Mais ações do bloco",
   "murals.moveDown": "Mover para baixo",
   "murals.moveHint": "Para mover este bloco, feche esta folha, depois mantenha-o premido e arraste-o no mural.",

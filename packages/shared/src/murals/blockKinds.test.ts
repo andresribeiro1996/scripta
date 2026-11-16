@@ -24,6 +24,12 @@ test("a new currentlyReading block already meets its minimum height", () => {
   assert.equal(ensureBookBlockHeights(blocks), blocks);
 });
 
+test("a new stats or profile block already meets its minimum height", () => {
+  const blocks = [createBlockCandidate("stats", []), createBlockCandidate("profile", [])];
+  assert.deepEqual(blocks.map((block) => block.layout.h), [6, 8]);
+  assert.equal(ensureBookBlockHeights(blocks), blocks);
+});
+
 test("muralBlockTitle names a block by its content and falls back to its label", () => {
   const books = [{ Title: "Dune", Attribution: "Frank Herbert" }];
   assert.equal(muralBlockTitle(make("text"), books, "en"), "Note");

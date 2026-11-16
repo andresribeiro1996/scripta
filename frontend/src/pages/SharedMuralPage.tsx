@@ -29,7 +29,7 @@ import { Page } from "../components/page/Page";
 import { MuralCanvas } from "../components/murals/MuralCanvas";
 import { FullscreenIcon, toolbarIconClass } from "../components/Toolbar";
 import { useMuralFullscreen } from "../hooks/useMuralFullscreen";
-import { ensureBookBlockHeights, muralThemeId, type Mural } from "../lib/murals";
+import { ensureBookBlockHeights, withoutUnfilledImages, muralThemeId, type Mural } from "../lib/murals";
 import { buildReconstructedBooks } from "../lib/sharedMural";
 import { muralThemeStyle, useAppScheme } from "../lib/theme";
 import { useT } from "../i18n";
@@ -83,7 +83,7 @@ export function SharedMuralPage() {
     id: data.mural.id,
     name: data.mural.name,
     theme: muralThemeId(data.mural.theme),
-    blocks: ensureBookBlockHeights(data.mural.blocks),
+    blocks: withoutUnfilledImages(ensureBookBlockHeights(data.mural.blocks)),
     createdAt: "",
     updatedAt: "",
     coverImageUrl: data.mural.coverImageUrl ?? undefined,

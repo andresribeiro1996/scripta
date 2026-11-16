@@ -29,9 +29,8 @@ export function ShareLayoutPicker<T extends string>({
               { backgroundColor: selected ? colors.accentFill : pressed ? colors.surfacePressed : colors.surface },
             ]}
           >
-            <View style={{ opacity: selected ? 1 : 0 }}><Icon name="confirm" size={typography.caption.fontSize} color={colors.text} /></View>
-            <Text {...dynamicType} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[typography.caption, styles.label, { color: colors.text }]}>{option.label}</Text>
-            <View style={{ width: typography.caption.fontSize }} />
+            {selected ? <Icon name="confirm" size={typography.caption.fontSize} color={colors.text} /> : null}
+            <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.label, { color: colors.text }]}>{option.label}</Text>
           </Pressable>
         );
       })}

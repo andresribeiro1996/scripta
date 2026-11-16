@@ -20,6 +20,7 @@ import { fetchOwnProfile } from "../community/api";
 import { MuralShareSheet } from "./MuralShareSheet";
 import { useMuralFolders, useMurals } from "./useMurals";
 import { FolderSheet } from "./FolderSheet";
+import { foldersButtonLabel } from "./canvasText";
 import { useLocale, useT } from "../../i18n";
 
 export function MuralsScreen() {
@@ -264,7 +265,7 @@ export function MuralsScreen() {
           </View>
           <View style={[styles.searchRow, { bottom: overlap }]}>
             <View style={styles.grow}><Input icon="search" accessibilityLabel={t("murals.searchMurals")} value={search} onChangeText={setSearch} placeholder={t("murals.searchMurals")} autoCapitalize="none" autoCorrect={false} returnKeyType="search" style={styles.searchField} /></View>
-            <IconButton name="folder" accessibilityLabel={t("murals.foldersLabel", { label: folderLabel })} tone={folderId === undefined || search.trim() ? "default" : "accent"} onPress={() => { Keyboard.dismiss(); setFolderPicker(true); }} />
+            <IconButton name="folder" accessibilityLabel={foldersButtonLabel(folderLabel, t("murals.folders"), (label) => t("murals.foldersLabel", { label }))} tone={folderId === undefined || search.trim() ? "default" : "accent"} onPress={() => { Keyboard.dismiss(); setFolderPicker(true); }} />
           </View>
         </View>
       </KeyboardAvoidingView>

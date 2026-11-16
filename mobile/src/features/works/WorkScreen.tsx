@@ -132,7 +132,7 @@ export function WorkScreen({ id, edition = null }: { id: string; edition?: strin
           ...(tint ? { headerTransparent: true, headerStyle: { backgroundColor: "transparent" }, headerLargeTitleEnabled: false, headerShadowVisible: false } : plainHeader),
           headerRight: () => (
             <HeaderActions>
-              <IconButton name="share" accessibilityLabel={t("book.shareBook")} onPress={() => void share()} />
+              <IconButton framed label={t("library.share")} name="share" accessibilityLabel={t("book.shareBook")} onPress={() => void share()} />
               {menuItems.length > 0 ? <ActionSheet title={work.title} groups={[menuItems]}>{(open) => <IconButton accessibilityLabel={t("shell.bookActions")} name="more" onPress={open} />}</ActionSheet> : null}
             </HeaderActions>
           ),

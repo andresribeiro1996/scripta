@@ -54,11 +54,11 @@ export function HomeScreen() {
   const empty = dashboard.isPending || (dashboard.hasNextPage && !dashboard.isError && !items.length) ? <Skeleton height={80} /> : dashboard.isError && !dashboard.data ? <ErrorState body={t("community.activityLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void dashboard.refetch()} /> : dashboard.hasNextPage ? null : <EmptyState title={t("community.circleStartsTitle")} body={t("community.circleStartsBody")} secondaryActionLabel={t("community.findPeople")} onSecondaryAction={findReaders} />;
   const noLibrary = actions.library.data === null || actions.library.data?.data.books.length === 0;
   return <Screen top={false}>
-    <Stack.Screen options={{ title: t("shell.tabHome"), headerShown: true, headerLeft: () => <View style={styles.mark}><BrandMark size={24} /></View>, headerRight: () => <HeaderActions><IconButton name="bell" accessibilityLabel={t("community.openActivity")} badge={activityBadge} onPress={() => router.push("/activity" as never)} /><IconButton name="bookmark" accessibilityLabel={t("community.openSaved")} onPress={() => setSavedOpen(true)} /></HeaderActions> }} />
+    <Stack.Screen options={{ title: t("shell.tabHome"), headerShown: true, headerLeft: () => <View style={styles.mark}><BrandMark size={24} /></View>, headerRight: () => <HeaderActions><IconButton framed name="bell" accessibilityLabel={t("community.openActivity")} badge={activityBadge} onPress={() => router.push("/activity" as never)} /><IconButton framed name="bookmark" accessibilityLabel={t("community.openSaved")} onPress={() => setSavedOpen(true)} /></HeaderActions> }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     <SectionList sections={sections} keyExtractor={(item) => `${item.kind}:${item.id}`} stickySectionHeadersEnabled={false} maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 10 }} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.list}
       ListHeaderComponent={<>
-        <DailyChapterCard />
+        <DailyChapterCard emptyLibrary={noLibrary} />
         <RecapHomeCard />
         <AwardHomeCard />
         {noLibrary ? <View style={styles.onboarding}><EmptyState title={t("library.startTitle")} body={t("community.startLibraryBody")} actionLabel={t("shell.importLibrary")} onAction={() => router.push("/import" as never)} secondaryActionLabel={t("shell.addBook")} onSecondaryAction={() => router.push("/add-book" as never)} /></View> : null}

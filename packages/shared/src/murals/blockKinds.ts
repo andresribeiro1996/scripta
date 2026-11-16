@@ -5,6 +5,7 @@ import { bookKey } from "../library/merge.js";
 import { booksByWork } from "../library/works.js";
 import type { TierlistData } from "../tierlists/types.js";
 import type { BlockLayout, BlockType, Mural, MuralBlock } from "./murals.js";
+import { libraryBreakdown } from "./stats.js";
 
 type Content<T extends BlockType> = Omit<Extract<MuralBlock, { type: T }>, "id" | "type" | "layout" | "style" | "expandedFrom">;
 
@@ -75,7 +76,7 @@ export function resolveShelfBooks(block: Extract<MuralBlock, { type: "shelf" }>,
 interface Kind<T extends BlockType> {
   label: Parameters<ReturnType<typeof sharedT>>[0];
   size: { w: number; h: number };
-  minHeight: number;
+  minHeight: number | ((block: Block<T>) => number);
   configurable: boolean;
   content(): Content<T>;
   valid(block: Record<string, unknown>): boolean;
@@ -83,6 +84,27 @@ interface Kind<T extends BlockType> {
   rekey(block: Block<T>, from: ReadonlySet<string>, to: string): Block<T>;
   scrub(block: Block<T>, keys: ReadonlySet<string>): Block<T> | null;
   draws(block: Block<T>, books: Book[], tierlist?: TierlistLookup): Book[];
+}
+
+const MURAL_ROW_PITCH = 36;
+const MURAL_ROW_GAP = 8;
+const STATS_BLOCK_CHROME = 26;
+const STATS_STRIP_ITEM = 48;
+const STATS_STRIP_GAP = 12;
+const STATS_BREAKDOWN_CONTENT = 163;
+const STATS_BREAKDOWN_EXTRA_METRIC = 39;
+
+function rowsFor(contentHeight: number): number {
+  return Math.ceil((contentHeight + STATS_BLOCK_CHROME + MURAL_ROW_GAP) / MURAL_ROW_PITCH);
+}
+
+function statsMinHeight(block: Block<"stats">): number {
+  const breakdown = libraryBreakdown(block.metrics, () => 0);
+  if (!breakdown) {
+    const lines = Math.max(1, Math.ceil(block.metrics.length / (block.layout.w >= 12 ? 2 : 1)));
+    return rowsFor(lines * STATS_STRIP_ITEM + (lines - 1) * STATS_STRIP_GAP);
+  }
+  return rowsFor(STATS_BREAKDOWN_CONTENT + breakdown.others.length * STATS_BREAKDOWN_EXTRA_METRIC);
 }
 
 const KINDS: { [T in BlockType]: Kind<T> } = {
@@ -125,12 +147,12 @@ const KINDS: { [T in BlockType]: Kind<T> } = {
     rekey: same, scrub: same, draws: noBooks },
   text: { label: "shared.murals.kindText", size: { w: 4, h: 3 }, minHeight: 0, configurable: true, content: () => ({ heading: "", body: "" }),
     valid: always, references: nothing, rekey: same, scrub: same, draws: noBooks },
-  profile: { label: "shared.murals.kindProfile", size: { w: 6, h: 5 }, minHeight: 0, configurable: true, content: () => ({ bio: "", favoriteGenres: [] }),
+  profile: { label: "shared.murals.kindProfile", size: { w: 6, h: 8 }, minHeight: 8, configurable: true, content: () => ({ bio: "", favoriteGenres: [] }),
     valid: always, references: (_b, refs) => { refs.needsShelfTheme = true; }, rekey: same, scrub: same, draws: noBooks },
   currentlyReading: { label: "shared.murals.kindCurrentlyReading", size: { w: 4, h: 6 }, minHeight: 6, configurable: false, content: () => ({}),
     valid: always, references: (_b, refs) => { refs.needsCurrentlyReading = true; }, rekey: same, scrub: same,
     draws: (_b, books) => books.filter((book) => book.ReadStatus === 1) },
-  stats: { label: "shared.murals.kindStats", size: { w: 6, h: 2 }, minHeight: 0, configurable: true, content: () => ({ metrics: ["totalBooks", "booksFinished", "totalHighlights"] }),
+  stats: { label: "shared.murals.kindStats", size: { w: 6, h: 6 }, minHeight: statsMinHeight, configurable: true, content: () => ({ metrics: ["totalBooks", "booksFinished", "totalHighlights"] }),
     valid: (b) => Array.isArray(b.metrics),
     references: (b, refs) => addStrings(refs.statsMetrics, b.metrics),
     rekey: same, scrub: same, draws: noBooks },
@@ -156,8 +178,9 @@ export function blockSize(type: BlockType): { w: number; h: number } {
   return KINDS[type].size;
 }
 
-export function minBlockHeight(type: BlockType): number {
-  return KINDS[type].minHeight;
+export function minBlockHeight(block: MuralBlock): number {
+  const { minHeight } = kindOf(block);
+  return typeof minHeight === "function" ? minHeight(block) : minHeight;
 }
 
 export function isConfigurable(type: BlockType): boolean {

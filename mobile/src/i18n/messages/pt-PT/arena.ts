@@ -50,6 +50,7 @@ export const arena: CatalogOf<typeof en> = {
   "arena.seedTitle": "Preparar torneio",
   "arena.tournamentName": "Nome do torneio",
   "arena.untitledTournament": "Torneio sem título",
+  "arena.roundDurationRange": "Introduz entre 1 minuto e 720 horas.",
   "arena.seedSummary": "{name} · {size} posições · rondas de {hours} h",
   "arena.randomFill": "Preencher ao acaso",
   "arena.saveProgress": "Guardar progresso",

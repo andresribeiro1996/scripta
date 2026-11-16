@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { API_URL } from "../../core/config";
-import { ActionSheet, type ActionItem, Button, Dialog, EditorHeading, ErrorState, FormScroll, HeaderActions, IconButton, Input, SaveStateButton, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme, useUnsavedChangesGuard } from "../../ui";
+import { ActionSheet, type ActionItem, Button, Dialog, EditorHeading, EmptyState, ErrorState, FormScroll, HeaderActions, IconButton, Input, SaveStateButton, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme, useUnsavedChangesGuard } from "../../ui";
 import { coverUrlForApi } from "../library/lib/coverUrl";
 import { publicContentUrl } from "../sharing/links";
 import { fetchQuizResults, publishQuiz, setPlayState, updateQuiz, type Quiz } from "./api";
@@ -142,7 +142,7 @@ export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz;
       </View>)}
       <Button label={t("quizzes.publishQuiz")} loading={publishing} disabled={data.books.length < 4 || busy} onPress={() => setConfirmingPublish(true)} />
       {data.books.length < 4 ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{t("quizzes.needsFourBooks")}</Text> : null}
-    </FormScroll> : frozen ? results.isPending ? <Skeleton height={180} /> : <View style={styles.grow}><View style={styles.frozenHeading}><EditorHeading name={current.name} /></View><SwipeableTabs accessibilityLabel={t("quizzes.editorView")} options={PUBLISHED_VIEWS.map(({ value, label }) => ({ value, label: t(label) }))} value={view} onChange={setView} renderPage={(page) => page === "results" ? results.isError ? <ErrorState body={t("quizzes.resultsLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void results.refetch()} /> : <ScrollView contentContainerStyle={styles.screen}>
+    </FormScroll> : frozen ? results.isPending ? <Skeleton height={180} /> : <View style={styles.grow}><View style={styles.frozenHeading}><EditorHeading name={current.name} /></View><SwipeableTabs accessibilityLabel={t("quizzes.editorView")} options={PUBLISHED_VIEWS.map(({ value, label }) => ({ value, label: t(label) }))} value={view} onChange={setView} renderPage={(page) => page === "results" ? results.isError ? <ErrorState body={t("quizzes.resultsLoadFailed")} actionLabel={t("shell.retry")} onAction={() => void results.refetch()} /> : (results.data?.plays.length ?? 0) === 0 ? <EmptyState title={t("quizzes.noPlays")} body={t("quizzes.noPlaysBody")} actionLabel={t("quizzes.shareChallengeLink")} onAction={() => void shareChallengeLink()} /> : <ScrollView contentContainerStyle={styles.screen}>
       {(results.data?.plays ?? []).map((play, i) => <View key={`${play.playerName ?? "Guest"}-${i}`} style={[styles.leaderRow, { borderColor: colors.border }]}>
         <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{i + 1}</Text>
         <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{playerLabel(play, locale).name}</Text>

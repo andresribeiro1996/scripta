@@ -22,7 +22,7 @@ import { SkeletonCardGrid } from "../components/Skeleton";
 import { SwipeTabs } from "../components/SwipeTabs";
 import { invalidateAfterFollow, useCommunityActivity, useCommunityLibrary, useCommunityProfile } from "../hooks/useCommunity";
 import { backTo } from "../lib/areas";
-import { ensureBookBlockHeights, profileOnlyMural, type Mural } from "../lib/murals";
+import { ensureBookBlockHeights, withoutUnfilledImages, profileOnlyMural, type Mural } from "../lib/murals";
 import { useResolvedTheme } from "../lib/theme";
 import { buildReconstructedBooks } from "../lib/sharedMural";
 import { useLocale, useT } from "../i18n";
@@ -116,7 +116,7 @@ export function CommunityProfilePage() {
         id: muralData.mural.id,
         name: muralData.mural.name,
         theme: muralData.mural.theme,
-        blocks: ensureBookBlockHeights(muralData.mural.blocks),
+        blocks: withoutUnfilledImages(ensureBookBlockHeights(muralData.mural.blocks)),
         createdAt: "",
         updatedAt: "",
         coverImageUrl: muralData.mural.coverImageUrl ?? undefined,
