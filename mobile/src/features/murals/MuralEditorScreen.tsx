@@ -26,7 +26,7 @@ import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, useWindowDimensio
 import Animated, { useAnimatedReaction, useAnimatedRef, useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { Text } from "../../ui/Text";
-import { ActionSheet, Button, Dialog, EditorHeading, EmptyState, ErrorState, Fab, HeaderActions, Icon, IconButton, Input, SaveStateButton, Sheet, Toast, useUnsavedChangesGuard } from "../../ui";
+import { ActionSheet, Button, Dialog, EditorHeading, EmptyState, ErrorState, Fab, HeaderActions, Icon, IconButton, Input, SaveStateButton, Sheet, Toast, useDismissThen, useUnsavedChangesGuard } from "../../ui";
 import { BookPickerList } from "../library/components/BookPickerList";
 import { ThemeGrid } from "../../ui/ThemeGrid";
 import { MuralThemeScope, radii, spacing, typography } from "../../ui/theme";
@@ -103,6 +103,8 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const [nameError, setNameError] = useState<string | undefined>();
   const [picking, setPicking] = useState<PickerKind | null>(null);
   const [quoteBook, setQuoteBook] = useState<Record<string, unknown> | null>(null);
+  const closePicker = () => { setPicking(null); setQuoteBook(null); };
+  const picker = useDismissThen(picking !== null, closePicker);
   const [busy, setBusy] = useState(false);
   const [shareFor, setShareFor] = useState<Mural | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -321,7 +323,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
         /> : null}
         layout={selected ? <LayoutTab block={selected} blocks={currentBlocks} disabled={busy} onToggleExpansion={toggleExpansion} onChange={(patch) => changeBlocks(changeBlockLayout(currentBlocks, selected.id, patch))} /> : null}
       />
-      <Sheet visible={picking !== null} title={quoteBook ? t("murals.choosePassage") : picking === "book" ? t("murals.chooseBook") : picking === "image" ? t("murals.chooseImage") : picking === "tierlist" ? t("murals.chooseTierlist") : t("murals.chooseContent")} onClose={() => { setPicking(null); setQuoteBook(null); }}>
+      <Sheet visible={picking !== null} title={quoteBook ? t("murals.choosePassage") : picking === "book" ? t("murals.chooseBook") : picking === "image" ? t("murals.chooseImage") : picking === "tierlist" ? t("murals.chooseTierlist") : t("murals.chooseContent")} onClose={closePicker} onDismiss={picker.onDismiss}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>
           {quoteBook ? <><Button label={t("murals.backToBooks")} variant="secondary" onPress={() => setQuoteBook(null)} />{(Array.isArray(quoteBook.highlights) ? quoteBook.highlights : []).filter((highlight) => highlight && typeof highlight === "object" && typeof highlight.BookmarkID === "string").map((highlight) => <Button key={String(highlight.BookmarkID)} label={String(highlight.Text ?? highlight.Annotation ?? t("murals.untitledPassage"))} variant="secondary" onPress={() => {
             const ref = { bookKey: bookKey(quoteBook), highlightId: String(highlight.BookmarkID) };
@@ -346,7 +348,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
           {picking === "image" ? (gallery.data ?? []).map((image) => <Pressable accessibilityLabel={t("murals.chooseFile", { filename: image.filename })} accessibilityRole="button" key={image.id} onPress={() => { updateSelected((block) => block.type === "image" ? { ...block, imageId: image.id } : block); setPicking(null); }}><Text style={[typography.body, { color: colors.text }]}>{image.filename}</Text></Pressable>) : null}
           {picking === "tierlist" ? tierlistOptions.map((tierlist) => <Button key={tierlist.id} label={tierlist.name} variant="secondary" onPress={() => { updateSelected((block) => block.type === "tierlist" ? { ...block, tierlistId: tierlist.id } : block); setPicking(null); }} />) : null}
           {picking && ((picking === "book" && books.length === 0) || (picking === "tierlist" && !tierlistOptions.length)) ? <EmptyState title={t("murals.nothingAvailable")} /> : null}
-          {picking === "image" && gallery.isSuccess && gallery.data.length === 0 ? <EmptyState title={t("addBook.galleryEmptyTitle")} body={t("addBook.galleryEmptyBody")} actionLabel={t("shell.youGallery")} onAction={() => { setPicking(null); router.push("/gallery"); }} /> : null}
+          {picking === "image" && gallery.isSuccess && gallery.data.length === 0 ? <EmptyState title={t("addBook.galleryEmptyTitle")} body={t("addBook.galleryEmptyBody")} actionLabel={t("shell.youGallery")} onAction={() => picker.then(() => { setSheetTab(null); router.push("/gallery"); })} /> : null}
         </ScrollView>
       </Sheet>
     </MuralScreen>
