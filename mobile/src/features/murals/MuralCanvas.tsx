@@ -52,6 +52,7 @@ import { minimumTouchTarget, MuralThemeScope, radii, spacing, useTheme, type The
 import type { GalleryImage } from "../gallery/api";
 import type { Tierlist } from "../tierlists/api";
 import { selectionBorderColor } from "./blockStyleOptions";
+import { quoteText } from "./canvasText";
 import { MURAL_ROW_HEIGHT, muralCanvasHeight, muralDragCell, muralDragPosition, muralPreviewScale } from "./layout";
 import { useLocale, useT } from "../../i18n";
 
@@ -219,9 +220,9 @@ export function BlockContent({ block, books, images, tierlists, profile, profile
       {block.caption ? <Text style={text.caption}>{block.caption}</Text> : null}
     </View>;
   }
-  if (block.type === "quote") { const value = resolveQuote(block, books); return <><Text numberOfLines={6} style={text.body}>“{String(value?.highlight.Text ?? t("murals.noEligiblePassage"))}”</Text>{value ? <Text style={[text.caption, dim]}>{String(value.book.Title)} · {String(value.book.Attribution ?? "")}</Text> : null}</>; }
+  if (block.type === "quote") { const value = resolveQuote(block, books); return <><Text numberOfLines={6} style={text.body}>{quoteText(value ? String(value.highlight.Text) : undefined, t("murals.noEligiblePassage"))}</Text>{value ? <Text style={[text.caption, dim]}>{String(value.book.Title)} · {String(value.book.Attribution ?? "")}</Text> : null}</>; }
   if (block.type === "quoteCollection") return <>{eyebrow(block.title || t("murals.quotes"))}{resolveQuoteCollection(block, books).map(({ highlight }, index) => <Text key={index} style={text.body}>“{String(highlight.Text ?? highlight.Annotation ?? "")}”</Text>)}</>;
-  if (block.type === "image") { const image = images.find((item) => item.id === block.imageId); return image && failedSource !== image.url ? <><Image source={{ uri: image.url }} style={styles.fill} contentFit="cover" onDisplay={() => onAssetReady?.(`image:${block.id}:${image.url}`)} onError={() => { setFailedSource(image.url); onAssetReady?.(`image:${block.id}:${image.url}`); }} />{block.caption ? <Text style={[text.caption, dim]}>{block.caption}</Text> : null}</> : <EmptyBlock message={t("murals.imageUnavailable")} style={[text.caption, dim]} />; }
+  if (block.type === "image") { const image = images.find((item) => item.id === block.imageId); return image && failedSource !== image.url ? <><Image source={{ uri: image.url }} style={styles.fill} contentFit="cover" onDisplay={() => onAssetReady?.(`image:${block.id}:${image.url}`)} onError={() => { setFailedSource(image.url); onAssetReady?.(`image:${block.id}:${image.url}`); }} />{block.caption ? <Text style={[text.caption, dim]}>{block.caption}</Text> : null}</> : editable ? <EmptyBlock message={t("murals.imageUnavailable")} style={[text.caption, dim]} /> : null; }
 
   if (block.type === "stats") {
     const value = (metric: StatMetric) => statsOverride?.[metric] ?? computeStat(metric, books);

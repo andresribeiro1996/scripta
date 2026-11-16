@@ -21,6 +21,16 @@ test("a shelf keeps its 4 row minimum and a tierlist its 8", () => {
   assert.deepEqual(grownTierlist.layout, { x: 0, y: 4, w: 12, h: 8 });
 });
 
+test("a stats block shorter than 6 rows and a profile shorter than 8 grow and push the blocks below them down", () => {
+  const stats: MuralBlock = { id: "st", type: "stats", metrics: ["totalBooks", "booksFinished", "booksInProgress"], layout: { x: 0, y: 3, w: 12, h: 4 } };
+  const profile: MuralBlock = { id: "pr", type: "profile", bio: "", favoriteGenres: [], layout: { x: 0, y: 0, w: 12, h: 3 } };
+  const below = text("below", 7, 3);
+  const [grownProfile, grownStats, shifted] = ensureBookBlockHeights([profile, stats, below]);
+  assert.equal(grownProfile.layout.h, 8);
+  assert.deepEqual(grownStats.layout, { x: 0, y: 8, w: 12, h: 6 });
+  assert.deepEqual(shifted.layout, { x: 0, y: 14, w: 12, h: 3 });
+});
+
 test("blocks already tall enough come back untouched", () => {
   const blocks = [text("above", 0, 3), reading(3, 6)];
   assert.equal(ensureBookBlockHeights(blocks), blocks);
