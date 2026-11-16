@@ -223,7 +223,7 @@ test("an owned tournament row shows its bracket, status badge and progress", () 
   const row = (over: Partial<Tournament>) => gameRow({ kind: "owned", key: "t1", item: ownedItems("tournaments", [tournament(over)], [], "en")[0]! }, "en");
   const seeding = row({ filledSlots: 3, covers: ["a", "b"] });
   assert.deepEqual(seeding, { kind: "tournament", name: "Best of 2025", meta: "8-book bracket", badges: [{ label: "Seeding", tone: "neutral" }], caption: "3 of 8 slots filled", covers: ["a", "b"] });
-  assert.deepEqual(row({ status: "active", currentRound: 2 }).badges, [{ label: "In progress", tone: "info" }]);
+  assert.deepEqual(row({ status: "active", currentRound: 2 }).badges, [{ label: "Round 2", tone: "accent" }]);
   assert.equal(row({ status: "active", currentRound: 2 }).caption, "Round 2 of 3");
   assert.deepEqual(row({ status: "completed" }).badges, [{ label: "Completed", tone: "success" }]);
   assert.equal(row({ status: "completed" }).caption, "");
@@ -274,7 +274,7 @@ test("an owned quiz row carries its books and an actual question preview", () =>
 
 test("voted rows carry a Voted badge beside their status", () => {
   const voted = gameRow({ kind: "votedTournament", key: "voted:t1", target: "/arena/t1", tournament: tournament({ status: "active", currentRound: 1, covers: ["a"] }) }, "en");
-  assert.deepEqual(voted.badges, [{ label: "In progress", tone: "info" }, { label: "Voted", tone: "info" }]);
+  assert.deepEqual(voted.badges, [{ label: "Round 1", tone: "accent" }, { label: "Voted", tone: "info" }]);
   assert.deepEqual(voted.covers, ["a"]);
 
   const list = gameRow({ kind: "votedTierlist", key: "voted:p1", target: "/vote/abc12345", tierlist: votedTierlist({ covers: ["a", "b"], votingOpen: false }) }, "en");

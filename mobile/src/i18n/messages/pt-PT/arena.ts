@@ -8,7 +8,6 @@ export const arena: CatalogOf<typeof en> = {
   "arena.votingIn": "Em votação",
   "arena.filterAll": "Todos",
   "arena.sectionHeader": "{title} · {count}",
-  "arena.seeding": "Em preparação",
   "arena.deleteEffectTournament": "Os confrontos e todos os votos nesses confrontos são eliminados, e a ligação deixa de funcionar. Esta ação não pode ser anulada.",
   "arena.deleteEffectTierlist": "Os votos são eliminados e a ligação de votação deixa de funcionar. Esta ação não pode ser anulada.",
   "arena.deleteEffectQuiz": "As participações e a tabela de classificação são eliminadas, e a ligação deixa de funcionar. Esta ação não pode ser anulada.",

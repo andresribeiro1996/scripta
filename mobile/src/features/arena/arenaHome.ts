@@ -1,6 +1,6 @@
 import { FAN_SIZE, TIER_LADDER } from "../community/communityHome";
-import { itemNoun, quizPreview, tierlistBookCount, type QuizPreview } from "@scripta/shared";
-import { contentStatusBadge, ownedTierlistStatus, type ContentTone } from "@scripta/shared/community";
+import { gamesSections, gameStage, itemNoun, quizPreview, tierlistBookCount, tournamentBadge, votedTierlistBadges, type Badge, type QuizPreview } from "@scripta/shared";
+import { contentStatusBadge, ownedTierlistStatus } from "@scripta/shared/community";
 import type { Quiz } from "../quizzes/api";
 import type { Tierlist, VotedTierlist } from "../tierlists/api";
 import type { Tournament } from "./api";
@@ -45,22 +45,7 @@ export const DELETE_EFFECT = {
   quiz: "arena.deleteEffectQuiz",
 } as const satisfies Record<OwnedItem["kind"], MessageKey>;
 
-type Badge = { label: string; tone: ContentTone };
-
-function tournamentBadge(status: Tournament["status"], locale: Locale): Badge {
-  if (status === "seeding") return { label: translatorFor(locale)("arena.seeding"), tone: "neutral" };
-  return contentStatusBadge(status === "active" ? "inProgress" : "completed", locale);
-}
-
-type Stage = "draft" | "open" | "closed";
-
-const TIERLIST_STATUS = { draft: "draft", open: "votingOpen", closed: "closed" } as const;
-
 const QUIZ_STATUS = { draft: "draft", open: "open", closed: "closed" } as const;
-
-function stage(voteCode: string | null, open: boolean): Stage {
-  return !voteCode ? "draft" : open ? "open" : "closed";
-}
 
 export function tabIndex(tab: ArenaTab): number {
   return Math.max(0, ARENA_TABS.findIndex((option) => option.value === tab));
@@ -134,22 +119,22 @@ export function homeSections(
   search = ""
 ): SectionedItem[] {
   const t = translatorFor(locale);
-  const needle = search.trim().toLowerCase();
-  const matches = (name: string) => !needle || name.toLowerCase().includes(needle);
-  const mine: SectionedItem[] =
-    owner === "voted" ? [] : owned.filter((item) => matches(item.name)).map((item) => ({ kind: "owned", key: item.id, item }));
-  const created = t("arena.createdByYou");
-  if (tab === "quizzes" || owner === "mine") return section("created", created, mine, locale);
-
-  const votedRows: SectionedItem[] =
-    tab === "tournaments"
-      ? votedTournaments
-          .filter((tournament) => matches(tournament.name))
-          .map((tournament) => ({ kind: "votedTournament", key: `voted:${tournament.id}`, target: `/arena/${tournament.id}`, tournament }))
-      : votedTierlists
-          .filter((tierlist) => matches(tierlist.name))
-          .map((tierlist) => ({ kind: "votedTierlist", key: `voted:${tierlist.id}`, target: `/vote/${tierlist.voteCode}`, tierlist }));
-  return [...section("created", created, mine, locale), ...section("participating", t(tab === "tournaments" ? "arena.votingIn" : "arena.votedOn"), votedRows, locale)];
+  const filter = { search, owner };
+  const mine = (items: OwnedItem[]): SectionedItem[] => items.map((item) => ({ kind: "owned", key: item.id, item }));
+  let created: SectionedItem[];
+  let votedRows: SectionedItem[] = [];
+  if (tab === "tournaments") {
+    const lists = gamesSections({ owned, voted: votedTournaments, ...filter });
+    created = mine(lists.created);
+    votedRows = lists.voted.map((tournament) => ({ kind: "votedTournament", key: `voted:${tournament.id}`, target: `/arena/${tournament.id}`, tournament }));
+  } else if (tab === "tierlists") {
+    const lists = gamesSections({ owned, voted: votedTierlists, ...filter });
+    created = mine(lists.created);
+    votedRows = lists.voted.map((tierlist) => ({ kind: "votedTierlist", key: `voted:${tierlist.id}`, target: `/vote/${tierlist.voteCode}`, tierlist }));
+  } else {
+    created = mine(gamesSections({ owned, voted: null, ...filter }).created);
+  }
+  return [...section("created", t("arena.createdByYou"), created, locale), ...section("participating", t(tab === "tournaments" ? "arena.votingIn" : "arena.votedOn"), votedRows, locale)];
 }
 
 export function emptyCopy(tab: ArenaTab, searching: boolean, locale: Locale, owner: OwnerFilter = "all"): { title: string; body: string; action?: string } {
@@ -220,7 +205,7 @@ function tournamentRow(tournament: Tournament, locale: Locale): GameRowModel {
     kind: "tournament",
     name: tournament.name,
     meta: translatorFor(locale)(tournament.subject ? "arena.bracketMetaCharacters" : "arena.bracketMetaBooks", { size: tournament.bracketSize }),
-    badges: [tournamentBadge(tournament.status, locale)],
+    badges: [tournamentBadge(tournament, locale)],
     caption: tournamentProgress(tournament, locale).label,
     covers: tournament.covers,
   };
@@ -237,7 +222,7 @@ export function gameRow(row: Exclude<SectionedItem, { kind: "header" }>, locale:
       kind: "tierlist",
       name: tierlist.name,
       meta: votedTierlistDetail(tierlist, locale),
-      badges: [contentStatusBadge(TIERLIST_STATUS[tierlist.votingOpen ? "open" : "closed"], locale), contentStatusBadge("voted", locale)],
+      badges: votedTierlistBadges(tierlist, locale),
       covers: tierlist.covers,
       ladder: TIER_LADDER,
     };
@@ -249,7 +234,7 @@ export function gameRow(row: Exclude<SectionedItem, { kind: "header" }>, locale:
       kind: "quiz",
       name: item.name,
       meta: item.detail,
-      badges: [contentStatusBadge(QUIZ_STATUS[stage(item.source.voteCode, item.source.playOpen)], locale)],
+      badges: [contentStatusBadge(QUIZ_STATUS[gameStage(item.source.voteCode, item.source.playOpen)], locale)],
       covers: item.source.data.books.flatMap((book) => (book.coverUrl ? [book.coverUrl] : [])),
       preview: quizPreview(item.source.data),
     };

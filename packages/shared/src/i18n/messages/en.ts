@@ -222,6 +222,8 @@ export const en = {
   "shared.arenaBracket.semis": "Semis",
   "shared.arenaBracket.quarters": "Quarters",
   "shared.arenaBracket.round": "Round {number}",
+  "shared.gamesList.seeding": "Seeding",
+  "shared.gamesList.round": "Round {number}",
 
   "shared.countdown.closing": "Closing…",
   "shared.countdown.daysHours": "{days}d {hours}h left",
